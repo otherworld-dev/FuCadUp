@@ -11,6 +11,10 @@ layout.
 Because the core is unchanged, FuCad opens existing FreeCAD documents and runs
 existing FreeCAD macros and addons.
 
+The name contracts **Fu**sion and Free**CAD**; the *Up* stands for
+**U**nified **P**arametric — Fusion's task-driven workflow over FreeCAD's
+parametric core.
+
 [Upstream project](https://www.freecad.org) •
 [Upstream documentation](https://wiki.freecad.org) •
 [Upstream repository](https://github.com/FreeCAD/FreeCAD)
