@@ -73,3 +73,8 @@ tsupdate_stdout.log
 # pixi environments
 *.egg-info
 .pixi
+
+# Claude Code
+.claude/
+CLAUDE.md
+.claudeignore
