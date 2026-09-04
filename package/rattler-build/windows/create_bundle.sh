@@ -91,26 +91,35 @@ if [[ "${WINDOWS_SIGN_RELEASE:-0}" == "1" ]]; then
 
     shopt -s nullglob
 
-    FILES=(
-      "$SIGN_DIR"/*.exe
-      "$SIGN_DIR"/bin/*.exe
-      "$SIGN_DIR"/bin/*.dll
-      "$SIGN_DIR"/bin/*.pyd
-    )
+    # Smart App Control evaluates every binary as it is loaded, not just the launcher, so a single
+    # unsigned DLL or .pyd anywhere in the tree is refused and the user gets "Smart App Control has
+    # blocked part of this app". Globbing bin/ alone left about 60% of the bundle unsigned: the Qt
+    # plugins under lib/qt6 (qt6.conf sets Prefix there, so the platform plugin loads at startup),
+    # the Python extension modules in bin/DLLs and bin/Lib/site-packages, and the shims in
+    # bin/Scripts. Walk the whole bundle instead.
+    mapfile -t FILES < <(find "$SIGN_DIR" -type f \( -name '*.exe' -o -name '*.dll' -o -name '*.pyd' \) | sort)
 
-    count=0
     total=${#FILES[@]}
-    echo "Signing $total files"
-    for f in "${FILES[@]}"; do
-      ((count+=1))
-      echo "Signing [$count/$total]: $f"
+    if [[ "$total" -eq 0 ]]; then
+      echo "No signable files found under ${SIGN_DIR} -- refusing to ship an unsigned bundle."
+      exit 1
+    fi
+
+    # "sign" takes file(s) with arity OneOrMore, so hand it batches: one process per file would be
+    # ~1700 sequential Azure round trips for a full bundle.
+    BATCH_SIZE=100
+    echo "Signing $total files in batches of ${BATCH_SIZE}"
+    for ((i = 0; i < total; i += BATCH_SIZE)); do
+      batch=("${FILES[@]:i:BATCH_SIZE}")
+      echo "Signing [$((i + 1))-$((i + ${#batch[@]}))/$total]"
       sign code artifact-signing \
         --artifact-signing-endpoint "${WINDOWS_AZURE_ENDPOINT}" \
         --artifact-signing-certificate-profile "${WINDOWS_AZURE_CERTIFICATE_PROFILE}" \
         --artifact-signing-account "${WINDOWS_AZURE_SIGNING_ACCOUNT}" \
         --timestamp-url https://timestamp.acs.microsoft.com \
         --timestamp-digest sha256 \
-        "$f" >/dev/null 2>&1
+        --max-concurrency 8 \
+        "${batch[@]}" >/dev/null 2>&1
 
       # Output was redirected to /dev/null because Azure authentication is absurdly noisy, with constant misleading
       # "failure" messages about Managed Identity authentication failing. We don't use, or want to use, that
@@ -119,6 +128,15 @@ if [[ "${WINDOWS_SIGN_RELEASE:-0}" == "1" ]]; then
 
     # Manually check the important one!
     signtool verify -pa "$SIGN_DIR/bin/FuCad.exe"
+
+    # ...and a nested one, which is what proves the walk reached the plugins and extension modules
+    # that Smart App Control blocks. Verifying only the launcher is how the gap went unnoticed.
+    mapfile -t NESTED < <(find "$SIGN_DIR/lib" "$SIGN_DIR/bin/Lib" "$SIGN_DIR/bin/DLLs" -type f \( -name '*.dll' -o -name '*.pyd' \) 2>/dev/null | sort)
+    if [[ ${#NESTED[@]} -eq 0 ]]; then
+      echo "Expected nested binaries under lib/ or bin/ -- has the bundle layout changed?"
+      exit 1
+    fi
+    signtool verify -pa "${NESTED[0]}"
 
     echo "Signing completed."
   else
