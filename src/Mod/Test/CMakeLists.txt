@@ -27,6 +27,7 @@ SET(Test_SRCS
     TestTreeSelection.py
     TestGraphicsViewWrapping.py
     TestRubberbandSelection.py
+    TestNavigationStyles.py
     TestCoinNodeSnapshots.py
     TestView3DFramebufferCapture.py
     TestSelectionVisual.py

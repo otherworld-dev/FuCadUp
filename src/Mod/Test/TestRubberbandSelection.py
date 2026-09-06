@@ -56,6 +56,7 @@ class TestRubberbandSelection(unittest.TestCase):
         ("Blender", "Gui::BlenderNavigationStyle"),
         ("Revit", "Gui::RevitNavigationStyle"),
         ("SolidWorks", "Gui::SolidWorksNavigationStyle"),
+        ("Fusion", "Gui::FusionNavigationStyle"),
         ("TinkerCAD", "Gui::TinkerCADNavigationStyle"),
         ("Touchpad", "Gui::TouchpadNavigationStyle"),
     )
@@ -64,6 +65,7 @@ class TestRubberbandSelection(unittest.TestCase):
         ("Blender", "Gui::BlenderNavigationStyle"),
         ("Revit", "Gui::RevitNavigationStyle"),
         ("SolidWorks", "Gui::SolidWorksNavigationStyle"),
+        ("Fusion", "Gui::FusionNavigationStyle"),
         ("TinkerCAD", "Gui::TinkerCADNavigationStyle"),
         ("Touchpad", "Gui::TouchpadNavigationStyle"),
     )
@@ -77,6 +79,7 @@ class TestRubberbandSelection(unittest.TestCase):
         ("OpenCascade", "Gui::OpenCascadeNavigationStyle"),
         ("Revit", "Gui::RevitNavigationStyle"),
         ("SolidWorks", "Gui::SolidWorksNavigationStyle"),
+        ("Fusion", "Gui::FusionNavigationStyle"),
         ("TinkerCAD", "Gui::TinkerCADNavigationStyle"),
         ("Touchpad", "Gui::TouchpadNavigationStyle"),
     )
