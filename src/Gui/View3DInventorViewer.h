@@ -102,6 +102,7 @@ class NavigationAnimation;
 struct CameraPose;
 class View3DInventor;
 class ViewProvider;
+class ViewportGrid;
 class SoFCBackgroundGradient;
 class NavigationStyle;
 class SoFCUnifiedSelection;
@@ -567,6 +568,10 @@ public:
     void setAxisCross(bool on);
     bool hasAxisCross();
 
+    /// The grid on the XY plane, drawn unless the user turned it off in the preferences.
+    void setGridEnabled(bool on);
+    bool isGridEnabled() const;
+
     void showRotationCenter(bool show);
     void changeRotationCenterPosition(const SbVec3f& newCenter);
 
@@ -705,6 +710,9 @@ private:
     // big one in the middle
     SoShapeScale* axisCross;
     SoGroup* axisGroup;
+
+    /// The XY-plane grid; its node lives in the scene beside the view providers.
+    std::unique_ptr<ViewportGrid> viewportGrid;
 
     SoGroup* rotationCenterGroup;
 

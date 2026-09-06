@@ -15,6 +15,7 @@ add_executable(Gui_tests_run
         StyleParameters/YamlParameterSourceTest.cpp
         InputHintTest.cpp
         SelectionTest.cpp
+        ViewportGridTest.cpp
 )
 
 # Qt tests

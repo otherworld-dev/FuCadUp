@@ -252,6 +252,26 @@ opening or creation</string>
        </widget>
       </item>
       <item>
+       <widget class="Gui::PrefCheckBox" name="CheckBox_ShowGrid">
+        <property name="toolTip">
+         <string>A grid on the XY plane through the origin is drawn in every
+3D view, except while a sketch shows a grid of its own</string>
+        </property>
+        <property name="text">
+         <string>Show grid on the XY plane</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+        <property name="prefEntry" stdset="0">
+         <cstring>ShowGrid</cstring>
+        </property>
+        <property name="prefPath" stdset="0">
+         <cstring>View</cstring>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="Gui::PrefCheckBox" name="CheckBox_ShowFPS">
         <property name="toolTip">
          <string>Time needed for last operation and resulting frame rate

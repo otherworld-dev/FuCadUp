@@ -123,6 +123,7 @@
 #include <Gui/BitmapFactory.h>
 
 #include "View3DInventorViewer.h"
+#include "ViewportGrid.h"
 #include "Application.h"
 #include "Camera.h"
 #include "Command.h"
@@ -1318,6 +1319,12 @@ void View3DInventorViewer::init()
     naviCubeEnabled = hViewGrp->GetBool("ShowNaviCube", true);
     syncNaviCubeVisibility();
 
+    // Ahead of the view providers in the scene, so that it is drawn with the
+    // same camera and lights and the model is depth-tested against it.
+    viewportGrid = std::make_unique<ViewportGrid>(this);
+    viewerSceneRoot->insertChild(viewportGrid->getNode(), viewerSceneRoot->findChild(pcViewProviderRoot));
+    viewportGrid->attachCamera();
+
     updateColors();
 }
 
@@ -1355,6 +1362,11 @@ View3DInventorViewer::~View3DInventorViewer()
     this->decorationroot = nullptr;
     this->pcBackGround->unref();
     this->pcBackGround = nullptr;
+
+    if (viewportGrid) {
+        this->viewerSceneRoot->removeChild(viewportGrid->getNode());
+        viewportGrid.reset();
+    }
 
     setSceneGraph(nullptr);
     this->viewerSceneRoot->unref();
@@ -1815,10 +1827,28 @@ SoPickedPoint* View3DInventorViewer::getPointOnRay(
     return (pick ? new SoPickedPoint(*pick) : nullptr);
 }
 
+namespace
+{
+/**
+ * Whether the view provider draws a grid of its own while it is edited, as a
+ * sketch does. The extension is looked up by name so that the viewer needs no
+ * link to the Part module that defines it.
+ */
+bool drawsOwnGrid(const ViewProvider* vp)
+{
+    const Base::Type gridExtension = Base::Type::fromName("PartGui::ViewProviderGridExtension");
+    return vp && !gridExtension.isBad() && vp->hasExtension(gridExtension);
+}
+}  // namespace
+
 void View3DInventorViewer::setEditingViewProvider(Gui::ViewProvider* vp, int ModNum)
 {
     this->editViewProvider = vp;
     this->editViewProvider->setEditViewer(this, ModNum);
+
+    if (viewportGrid) {
+        viewportGrid->setSuspended(drawsOwnGrid(vp));
+    }
 
 #if (COIN_MAJOR_VERSION * 100 + COIN_MINOR_VERSION * 10 + COIN_MICRO_VERSION < 403)
     this->navigation->findBoundingSphere();
@@ -1849,6 +1879,10 @@ void View3DInventorViewer::resetEditingViewProvider()
             this->editViewProvider
         );
         this->editViewProvider = nullptr;
+
+        if (viewportGrid) {
+            viewportGrid->setSuspended(false);
+        }
     }
 }
 
@@ -2243,6 +2277,18 @@ void View3DInventorViewer::setAxisCross(bool on)
 bool View3DInventorViewer::hasAxisCross()
 {
     return axisGroup;
+}
+
+void View3DInventorViewer::setGridEnabled(bool on)
+{
+    if (viewportGrid) {
+        viewportGrid->setEnabled(on);
+    }
+}
+
+bool View3DInventorViewer::isGridEnabled() const
+{
+    return viewportGrid && viewportGrid->isEnabled();
 }
 
 void View3DInventorViewer::showRotationCenter(bool show)
@@ -3195,6 +3241,12 @@ bool View3DInventorViewer::renderToFramebuffer(QOpenGLFramebufferObject* fbo, bo
 
 void View3DInventorViewer::actualRedraw()
 {
+    // The first layout, and every resize after it, reach the grid here rather
+    // than through its camera sensor, which only fires when the camera moves.
+    if (viewportGrid) {
+        viewportGrid->syncViewport();
+    }
+
     switch (renderType) {
         case Native:
             renderScene();
@@ -4157,6 +4209,11 @@ void View3DInventorViewer::setCameraType(SoType type)
 {
     inherited::setCameraType(type);
 
+    // The old camera is gone with its sensor; the grid follows the new one.
+    if (viewportGrid) {
+        viewportGrid->attachCamera();
+    }
+
     SoCamera* cam = this->getSoRenderManager()->getCamera();
 
     if (!cam) {
@@ -4474,6 +4531,9 @@ SbBox3f View3DInventorViewer::getBoundingBox() const
 {
     SbViewportRegion vp = this->getSoRenderManager()->getViewportRegion();
     SoGetBoundingBoxAction action(vp);
+    // The same mark "fit all" sets, so that the viewport grid, which only
+    // the clipping planes are meant to count, stays out of this box too.
+    SoSkipBoundingBoxElement::set(action.getState(), SoSkipBoundingGroup::EXCLUDE_BBOX);
     action.apply(this->getSoRenderManager()->getSceneGraph());
     return action.getBoundingBox();
 }
