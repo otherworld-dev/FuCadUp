@@ -20,17 +20,28 @@
  ***************************************************************************/
 
 
+#include <QAbstractItemView>
+#include <QFont>
 #include <QFrame>
+#include <QHBoxLayout>
 #include <QSignalBlocker>
+#include <QSize>
 #include <QSizePolicy>
 #include <QStackedWidget>
 #include <QStyle>
 #include <QTabBar>
 #include <QVBoxLayout>
 
+#include <Base/Console.h>
+#include <Gui/Action.h>
+#include <Gui/Application.h>
+#include <Gui/Command.h>
+#include <Gui/WorkbenchSelector.h>
+
 #include "RibbonBar.h"
 
 
+using namespace Gui;
 using namespace Gui::Ribbon;
 
 namespace
@@ -40,6 +51,16 @@ namespace
 constexpr int ribbonBarHeight = 86;
 // Selected on by the stylesheet as QTabBar#RibbonTabBar[contextTab="true"].
 constexpr const char* contextTabProperty = "contextTab";
+// The workspace block keeps the side margin of a panel body so that the
+// selector lines up with the buttons beside it.
+constexpr int workspaceBlockSideMargin = 8;
+constexpr int workspaceBlockVerticalMargin = 6;
+constexpr int workspaceSelectorMinimumWidth = 180;
+constexpr int workspaceSelectorIconExtent = 20;
+// The selector names the workspace, so it reads a step larger than the
+// captions under the panels.
+constexpr int workspaceSelectorPointSizeDelta = 2;
+constexpr int separatorWidth = 1;
 }  // namespace
 
 
@@ -66,12 +87,25 @@ RibbonBar::RibbonBar(QWidget* parent)
     tabBar->setFocusPolicy(Qt::NoFocus);
     tabBar->setProperty(contextTabProperty, false);
 
-    pageStack = new QStackedWidget(this);
+    auto* pageRow = new QWidget(this);
+    pageRow->setObjectName(QStringLiteral("RibbonPageRow"));
+    pageRow->setAttribute(Qt::WA_StyledBackground, true);
+
+    auto* rowLayout = new QHBoxLayout(pageRow);
+    rowLayout->setContentsMargins(0, 0, 0, 0);
+    rowLayout->setSpacing(0);
+
+    pageStack = new QStackedWidget(pageRow);
     pageStack->setObjectName(QStringLiteral("RibbonPages"));
     pageStack->setFrameShape(QFrame::NoFrame);
 
+    if (QWidget* workspaceBlock = createWorkspaceBlock(pageRow)) {
+        rowLayout->addWidget(workspaceBlock, 0);
+    }
+    rowLayout->addWidget(pageStack, 1);
+
     layout->addWidget(tabBar, 0);
-    layout->addWidget(pageStack, 1);
+    layout->addWidget(pageRow, 1);
 
     connect(tabBar, &QTabBar::currentChanged, this, [this](int index) {
         if (index >= 0 && index < pageStack->count()) {
@@ -79,6 +113,77 @@ RibbonBar::RibbonBar(QWidget* parent)
         }
         Q_EMIT tabActivated(index);
     });
+}
+
+QWidget* RibbonBar::createWorkspaceBlock(QWidget* parent)
+{
+    if (!Application::Instance) {
+        return nullptr;
+    }
+
+    CommandManager& manager = Application::Instance->commandManager();
+    Command* command = manager.getCommandByName("Std_Workbench");
+    if (!command) {
+        Base::Console().warning(
+            "Ribbon: 'Std_Workbench' is not registered, the workspace selector is unavailable\n"
+        );
+        return nullptr;
+    }
+
+    command->initAction();
+    auto* group = qobject_cast<WorkbenchGroup*>(command->getAction());
+    if (!group) {
+        Base::Console().warning("Ribbon: 'Std_Workbench' provides no workbench group\n");
+        return nullptr;
+    }
+
+    auto* block = new QWidget(parent);
+    block->setObjectName(QStringLiteral("RibbonWorkspaceBlock"));
+    block->setAttribute(Qt::WA_StyledBackground, true);
+
+    auto* blockLayout = new QHBoxLayout(block);
+    blockLayout->setContentsMargins(0, 0, 0, 0);
+    blockLayout->setSpacing(0);
+
+    auto* selector = new WorkbenchComboBox(group, block);
+    selector->setObjectName(QStringLiteral("RibbonWorkspaceSelector"));
+    selector->setIconSize(QSize(workspaceSelectorIconExtent, workspaceSelectorIconExtent));
+    selector->setMinimumWidth(workspaceSelectorMinimumWidth);
+    // Sized for the longest workspace name, so the block never shifts the
+    // panels when the selection changes.
+    selector->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    selector->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+
+    QFont selectorFont = selector->font();
+    if (selectorFont.pointSizeF() > 0.0) {
+        // The popup list keeps the regular size; only the box grows.
+        selector->view()->setFont(selectorFont);
+        selectorFont.setPointSizeF(selectorFont.pointSizeF() + workspaceSelectorPointSizeDelta);
+        selector->setFont(selectorFont);
+    }
+
+    auto* selectorLayout = new QHBoxLayout();
+    selectorLayout->setContentsMargins(
+        workspaceBlockSideMargin,
+        workspaceBlockVerticalMargin,
+        workspaceBlockSideMargin,
+        workspaceBlockVerticalMargin
+    );
+    selectorLayout->setSpacing(0);
+    selectorLayout->addWidget(selector);
+
+    // The same rule a panel draws down its right edge, so the block reads as
+    // the first panel of every page.
+    auto* separator = new QWidget(block);
+    separator->setObjectName(QStringLiteral("RibbonPanelSeparator"));
+    separator->setAttribute(Qt::WA_StyledBackground, true);
+    separator->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    separator->setFixedWidth(separatorWidth);
+
+    blockLayout->addLayout(selectorLayout);
+    blockLayout->addWidget(separator);
+
+    return block;
 }
 
 void RibbonBar::clear()

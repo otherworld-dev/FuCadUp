@@ -39,11 +39,7 @@
 #include <QWindow>
 
 #include <Base/Console.h>
-#include <Gui/Action.h>
-#include <Gui/Application.h>
-#include <Gui/Command.h>
 #include <Gui/MainWindow.h>
-#include <Gui/WorkbenchSelector.h>
 
 #include "AppBar.h"
 #include "FramelessWindow.h"
@@ -59,7 +55,6 @@ constexpr int appBarHeight = 30;
 constexpr int quickAccessIconExtent = 16;
 constexpr int separatorGap = 3;
 constexpr int separatorWidth = 1;
-constexpr int workspaceSelectorWidth = 170;
 constexpr int windowButtonWidth = 40;
 }  // namespace
 
@@ -86,7 +81,6 @@ AppBar::AppBar(QWidget* parent)
     barLayout->addStretch(1);
     createTitle();
     barLayout->addStretch(1);
-    createWorkspaceSelector();
     createWindowControls();
 }
 
@@ -334,34 +328,6 @@ bool AppBar::eventFilter(QObject* watched, QEvent* event)
     }
 
     return QWidget::eventFilter(watched, event);
-}
-
-void AppBar::createWorkspaceSelector()
-{
-    if (!Application::Instance) {
-        return;
-    }
-
-    CommandManager& manager = Application::Instance->commandManager();
-    Command* command = manager.getCommandByName("Std_Workbench");
-    if (!command) {
-        Base::Console().warning(
-            "Ribbon: 'Std_Workbench' is not registered, the workspace selector is unavailable\n"
-        );
-        return;
-    }
-
-    command->initAction();
-    auto* group = qobject_cast<WorkbenchGroup*>(command->getAction());
-    if (!group) {
-        Base::Console().warning("Ribbon: 'Std_Workbench' provides no workbench group\n");
-        return;
-    }
-
-    auto* selector = new WorkbenchComboBox(group, this);
-    selector->setObjectName(QStringLiteral("RibbonWorkspaceSelector"));
-    selector->setMinimumWidth(workspaceSelectorWidth);
-    barLayout->addWidget(selector);
 }
 
 void AppBar::refreshMenu()

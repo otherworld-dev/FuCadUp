@@ -2799,12 +2799,42 @@ QWidget#RibbonBar {
 }
 
 QStackedWidget#RibbonPages,
+QWidget#RibbonPageRow,
 QWidget#RibbonPage,
 QWidget#RibbonPanel,
 QWidget#RibbonPanelBody,
-QWidget#RibbonPanelButtons {
+QWidget#RibbonPanelButtons,
+QWidget#RibbonWorkspaceBlock {
   background-color: @PrimaryColor;
   border: none;
+}
+
+/* The workspace selector leads the panel row, as in Fusion's DESIGN block: a
+   boxed drop-down as tall as the panels beside it. */
+QComboBox#RibbonWorkspaceSelector {
+  background-color: @ButtonTopBackgroundColor;
+  border: 1px solid @GeneralBorderColor;
+  border-radius: @InputFieldBorderRadius;
+  color: @TextForegroundColor;
+  padding: 0px 22px 0px 6px;
+}
+
+QComboBox#RibbonWorkspaceSelector:hover {
+  background-color: @GeneralBackgroundHoverColor;
+  border: 1px solid @GeneralBorderHoverColor;
+}
+
+QComboBox#RibbonWorkspaceSelector:on,
+QComboBox#RibbonWorkspaceSelector:focus {
+  border: 1px solid @AccentColor;
+}
+
+QComboBox#RibbonWorkspaceSelector::drop-down {
+  subcontrol-origin: padding;
+  subcontrol-position: center right;
+  width: 20px;
+  border: none;
+  padding: 0px;
 }
 
 QWidget#RibbonPanelSeparator {

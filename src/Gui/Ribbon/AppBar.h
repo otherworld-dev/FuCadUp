@@ -40,8 +40,8 @@ namespace Ribbon
 {
 
 /**
- * The strip above the ribbon tabs: the application menu button, the
- * quick-access buttons and the workspace selector.
+ * The strip above the ribbon tabs: the application menu button and the
+ * quick-access buttons.
  *
  * The app bar also hosts the application's one and only QMenuBar. The bar is
  * never installed into the QMainWindow menu slot, because the ribbon container
@@ -73,7 +73,6 @@ private:
     void createMenuButton();
     void createQuickAccess();
     void createTitle();
-    void createWorkspaceSelector();
     void createWindowControls();
     void refreshMenu();
     void refreshTitle();

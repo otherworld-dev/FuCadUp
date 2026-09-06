@@ -39,6 +39,10 @@ namespace Ribbon
  * The tab strip of the Fusion-style shell: a QTabBar stacked on top of a
  * QStackedWidget so that selecting a tab swaps the row of tool panels below it.
  *
+ * The workspace selector leads the panel row, the way Fusion's workspace
+ * drop-down does: a block as tall as the panels, to the left of every page
+ * rather than inside any of them.
+ *
  * The bar only owns the presentation; RibbonManager decides which tabs exist
  * and fills the pages.
  * @author FuCad contributors
@@ -77,6 +81,10 @@ Q_SIGNALS:
     void tabActivated(int index);
 
 private:
+    /// Builds the block holding the workspace selector, or returns null when
+    /// the Std_Workbench command has nothing to offer.
+    QWidget* createWorkspaceBlock(QWidget* parent);
+
     QTabBar* tabBar;
     QStackedWidget* pageStack;
 
