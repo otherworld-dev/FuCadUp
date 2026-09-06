@@ -62,6 +62,8 @@ SET(Features_SRCS
     SketchGeometry.h
     SketchGeometryExtension.cpp
     SketchGeometryExtension.h
+    SnapGeometry.cpp
+    SnapGeometry.h
     ExternalGeometryExtension.cpp
     ExternalGeometryExtension.h
     SolverGeometryExtension.cpp

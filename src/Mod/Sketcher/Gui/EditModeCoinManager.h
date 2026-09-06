@@ -34,6 +34,7 @@
 #include <App/Application.h>
 #include <Base/Vector3D.h>
 #include <Mod/Sketcher/App/GeoList.h>
+#include <Mod/Sketcher/App/SnapGeometry.h>
 #include "GeometryCreationMode.h"
 
 #include "EditModeCoinManagerParameters.h"
@@ -270,6 +271,10 @@ public:
     /** @name Temporary edit curves and markers */
     //@{
     void drawEditMarkers(const std::vector<Base::Vector2d>& EditMarkers, unsigned int augmentationlevel);
+    /// Shows the snap glyph for @a kind at @a position (sketch coordinates).
+    void drawSnapMarker(const Base::Vector2d& position, Sketcher::SnapGeometry::SnapKind kind);
+    /// Hides the snap glyph.
+    void clearSnapMarker();
     void drawEdit(const std::vector<Base::Vector2d>& EditCurve, GeometryCreationMode mode);
     void drawEdit(const std::list<std::vector<Base::Vector2d>>& list, GeometryCreationMode mode);
     void drawLineExtensionAutoConstraintHint(const std::vector<Base::Vector2d>& HintCurve);

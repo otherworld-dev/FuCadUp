@@ -25,16 +25,13 @@
 
 #pragma once
 
+#include <optional>
+
 #include <App/Application.h>
 
 #include <Base/Tools2D.h>
 #include <Base/Vector3D.h>
-
-namespace Part
-{
-class GeomLineSegment;
-class GeomArcOfCircle;
-}  // namespace Part
+#include <Mod/Sketcher/App/SnapGeometry.h>
 
 namespace SketcherGui
 {
@@ -48,6 +45,7 @@ private:
     static inline int getPreselectPoint(const ViewProviderSketch& vp);
     static inline int getPreselectCross(const ViewProviderSketch& vp);
     static inline int getPreselectCurve(const ViewProviderSketch& vp);
+    static inline float getSketchUnitsPerPixel(const ViewProviderSketch& vp);
 
     friend class SnapManager;
 };
@@ -67,8 +65,16 @@ enum class SnapType
  *  (in Edit-Mode) depending on the situation. Those situations are in priority order :
  *  1 - Snap at angle: For tools like Slot, Arc, Line, Ellipse, this enables to constrain the angle
  * at steps of 5° (or customized angle). This is useful to make features at a certain angle (45° for
- * example) 2 - Snap to object: This snaps the mouse pointer onto objects. 3 - Snap to grid: This
- * snaps the mouse pointer on the grid.
+ * example).
+ *  2 - Snap to object: This snaps the mouse pointer onto the preselected object: the origin, a
+ * vertex, an axis, or a curve. On a curve the pointer prefers, within the snap radius, the curve's
+ * crossings with other geometry, its midpoint and its quadrant points, and otherwise lands on the
+ * closest point of the curve.
+ *  3 - Snap to grid: While the grid is displayed and nothing else caught the pointer, it snaps
+ * to a grid line or intersection that comes within a few pixels, and is otherwise left free.
+ *
+ * The snap radius (in pixels) is shared with preselection in edit mode, so whatever the pointer
+ * snaps to is also what is preselected, and autoconstraints follow.
  */
 class SnapManager
 {
@@ -99,6 +105,8 @@ class SnapManager
         void updateSnapToObjectParameter(const std::string& parametername);
         void updateSnapToGridParameter(const std::string& parametername);
         void updateSnapAngleParameter(const std::string& parametername);
+        void updateSnapRadiusParameter(const std::string& parametername);
+        void updateGridSnapToleranceParameter(const std::string& parametername);
 
         static ParameterGrp::handle getParameterGrpHandle();
 
@@ -116,10 +124,32 @@ public:
     bool snapToObject(Base::Vector2d inputPos, Base::Vector2d& snapPos, SnapType mask);
     bool snapToGrid(Base::Vector2d inputPos, Base::Vector2d& snapPos);
 
-    bool snapToLineMiddle(Base::Vector3d& pointToOverride, const Part::GeomLineSegment* line);
-    bool snapToArcMiddle(Base::Vector3d& pointToOverride, const Part::GeomArcOfCircle* arc);
-
     void setAngleSnapping(bool enable, Base::Vector2d referencepoint);
+
+    /// What the last call to snap() landed on.
+    struct SnapResult
+    {
+        Sketcher::SnapGeometry::SnapKind kind = Sketcher::SnapGeometry::SnapKind::None;
+        Base::Vector2d position;
+    };
+
+    /// The snap the most recent snap() produced, if it snapped at all.
+    std::optional<SnapResult> lastSnap() const
+    {
+        return lastSnapResult;
+    }
+
+    /// Forgets the last snap, so a mouse move that never asked to snap shows no marker.
+    void resetLastSnap()
+    {
+        lastSnapResult.reset();
+    }
+
+    /// Screen distance, in pixels, within which points attract the pointer.
+    double getSnapRadiusPixels() const
+    {
+        return snapRadiusPixels;
+    }
 
     struct SnapHandle
     {
@@ -147,6 +177,17 @@ private:
     double lastMouseAngle;
 
     double snapAngle;
+    double snapRadiusPixels = 8.0;
+    double gridSnapTolerancePixels = 15.0;
+
+    std::optional<SnapResult> lastSnapResult;
+
+    /// Points on the preselected curve worth snapping to, within the snap radius.
+    std::vector<Sketcher::SnapGeometry::SnapCandidate> curveSnapCandidates(
+        int curveGeoId,
+        const Base::Vector2d& cursor,
+        double radius
+    ) const;
 
     /// Observer to track all the needed parameters.
     std::unique_ptr<SnapManager::ParameterObserver> pObserver;

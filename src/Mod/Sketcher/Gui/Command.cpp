@@ -1493,7 +1493,7 @@ void GridSpaceAction::updateWidget()
         updateCheckBoxFromProperty(gridAutoSpacing, sketchView->GridAuto);
 
         ParameterGrp::handle hGrp = getParameterPath();
-        updateCheckBox(snapToGrid, hGrp->GetBool("SnapToGrid", false));
+        updateCheckBox(snapToGrid, hGrp->GetBool("SnapToGrid", true));
 
         gridSizeBox->setValue(sketchView->GridSize.getValue());
     }
@@ -1514,8 +1514,8 @@ void GridSpaceAction::languageChange()
 
     snapToGrid->setText(tr("Snap to grid"));
     snapToGrid->setToolTip(
-        tr("New points will snap to the nearest grid line.\nPoints must be set closer than a "
-            "fifth of the grid spacing to a grid line to snap."));
+        tr("While the grid is displayed, new points snap to a grid line or intersection\n"
+           "when the pointer comes within a few pixels of it; other snaps take precedence."));
     snapToGrid->setStatusTip(snapToGrid->toolTip());
 }
 
@@ -1751,8 +1751,9 @@ void SnapSpaceAction::updateWidget(bool snapenabled)
 void SnapSpaceAction::languageChange()
 {
     snapToObjects->setText(tr("Snap to objects"));
-    snapToObjects->setToolTip(tr("New points will snap to the currently preselected object. It "
-                                    "will also snap to the middle of lines and arcs."));
+    snapToObjects->setToolTip(tr("New points snap to the origin, vertices, axes and curves near "
+                                    "the pointer, preferring where curves cross, their midpoints "
+                                    "and the quadrant points of circles and arcs."));
     snapToObjects->setStatusTip(snapToObjects->toolTip());
 
     angleLabel->setText(tr("Snap angle"));

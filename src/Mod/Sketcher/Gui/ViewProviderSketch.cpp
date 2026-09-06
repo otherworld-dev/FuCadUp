@@ -780,6 +780,9 @@ void ViewProviderSketch::deactivateHandler()
         sketchHandler->deactivate();
         sketchHandler = nullptr;
     }
+    if (editCoinManager) {
+        editCoinManager->clearSnapMarker();
+    }
     setSketchMode(STATUS_NONE);
 }
 
@@ -913,7 +916,7 @@ SoPickedPointList ViewProviderSketch::getPickedPointsOnRay(
     SoRayPickAction rp(viewer->getSoRenderManager()->getViewportRegion());
     rp.setPickAll(true);
     rp.setPoint(pos);
-    rp.setRadius(viewer->getPickRadius());
+    rp.setRadius(getEditPickRadius(viewer));
 
     editCoinManager->setInternalFacesPickable(true);
     rp.apply(root);
@@ -974,7 +977,7 @@ EditModeCoinManager::PreselectionResult ViewProviderSketch::resolveClickPreselec
 
     float distanceSquared = static_cast<float>(dx) * static_cast<float>(dx)
         + static_cast<float>(dy) * static_cast<float>(dy);
-    float pickRadius = viewer->getPickRadius();
+    float pickRadius = getEditPickRadius(viewer);
     if (distanceSquared > pickRadius * pickRadius) {
         return clickResult;
     }
@@ -1940,7 +1943,9 @@ bool ViewProviderSketch::mouseMove(const SbVec2s& cursorPos, Gui::View3DInventor
             }
             return true;
         case STATUS_SKETCH_UseHandler:
+            snapManager->resetLastSnap();
             sketchHandler->mouseMove(*snapHandle);
+            updateSnapMarker();
             if (preselectChanged) {
                 editCoinManager->drawConstraintIcons();
                 sketchHandler->applyCursor();
@@ -3619,6 +3624,58 @@ float ViewProviderSketch::getScaleFactor() const
     }
     else {
         return 1.f;
+    }
+}
+
+float ViewProviderSketch::getSketchUnitsPerPixel() const
+{
+    assert(isInEditMode());
+    Gui::MDIView* mdi =
+        Gui::Application::Instance->editViewOfNode(editCoinManager->getRootEditNode());
+    if (mdi && mdi->isDerivedFrom<Gui::View3DInventor>()) {
+        Gui::View3DInventorViewer* viewer = static_cast<Gui::View3DInventor*>(mdi)->getViewer();
+        SoCamera* camera = viewer->getSoRenderManager()->getCamera();
+        const SbVec2s viewportSize =
+            viewer->getSoRenderManager()->getViewportRegion().getViewportSizePixels();
+        if (camera && viewportSize[0] > 0) {
+            // Coin measures a normalised radius along the viewport's width, so a radius of 1
+            // is the world-space width of the whole viewport at the sketch origin's depth.
+            const float viewportWidth = camera->getViewVolume(camera->aspectRatio.getValue())
+                                            .getWorldToScreenScale(SbVec3f(0.f, 0.f, 0.f), 1.0f);
+            return viewportWidth / static_cast<float>(viewportSize[0]);
+        }
+    }
+    return 0.f;
+}
+
+float ViewProviderSketch::getEditPickRadius(const Gui::View3DInventorViewer* viewer) const
+{
+    float radius = viewer ? viewer->getPickRadius() : 0.f;
+    if (snapManager) {
+        radius = std::max(radius, static_cast<float>(snapManager->getSnapRadiusPixels()));
+    }
+    return radius;
+}
+
+void ViewProviderSketch::updateSnapMarker()
+{
+    using Sketcher::SnapGeometry::SnapKind;
+
+    if (!editCoinManager || !snapManager) {
+        return;
+    }
+
+    const auto snap = snapManager->lastSnap();
+    const bool isPointSnap = snap
+        && (snap->kind == SnapKind::Origin || snap->kind == SnapKind::Vertex
+            || snap->kind == SnapKind::Intersection || snap->kind == SnapKind::Midpoint
+            || snap->kind == SnapKind::Quadrant);
+
+    if (isPointSnap) {
+        editCoinManager->drawSnapMarker(snap->position, snap->kind);
+    }
+    else {
+        editCoinManager->clearSnapMarker();
     }
 }
 

@@ -6,6 +6,7 @@ add_executable(Sketcher_tests_run
         SketchObject.cpp
         SketchObjectChanges.cpp
         SketchObjectSymmetric.cpp
+        SnapGeometry.cpp
 )
 
 add_subdirectory(planegcs)

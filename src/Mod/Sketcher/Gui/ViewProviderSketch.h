@@ -882,6 +882,15 @@ private:
     int getPreselectPoint() const;
     int getPreselectCurve() const;
     int getPreselectCross() const;
+    /// Sketch units covered by one screen pixel at the current zoom.
+    float getSketchUnitsPerPixel() const;
+    /**
+     * Pick radius used while editing: the viewer's, widened to the snap radius so that whatever
+     * the pointer snaps to is also what is preselected.
+     */
+    float getEditPickRadius(const Gui::View3DInventorViewer* viewer) const;
+    /// Shows a marker at the point the pointer last snapped to, or hides it.
+    void updateSnapMarker();
     void setPreselectPoint(int PreselectPoint);
     void setPreselectRootPoint();
     void resetPreselectPoint();

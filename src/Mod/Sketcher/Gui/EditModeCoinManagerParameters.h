@@ -505,6 +505,13 @@ struct EditModeScenegraphNodes
     SoDrawStyle* EditMarkersDrawStyle;
     //@}
 
+    /** @name Snap marker nodes - the glyph on the point the pointer snapped to */
+    //@{
+    SoMaterial* SnapMarkerMaterial = nullptr;
+    SoCoordinate3* SnapMarkerCoordinate = nullptr;
+    SoMarkerSet* SnapMarkerSet = nullptr;
+    //@}
+
     /** @name Temporal edit text nodes*/
     //@{
     SoText2* textX;

@@ -1039,6 +1039,86 @@ void EditModeCoinManager::drawEditMarkers(
     editModeScenegraphNodes.EditMarkerSet->markerIndex.finishEditing();
 }
 
+namespace
+{
+
+/// Marker bitmap standing for each kind of point snap.
+const char* snapMarkerName(Sketcher::SnapGeometry::SnapKind kind)
+{
+    using Sketcher::SnapGeometry::SnapKind;
+    switch (kind) {
+        case SnapKind::Origin:
+            return "PLUS";
+        case SnapKind::Vertex:
+            return "SQUARE_FILLED";
+        case SnapKind::Intersection:
+            return "CROSS";
+        case SnapKind::Midpoint:
+            return "DIAMOND_FILLED";
+        case SnapKind::Quadrant:
+            return "CIRCLE_LINE";
+        default:
+            return nullptr;
+    }
+}
+
+/// The smallest supported marker size larger than the vertex markers, so the glyph stands out.
+int snapMarkerSize(const char* markerName, int vertexMarkerSize)
+{
+    const auto sizes = Gui::Inventor::MarkerBitmaps::getSupportedSizes(markerName);
+    for (int size : sizes) {
+        if (size > vertexMarkerSize) {
+            return size;
+        }
+    }
+    return sizes.empty() ? vertexMarkerSize : sizes.back();
+}
+
+}  // namespace
+
+void EditModeCoinManager::drawSnapMarker(
+    const Base::Vector2d& position,
+    Sketcher::SnapGeometry::SnapKind kind
+)
+{
+    if (!editModeScenegraphNodes.SnapMarkerSet) {
+        return;  // edit-mode nodes not built (yet)
+    }
+
+    const char* markerName = snapMarkerName(kind);
+    if (!markerName) {
+        clearSnapMarker();
+        return;
+    }
+
+    editModeScenegraphNodes.SnapMarkerMaterial->diffuseColor = drawingParameters.PreselectColor;
+    editModeScenegraphNodes.SnapMarkerSet->markerIndex = Gui::Inventor::MarkerBitmaps::getMarkerIndex(
+        markerName,
+        snapMarkerSize(markerName, drawingParameters.markerSize)
+    );
+    editModeScenegraphNodes.SnapMarkerCoordinate->point.setNum(1);
+    editModeScenegraphNodes.SnapMarkerCoordinate->point.set1Value(
+        0,
+        SbVec3f(
+            position.x,
+            position.y,
+            ViewProviderSketchCoinAttorney::getViewOrientationFactor(viewProvider)
+                * drawingParameters.zHighlight
+        )
+    );
+    editModeScenegraphNodes.SnapMarkerSet->numPoints = 1;
+}
+
+void EditModeCoinManager::clearSnapMarker()
+{
+    if (!editModeScenegraphNodes.SnapMarkerSet
+        || editModeScenegraphNodes.SnapMarkerSet->numPoints.getValue() == 0) {
+        return;
+    }
+    editModeScenegraphNodes.SnapMarkerSet->numPoints = 0;
+    editModeScenegraphNodes.SnapMarkerCoordinate->point.setNum(0);
+}
+
 void EditModeCoinManager::drawEdit(const std::vector<Base::Vector2d>& EditCurve, GeometryCreationMode mode)
 {
     editModeScenegraphNodes.EditCurveSet->numVertices.setNum(1);
@@ -2031,6 +2111,32 @@ void EditModeCoinManager::createEditModeInventorNodes()
     editModeScenegraphNodes.EditMarkerSet->markerIndex
         = Gui::Inventor::MarkerBitmaps::getMarkerIndex("CIRCLE_LINE", drawingParameters.markerSize);
     editMarkersRoot->addChild(editModeScenegraphNodes.EditMarkerSet);
+
+    // stuff for the snap marker ++++++++++++++++++++++++++++++++++++++++++
+    // Kept out of picking so the glyph never becomes what the pointer is over.
+    SoSeparator* snapMarkerRoot = new SoSeparator;
+    snapMarkerRoot->setName("SnapMarkerRoot");
+    snapMarkerRoot->renderCaching = SoSeparator::OFF;
+    editModeScenegraphNodes.EditRoot->addChild(snapMarkerRoot);
+
+    SoPickStyle* snapMarkerPickStyle = new SoPickStyle;
+    snapMarkerPickStyle->style.setValue(SoPickStyle::UNPICKABLE);
+    snapMarkerRoot->addChild(snapMarkerPickStyle);
+
+    editModeScenegraphNodes.SnapMarkerMaterial = new SoMaterial;
+    editModeScenegraphNodes.SnapMarkerMaterial->setName("SnapMarkerMaterial");
+    editModeScenegraphNodes.SnapMarkerMaterial->diffuseColor = drawingParameters.PreselectColor;
+    snapMarkerRoot->addChild(editModeScenegraphNodes.SnapMarkerMaterial);
+
+    editModeScenegraphNodes.SnapMarkerCoordinate = new SoCoordinate3;
+    editModeScenegraphNodes.SnapMarkerCoordinate->setName("SnapMarkerCoordinate");
+    editModeScenegraphNodes.SnapMarkerCoordinate->point.setNum(0);
+    snapMarkerRoot->addChild(editModeScenegraphNodes.SnapMarkerCoordinate);
+
+    editModeScenegraphNodes.SnapMarkerSet = new SoMarkerSet;
+    editModeScenegraphNodes.SnapMarkerSet->setName("SnapMarkerSet");
+    editModeScenegraphNodes.SnapMarkerSet->numPoints = 0;
+    snapMarkerRoot->addChild(editModeScenegraphNodes.SnapMarkerSet);
 
     // stuff for the edit coordinates ++++++++++++++++++++++++++++++++++++++
     SoSeparator* Coordsep = new SoSeparator();
