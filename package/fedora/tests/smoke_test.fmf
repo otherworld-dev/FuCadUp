@@ -1,4 +1,4 @@
-summary: Run All FuCadCmd python tests
-test: /usr/bin/FuCadCmd -v
-require: /usr/bin/FuCadCmd
+summary: Run All FuCadUpCmd python tests
+test: /usr/bin/FuCadUpCmd -v
+require: /usr/bin/FuCadUpCmd
 duration: 1m

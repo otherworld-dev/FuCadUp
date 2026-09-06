@@ -80,7 +80,7 @@
 #endif
 
 #else
-#   error "FuCad is not ported to this OS yet. For help see https://github.com/FadyFaheem/FuCad"
+#   error "FuCadUp is not ported to this OS yet. For help see https://github.com/otherworld-dev/FuCadUp"
 #endif
 
 #ifdef FC_OS_WIN32

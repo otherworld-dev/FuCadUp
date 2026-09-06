@@ -10,7 +10,7 @@ Var FileAssociation
 
 # ----------------------------------
 
-Section "un.FuCad" un.SecUnProgramFiles
+Section "un.FuCadUp" un.SecUnProgramFiles
 
   SectionIn RO
 
@@ -80,12 +80,12 @@ SectionEnd
 
 #---------------------------------
 # user preferences
-Section /o "un.$(UnFuCadPreferencesTitle)" un.SecUnPreferences
+Section /o "un.$(UnFuCadUpPreferencesTitle)" un.SecUnPreferences
 
  # issue a warning dialog
  MessageBox MB_YESNO|MB_DEFBUTTON2|MB_ICONEXCLAMATION $(DialogUnPreferences) /SD IDYES IDYES +2 # continue if yes
   Goto NotPreferences
- # remove FuCad's config files
+ # remove FuCadUp's config files
  StrCpy $AppSubfolder ${APP_DIR_USERDATA}
  Call un.DelAppPathSub # function from Utils.nsh
  # remove the registry key that stores the main window parameters

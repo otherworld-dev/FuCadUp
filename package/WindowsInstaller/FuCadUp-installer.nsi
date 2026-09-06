@@ -1,5 +1,5 @@
 /*
-FuCad Installer for Windows
+FuCadUp Installer for Windows
 Author: Uwe Stöhr
 Compatible with NSIS 3.x
 */
@@ -17,7 +17,7 @@ ManifestDPIAware true
 # installer settings like version numbers
 !include settings.nsh
 
-# declarations of FuCad's registry keys
+# declarations of FuCadUp's registry keys
 !include include\declarations.nsh
 
 # Multi-User settings
@@ -53,13 +53,13 @@ ManifestDPIAware true
 # sets the install sections and checks the system on starting the un/installer
 !include include\init.nsh
 
-# install FuCad and needed third-party programs like Python etc.
+# install FuCadUp and needed third-party programs like Python etc.
 !include setup\install.nsh
 
-# uninstall FuCad and all programs that were installed together with FuCad
+# uninstall FuCadUp and all programs that were installed together with FuCadUp
 !include setup\uninstall.nsh
 
-# configure FuCad (set start menu and write registry entries)
+# configure FuCadUp (set start menu and write registry entries)
 !include setup\configure.nsh
 
 #--------------------------------

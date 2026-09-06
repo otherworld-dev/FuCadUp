@@ -55,9 +55,9 @@ PyMOD_INIT_FUNC(FreeCADGui)
         Base::Interpreter().loadModule("FreeCAD");
         App::Application::Config()["AppIcon"] = "fucad";
         App::Application::Config()["SplashScreen"] = "fucadsplash";
-        App::Application::Config()["CopyrightInfo"] = fmt::format("\xc2\xa9 FuCad contributors and, for the FreeCAD work it is derived from, Juergen Riegel, Werner Mayer, Yorik van Havre and others 2001-{}\n", FCCopyrightYear);
-        App::Application::Config()["LicenseInfo"] = "FuCad is free and open-source software licensed under the terms of the LGPL-2.1-or-later license.\n";
-        App::Application::Config()["CreditsInfo"] = "FuCad would not be possible without the FreeCAD community.\n";
+        App::Application::Config()["CopyrightInfo"] = fmt::format("\xc2\xa9 FuCadUp contributors and, for the FuCad and FreeCAD work it is derived from, FuCad contributors, Juergen Riegel, Werner Mayer, Yorik van Havre and others 2001-{}\n", FCCopyrightYear);
+        App::Application::Config()["LicenseInfo"] = "FuCadUp is free and open-source software licensed under the terms of the LGPL-2.1-or-later license.\n";
+        App::Application::Config()["CreditsInfo"] = "FuCadUp would not be possible without the FreeCAD community.\n";
         // clang-format on
 
         // it's possible that the GUI is already initialized when the Gui version of the executable

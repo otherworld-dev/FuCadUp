@@ -3,14 +3,14 @@
 """
 run_gui_tests.py
 
-List registered tests via `FuCad -t`, filter for GUI tests (names containing 'Gui'), and run each
-GUI test module using the specified FuCad executable.
+List registered tests via `FuCadUp -t`, filter for GUI tests (names containing 'Gui'), and run each
+GUI test module using the specified FuCadUp executable.
 
 Usage:
   run_gui_tests.py [FUCAD_EXEC]
 
-If FUCAD_EXEC is omitted the script falls back to 'FuCad' on PATH.
-If FUCAD_EXEC is a directory containing bin/FuCad, that binary is used.
+If FUCAD_EXEC is omitted the script falls back to 'FuCadUp' on PATH.
+If FUCAD_EXEC is a directory containing bin/FuCadUp, that binary is used.
 If FUCAD_EXEC is an executable path, it is used directly.
 
 This script returns 0 if all GUI modules run successfully. Otherwise it returns the last non-zero
@@ -25,19 +25,19 @@ from pathlib import Path
 
 
 def find_executable(arg: str | None) -> str:
-    """Return the FuCad executable path to use.
+    """Return the FuCadUp executable path to use.
 
-    If `arg` is None or empty, returns the plain name 'FuCad' which will be looked up on PATH. If
-    `arg` is a directory and contains `bin/FuCad` that binary will be returned. If `arg` is a file
+    If `arg` is None or empty, returns the plain name 'FuCadUp' which will be looked up on PATH. If
+    `arg` is a directory and contains `bin/FuCadUp` that binary will be returned. If `arg` is a file
     path it is returned as-is. Otherwise the original argument is returned.
 
-    Common use cases: use the FuCad binary from a build directory or an installed FuCad prefix.
+    Common use cases: use the FuCadUp binary from a build directory or an installed FuCadUp prefix.
     """
     if not arg:
-        return "FuCad"
+        return "FuCadUp"
     p = Path(arg)
     if p.is_dir():
-        candidate = p / "bin" / "FuCad"
+        candidate = p / "bin" / "FuCadUp"
         if candidate.exists():
             return str(candidate)
     if p.is_file():
@@ -49,30 +49,30 @@ def find_executable(arg: str | None) -> str:
 def validate_executable(path: str) -> tuple[bool, str]:
     """Return (ok, message). Checks if the executable exists or is likely on PATH.
 
-    This is best effort: if a bare name is given (e.g. 'FuCad') we can't stat it here, so we
+    This is best effort: if a bare name is given (e.g. 'FuCadUp') we can't stat it here, so we
     accept it but warn. If the path points to a file, we check executability. Also warn if the name
-    looks like the CLI-only 'FuCadCmd'.
+    looks like the CLI-only 'FuCadUpCmd'.
     """
     p = Path(path)
     if p.is_file():
         if not os.access(str(p), os.X_OK):
             return False, f"File exists but is not executable: {path}"
-        if p.name.endswith("FuCadCmd"):
+        if p.name.endswith("FuCadUpCmd"):
             return (
                 True,
                 (
-                    "Warning: executable looks like 'FuCadCmd' (CLI); GUI tests require the GUI "
-                    "binary 'FuCad'."
+                    "Warning: executable looks like 'FuCadUpCmd' (CLI); GUI tests require the GUI "
+                    "binary 'FuCadUp'."
                 ),
             )
         return True, ""
     # Bare name or non-existent path: accept but warn
-    if p.name.endswith("FuCadCmd"):
+    if p.name.endswith("FuCadUpCmd"):
         return (
             True,
             (
-                "Warning: executable name looks like 'FuCadCmd' (CLI); GUI tests require the GUI "
-                "binary 'FuCad'."
+                "Warning: executable name looks like 'FuCadUpCmd' (CLI); GUI tests require the GUI "
+                "binary 'FuCadUp'."
             ),
         )
     return True, ""
@@ -94,7 +94,7 @@ def run_and_capture(cmd: list[str]) -> tuple[int, str]:
 
 
 def parse_registered_tests(output: str) -> list[str]:
-    """Parse output from `FuCad -t` and return a list of registered test unit names.
+    """Parse output from `FuCadUp -t` and return a list of registered test unit names.
 
     The function looks for the section starting with the literal 'Registered test units:' and
     then collects non-empty, stripped lines from that point onwards as test names.
@@ -116,20 +116,20 @@ def parse_registered_tests(output: str) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    """Entry point: run GUI test modules registered in the FuCad executable.
+    """Entry point: run GUI test modules registered in the FuCadUp executable.
 
     Returns the last non-zero exit code from any GUI test module, or 0 on success.
     """
     exec_arg = argv[1] if len(argv) > 1 else None
     fucad_exec = find_executable(exec_arg)
 
-    print(f"Using FuCad executable: {fucad_exec}")
+    print(f"Using FuCadUp executable: {fucad_exec}")
 
     ok, msg = validate_executable(fucad_exec)
     if msg:
         print(msg, file=sys.stderr)
     if not ok:
-        print(f"Aborting: invalid FuCad executable: {fucad_exec}", file=sys.stderr)
+        print(f"Aborting: invalid FuCadUp executable: {fucad_exec}", file=sys.stderr)
         return 3
 
     code, out = run_and_capture([fucad_exec, "-t"])

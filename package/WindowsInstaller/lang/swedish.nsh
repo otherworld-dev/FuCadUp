@@ -1,5 +1,5 @@
 ﻿/*
-FuCad Installer Language File
+FuCadUp Installer Language File
 Language: Swedish
 */
 
@@ -14,18 +14,18 @@ ${LangFileString} TEXT_WELCOME "Denna guide tar dig igenom installationen av $(^
 #${LangFileString} TEXT_CONFIGURE_PYTHON "Kompilerar Pythonskript..."
 
 ${LangFileString} TEXT_FINISH_DESKTOP "Skapa skrivbordsgenväg"
-${LangFileString} TEXT_FINISH_WEBSITE "Besök fucad.org för de senaste nyheterna, support och tips"
+${LangFileString} TEXT_FINISH_WEBSITE "Besök github.com/otherworld-dev/FuCadUp för de senaste nyheterna, support och tips"
 
-#${LangFileString} FileTypeTitle "FuCad-dokument"
+#${LangFileString} FileTypeTitle "FuCadUp-dokument"
 
 #${LangFileString} SecAllUsersTitle "Installera för alla användare?"
 ${LangFileString} SecFileAssocTitle "Filassociationer"
 ${LangFileString} SecDesktopTitle "Skrivbordsikon"
 
-${LangFileString} SecCoreDescription "FuCad-filerna."
-#${LangFileString} SecAllUsersDescription "Installera FuCad för alla användare, eller enbart för den aktuella användaren."
-${LangFileString} SecFileAssocDescription "Filer med ändelsen .FCStd kommer att automatiskt öppnas i FuCad."
-${LangFileString} SecDesktopDescription "En FuCad-ikon på skrivbordet."
+${LangFileString} SecCoreDescription "FuCadUp-filerna."
+#${LangFileString} SecAllUsersDescription "Installera FuCadUp för alla användare, eller enbart för den aktuella användaren."
+${LangFileString} SecFileAssocDescription "Filer med ändelsen .FCStd kommer att automatiskt öppnas i FuCadUp."
+${LangFileString} SecDesktopDescription "En FuCadUp-ikon på skrivbordet."
 #${LangFileString} SecDictionaries "Ordböcker"
 #${LangFileString} SecDictionariesDescription "Stavningskontrollens ordböcker som kan laddas ned och installeras."
 
@@ -34,37 +34,37 @@ ${LangFileString} SecDesktopDescription "En FuCad-ikon på skrivbordet."
 
 #${LangFileString} DictionariesFailed 'Nedladdning av ordbok för språk $\"$R3$\" misslyckades.'
 
-#${LangFileString} ConfigInfo "Följande konfigurering av FuCad kommer att ta en stund."
+#${LangFileString} ConfigInfo "Följande konfigurering av FuCadUp kommer att ta en stund."
 
 #${LangFileString} RunConfigureFailed "Kunde inte köra konfigurationsskriptet"
 ${LangFileString} InstallRunning "Installationsprogrammet körs redan!"
-${LangFileString} AlreadyInstalled "FuCad ${APP_SERIES_KEY2} är redan installerad!$\r$\n\
-				Vill du ändå installera FuCad över den nuvarande versionen?"
-${LangFileString} NewerInstalled "Du försöker att installera en äldre version av FuCad än vad du har installerad.$\r$\n\
-				  Om du verkligen vill detta måste du avinstallera den befintliga FuCad $OldVersionNumber innan."
+${LangFileString} AlreadyInstalled "FuCadUp ${APP_SERIES_KEY2} är redan installerad!$\r$\n\
+				Vill du ändå installera FuCadUp över den nuvarande versionen?"
+${LangFileString} NewerInstalled "Du försöker att installera en äldre version av FuCadUp än vad du har installerad.$\r$\n\
+				  Om du verkligen vill detta måste du avinstallera den befintliga FuCadUp $OldVersionNumber innan."
 
-#${LangFileString} FinishPageMessage "Gratulerar! FuCad har installerats framgångsrikt.$\r$\n\
+#${LangFileString} FinishPageMessage "Gratulerar! FuCadUp har installerats framgångsrikt.$\r$\n\
 #					$\r$\n\
-#					(Den första starten av FuCad kan ta en stund.)"
-${LangFileString} FinishPageRun "Kör FuCad"
+#					(Den första starten av FuCadUp kan ta en stund.)"
+${LangFileString} FinishPageRun "Kör FuCadUp"
 
-${LangFileString} UnNotInRegistryLabel "Kan inte hitta FuCad i registret.$\r$\n\
+${LangFileString} UnNotInRegistryLabel "Kan inte hitta FuCadUp i registret.$\r$\n\
 					Genvägar på skrivbordet och i startmenyn kommer inte att tas bort."
-${LangFileString} UnInstallRunning "Du måste stänga FuCad först!"
-${LangFileString} UnNotAdminLabel "Du måste ha administratörsbehörighet för att avinstallera FuCad!"
-${LangFileString} UnReallyRemoveLabel "Är du säker på att du verkligen vill fullständigt ta bort FuCad och alla dess komponenter?"
-${LangFileString} UnFuCadPreferencesTitle 'FuCad-användarinställningar'
+${LangFileString} UnInstallRunning "Du måste stänga FuCadUp först!"
+${LangFileString} UnNotAdminLabel "Du måste ha administratörsbehörighet för att avinstallera FuCadUp!"
+${LangFileString} UnReallyRemoveLabel "Är du säker på att du verkligen vill fullständigt ta bort FuCadUp och alla dess komponenter?"
+${LangFileString} UnFuCadUpPreferencesTitle 'FuCadUp-användarinställningar'
 
 #${LangFileString} SecUnProgDescription "Avinstallerar xxx."
-${LangFileString} SecUnPreferencesDescription 'Raderar FuCad-konfiguration$\r$\n\
+${LangFileString} SecUnPreferencesDescription 'Raderar FuCadUp-konfiguration$\r$\n\
 						(katalog $\"$AppPre\username\$\r$\n\
 						$AppSuff\$\r$\n\
 						${APP_DIR_USERDATA}$\")$\r$\n\
 						för dig eller för alla användare (om du är admin).'
-${LangFileString} DialogUnPreferences 'You chose to delete the FuCads user configuration.$\r$\n\
-						This will also delete all installed FuCad addons.$\r$\n\
+${LangFileString} DialogUnPreferences 'You chose to delete the FuCadUps user configuration.$\r$\n\
+						This will also delete all installed FuCadUp addons.$\r$\n\
 						Do you agree with this?'
-${LangFileString} SecUnProgramFilesDescription "Avinstallera FuCad och alla dess komponenter."
+${LangFileString} SecUnProgramFilesDescription "Avinstallera FuCadUp och alla dess komponenter."
 
 ${LangFileString} DirNotEmptyWarning "The selected folder '$INSTDIR' is not empty.$\r$\n\
                         The installer will remove all its content before installing. Continue?"

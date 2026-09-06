@@ -12,38 +12,38 @@ if(NOT DEFINED APPDATA_RELEASE_DATE)
 endif()
 
 configure_file(
-    org.fucad.FuCad.metainfo.xml.in
-    ${CMAKE_BINARY_DIR}/org.fucad.FuCad.metainfo.xml
+    org.fucadup.FuCadUp.metainfo.xml.in
+    ${CMAKE_BINARY_DIR}/org.fucadup.FuCadUp.metainfo.xml
 )
 install(
-    FILES ${CMAKE_BINARY_DIR}/org.fucad.FuCad.metainfo.xml
+    FILES ${CMAKE_BINARY_DIR}/org.fucadup.FuCadUp.metainfo.xml
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo
 )
 
 install(
-    FILES org.fucad.FuCad.desktop
+    FILES org.fucadup.FuCadUp.desktop
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
 )
 
 install(
-    FILES org.fucad.FuCad.xml
+    FILES org.fucadup.FuCadUp.xml
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/mime/packages
 )
 
 configure_file(
-    FuCad.thumbnailer.in
-    ${CMAKE_BINARY_DIR}/FuCad.thumbnailer
+    FuCadUp.thumbnailer.in
+    ${CMAKE_BINARY_DIR}/FuCadUp.thumbnailer
 )
 install(
-    FILES ${CMAKE_BINARY_DIR}/FuCad.thumbnailer
+    FILES ${CMAKE_BINARY_DIR}/FuCadUp.thumbnailer
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/thumbnailers
 )
 
 configure_file(
-    ${CMAKE_SOURCE_DIR}/src/Tools/fucad-thumbnailer.in
-    ${CMAKE_BINARY_DIR}/fucad-thumbnailer
+    ${CMAKE_SOURCE_DIR}/src/Tools/fucadup-thumbnailer.in
+    ${CMAKE_BINARY_DIR}/fucadup-thumbnailer
 )
 install(
-    PROGRAMS ${CMAKE_BINARY_DIR}/fucad-thumbnailer
+    PROGRAMS ${CMAKE_BINARY_DIR}/fucadup-thumbnailer
     TYPE BIN
 )

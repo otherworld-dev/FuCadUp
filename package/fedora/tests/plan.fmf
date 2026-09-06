@@ -1,5 +1,5 @@
 summary:
-    Run All FuCad python tests
+    Run All FuCadUp python tests
 prepare:
     how: install
     package: 

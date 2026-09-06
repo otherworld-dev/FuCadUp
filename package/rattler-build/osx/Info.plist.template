@@ -5,13 +5,13 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleExecutable</key>
-	<string>FuCad</string>
+	<string>FuCadUp</string>
 	<key>CFBundleGetInfoString</key>
 	<string></string>
 	<key>CFBundleIconFile</key>
 	<string>fucad.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>org.fucad.FuCad</string>
+	<string>org.fucadup.FuCadUp</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleLongVersionString</key>
@@ -74,9 +74,9 @@
 				<string>public.data</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>FuCad Document</string>
+			<string>FuCadUp Document</string>
 			<key>UTTypeIdentifier</key>
-			<string>org.fucad.fcstd</string>
+			<string>org.fucadup.fcstd</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

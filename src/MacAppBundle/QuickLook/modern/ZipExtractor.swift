@@ -110,7 +110,7 @@ enum ZIPParserError: Error, LocalizedError {
 
 struct SwiftZIPParser {
     private static let logger = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "org.fucad.quicklook",
+        subsystem: Bundle.main.bundleIdentifier ?? "org.fucadup.quicklook",
         category: "SwiftZIPParser"
     )
 

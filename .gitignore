@@ -78,3 +78,4 @@ tsupdate_stdout.log
 .claude/
 CLAUDE.md
 .claudeignore
+.superpowers/

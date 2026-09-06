@@ -2,8 +2,8 @@ linux/AppDir/usr
 linux/AppDir/*.desktop
 linux/AppDir/*.svg
 linux/AppDir/packages.txt
-windows/FuCad_*Windows*
-osx/FuCad.app
+windows/FuCadUp_*Windows*
+osx/FuCadUp.app
 **.AppImage
 **.AppImage.zsync
 **.dmg

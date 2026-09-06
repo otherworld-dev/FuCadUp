@@ -163,7 +163,7 @@ class BaseExport Exception: public BaseClass
     TYPESYSTEM_HEADER_WITH_OVERRIDE();
 
 public:
-    explicit Exception(std::string message = "FuCad Exception");
+    explicit Exception(std::string message = "FuCadUp Exception");
     Exception(const Exception& inst);
     Exception(Exception&& inst) noexcept;
 

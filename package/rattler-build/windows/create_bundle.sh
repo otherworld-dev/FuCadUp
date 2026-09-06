@@ -5,10 +5,10 @@ set -x
 
 conda_env="$(pwd)/../.pixi/envs/default/"
 
-copy_dir="FuCad_Windows"
+copy_dir="FuCadUp_Windows"
 mkdir -p ${copy_dir}/bin
 
-# Copy Conda's Python and (U)CRT to FuCad/bin
+# Copy Conda's Python and (U)CRT to FuCadUp/bin
 cp -a ${conda_env}/DLLs ${copy_dir}/bin/DLLs
 cp -a ${conda_env}/Lib ${copy_dir}/bin/Lib
 cp -a ${conda_env}/Scripts ${copy_dir}/bin/Scripts
@@ -25,9 +25,9 @@ cp -a ${conda_env}/Library/mingw-w64/bin/* ${copy_dir}/bin
 cp -a ${conda_env}/Library/share ${copy_dir}/share
 # get all the dependency .dlls
 cp -a ${conda_env}/Library/bin/*.dll ${copy_dir}/bin
-# Copy FuCad build. The conda package lowercases the executables (fucad.exe, fucadcmd.exe) and the
+# Copy FuCadUp build. The conda package lowercases the executables (fucadup.exe, fucadupcmd.exe) and the
 # Python module keeps the FreeCAD name (FreeCAD.pyd); globs are case-sensitive here, so match both.
-cp -a ${conda_env}/Library/bin/fucad* ${copy_dir}/bin
+cp -a ${conda_env}/Library/bin/fucadup* ${copy_dir}/bin
 cp -a ${conda_env}/Library/bin/FreeCAD* ${copy_dir}/bin
 cp -a ${conda_env}/Library/data ${copy_dir}/data
 cp -a ${conda_env}/Library/Ext ${copy_dir}/Ext
@@ -54,12 +54,12 @@ echo 'Prefix = ../lib/qt6' >> ${copy_dir}/bin/qt6.conf
 # convenient shortcuts to run the binaries
 if [ -x /c/ProgramData/chocolatey/tools/shimgen.exe ]; then
     pushd ${copy_dir}
-    /c/ProgramData/chocolatey/tools/shimgen.exe -p bin/fucadcmd.exe -i "$(pwd)/../../../WindowsInstaller/icons/FuCad.ico" -o "$(pwd)/FuCadCmd.exe"
-    /c/ProgramData/chocolatey/tools/shimgen.exe --gui -p bin/fucad.exe -i "$(pwd)/../../../WindowsInstaller/icons/FuCad.ico" -o "$(pwd)/FuCad.exe"
+    /c/ProgramData/chocolatey/tools/shimgen.exe -p bin/fucadupcmd.exe -i "$(pwd)/../../../WindowsInstaller/icons/FuCadUp.ico" -o "$(pwd)/FuCadUpCmd.exe"
+    /c/ProgramData/chocolatey/tools/shimgen.exe --gui -p bin/fucadup.exe -i "$(pwd)/../../../WindowsInstaller/icons/FuCadUp.ico" -o "$(pwd)/FuCadUp.exe"
     popd
 fi
 
-version_name="FuCad_${BUILD_TAG}-Windows-$(uname -m)"
+version_name="FuCadUp_${BUILD_TAG}-Windows-$(uname -m)"
 
 echo -e "################"
 echo -e "version_name:  ${version_name}"
@@ -127,7 +127,7 @@ if [[ "${WINDOWS_SIGN_RELEASE:-0}" == "1" ]]; then
     done
 
     # Manually check the important one!
-    signtool verify -pa "$SIGN_DIR/bin/FuCad.exe"
+    signtool verify -pa "$SIGN_DIR/bin/FuCadUp.exe"
 
     # ...and a nested one, which is what proves the walk reached the plugins and extension modules
     # that Smart App Control blocks. Verifying only the launcher is how the gap went unnoticed.
@@ -146,15 +146,15 @@ else
   echo "Not logged into Azure -- skipping signing."
 fi
 
-echo "Running FuCad command-line smoke test..."
-if ! "$SIGN_DIR/bin/fucadcmd.exe" --safe-mode --version; then
-  echo "FuCad command-line smoke test failed; the Windows bundle cannot start."
+echo "Running FuCadUp command-line smoke test..."
+if ! "$SIGN_DIR/bin/fucadupcmd.exe" --safe-mode --version; then
+  echo "FuCadUp command-line smoke test failed; the Windows bundle cannot start."
   exit 1
 fi
 
-echo "Running FuCad bundled Pivy smoke test..."
-if ! "$SIGN_DIR/bin/fucadcmd.exe" --safe-mode --console "import pivy; from pivy import coin; print(pivy.__file__); print(coin.SoDB.getVersion())"; then
-  echo "FuCad bundled Pivy smoke test failed; the Windows bundle cannot import the bundled Coin/Pivy runtime."
+echo "Running FuCadUp bundled Pivy smoke test..."
+if ! "$SIGN_DIR/bin/fucadupcmd.exe" --safe-mode --console "import pivy; from pivy import coin; print(pivy.__file__); print(coin.SoDB.getVersion())"; then
+  echo "FuCadUp bundled Pivy smoke test failed; the Windows bundle cannot import the bundled Coin/Pivy runtime."
   exit 1
 fi
 
@@ -169,7 +169,7 @@ if [ "${MAKE_INSTALLER}" == "true" ]; then
         -D"ExeFile=${version_name}-installer.exe" \
         -D"FILES_FUCAD=${FILES_FUCAD}" \
         -X'SetCompressor /FINAL lzma' \
-        ../../WindowsInstaller/FuCad-installer.nsi
+        ../../WindowsInstaller/FuCadUp-installer.nsi
     mv ../../WindowsInstaller/${version_name}-installer.exe .
     echo "Created installer ${version_name}-installer.exe"
     # See if we can sign the installer exe as well:

@@ -4,11 +4,11 @@
 
 # Default values
 SIGNING_KEY_ID="${FUCAD_SIGNING_KEY_ID}"
-KEYCHAIN_PROFILE="FuCad"
+KEYCHAIN_PROFILE="FuCadUp"
 CONTAINING_FOLDER="."
-APP_NAME="FuCad.app"
-VOLUME_NAME="FuCad"
-DMG_NAME="FuCad-macOS-$(uname -m).dmg"
+APP_NAME="FuCadUp.app"
+VOLUME_NAME="FuCadUp"
+DMG_NAME="FuCadUp-macOS-$(uname -m).dmg"
 DMG_SETTINGS="dmg_settings.py"
 
 # Function to display usage information
@@ -18,7 +18,7 @@ function usage {
     echo "                [-v|--volume-name <volume_name>] [-o|--output <image_name.dmg>]"
     echo "                [-s|--dmg-settings <dmg_settings.py>]"
     echo
-    echo "This script signs and notarizes a FuCad.app bundle. It expects that the bundle is in a folder"
+    echo "This script signs and notarizes a FuCadUp.app bundle. It expects that the bundle is in a folder"
     echo "by itself (that folder will be used as the basis for the created disk image file, so anything"
     echo "else in it will become part of the image). That folder should be located in the same folder as"
     echo "this script."
@@ -150,19 +150,19 @@ if [ -d "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns" ]; then
     THUMBNAIL_ENTITLEMENTS="${SCRIPT_DIR}/../../src/MacAppBundle/QuickLook/modern/ThumbnailExtension.entitlements"
 
     # Sign individual executables within .appex bundles first
-    if [ -f "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadThumbnailExtension.appex/Contents/MacOS/FuCadThumbnailExtension" ]; then
-        run_codesign "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadThumbnailExtension.appex/Contents/MacOS/FuCadThumbnailExtension"
+    if [ -f "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadUpThumbnailExtension.appex/Contents/MacOS/FuCadUpThumbnailExtension" ]; then
+        run_codesign "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadUpThumbnailExtension.appex/Contents/MacOS/FuCadUpThumbnailExtension"
     fi
-    if [ -f "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadPreviewExtension.appex/Contents/MacOS/FuCadPreviewExtension" ]; then
-        run_codesign "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadPreviewExtension.appex/Contents/MacOS/FuCadPreviewExtension"
+    if [ -f "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadUpPreviewExtension.appex/Contents/MacOS/FuCadUpPreviewExtension" ]; then
+        run_codesign "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadUpPreviewExtension.appex/Contents/MacOS/FuCadUpPreviewExtension"
     fi
 
     # Then sign the .appex bundles themselves with extension-specific entitlements
-    if [ -d "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadThumbnailExtension.appex" ] && [ -f "$THUMBNAIL_ENTITLEMENTS" ]; then
-        run_codesign_extension "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadThumbnailExtension.appex" "$THUMBNAIL_ENTITLEMENTS"
+    if [ -d "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadUpThumbnailExtension.appex" ] && [ -f "$THUMBNAIL_ENTITLEMENTS" ]; then
+        run_codesign_extension "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadUpThumbnailExtension.appex" "$THUMBNAIL_ENTITLEMENTS"
     fi
-    if [ -d "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadPreviewExtension.appex" ] && [ -f "$PREVIEW_ENTITLEMENTS" ]; then
-        run_codesign_extension "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadPreviewExtension.appex" "$PREVIEW_ENTITLEMENTS"
+    if [ -d "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadUpPreviewExtension.appex" ] && [ -f "$PREVIEW_ENTITLEMENTS" ]; then
+        run_codesign_extension "${CONTAINING_FOLDER}/${APP_NAME}/Contents/PlugIns/FuCadUpPreviewExtension.appex" "$PREVIEW_ENTITLEMENTS"
     fi
 fi
 

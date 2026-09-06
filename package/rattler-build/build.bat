@@ -35,5 +35,5 @@ if %ERRORLEVEL% neq 0 exit 1
 ninja -C build install
 if %ERRORLEVEL% neq 0 exit 1
 
-ren %LIBRARY_PREFIX%\bin\FuCad.exe fucad.exe
-ren %LIBRARY_PREFIX%\bin\FuCadCmd.exe fucadcmd.exe
+ren %LIBRARY_PREFIX%\bin\FuCadUp.exe fucadup.exe
+ren %LIBRARY_PREFIX%\bin\FuCadUpCmd.exe fucadupcmd.exe

@@ -9,5 +9,5 @@ else()
 endif()
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(FuCad FuCad.cpp)
-target_link_libraries(FuCad)
+add_executable(FuCadUp FuCadUp.cpp)
+target_link_libraries(FuCadUp)

@@ -303,10 +303,10 @@
         <file>zoom-out.svg</file>
         <file>zoom-selection.svg</file>
     </qresource>
-    <qresource prefix="/icons/FuCad-default">
+    <qresource prefix="/icons/FuCadUp-default">
         <file>index.theme</file>
     </qresource>
-    <qresource prefix="/icons/FuCad-default/scalable">
+    <qresource prefix="/icons/FuCadUp-default/scalable">
         <!-- provide overrides for all system icons -->
         <file>delete.svg</file>
         <file>list-remove.svg</file>

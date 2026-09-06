@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # Copyright (c) 2026 FuCad contributors
 
-"""Regenerate every FuCad brand asset from the definitions in ``brand.py``.
+"""Regenerate every FuCadUp brand asset from the definitions in ``brand.py``.
 
 Run it from anywhere after changing the palette or the mark geometry::
 
@@ -19,6 +19,8 @@ from PIL import Image, ImageDraw
 from brand import (
     AMBER,
     AMBER_LIT,
+    BENCH_DEEP,
+    BENCH_LIT,
     INK,
     MARK_ASPECT,
     MIST,
@@ -39,16 +41,20 @@ from brand import (
     rounded_rect_mask,
     rounded_rect_ring,
     svg_document,
+    svg_fill,
     svg_path,
     tracked_width,
     write_icns,
     write_ico,
 )
 
-WORDMARK = "FuCad"
-ATTRIBUTION = "Fork of FreeCAD  \u00b7  LGPL-2.1-or-later"
+WORDMARK = "FuCadUp"
+ATTRIBUTION = "Fork of FuCad  \u00b7  LGPL-2.1-or-later"
 
 ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
+
+# The watermark behind an empty workspace is sized to the mark's own proportions.
+WATERMARK_SIZE = (104.0, float(round(104.0 / MARK_ASPECT)))
 
 
 # --------------------------------------------------------------------------
@@ -57,7 +63,7 @@ ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
 
 
 def app_icon(size):
-    """The FuCad application icon: the extruded mark on a steel plate."""
+    """The FuCadUp application icon: the padded mark on a steel plate."""
     canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     plate_mask = rounded_rect_mask((size, size), size * 0.215)
     canvas.paste(linear_gradient((size, size), STEEL_LIT, STEEL_DEEP, 55.0), (0, 0), plate_mask)
@@ -67,12 +73,14 @@ def app_icon(size):
         highlight = Image.new("RGBA", (size, size), rgba(PAPER, 38))
         canvas.paste(highlight, (0, 0), ring)
 
-    inset = size * 0.175
+    inset = size * 0.13
     shapes = mark_polygons(
         (inset, inset, size - 2 * inset, size - 2 * inset),
         rgba(PAPER),
         rgba(AMBER_LIT),
         rgba(AMBER),
+        plane_line=rgba(PAPER, 90),
+        plane_fill=rgba(PAPER, 14),
     )
     canvas.alpha_composite(render_polygons((size, size), shapes))
     return canvas
@@ -111,10 +119,11 @@ def document_icon(size):
     scale = size / 64.0
     shapes = _page_shapes(scale)
     shapes += mark_polygons(
-        (17.0 * scale, 21.0 * scale, 31.0 * scale, 31.0 * scale),
+        (16.0 * scale, 22.0 * scale, 33.0 * scale, 30.0 * scale),
         rgba(STEEL),
         rgba(AMBER_LIT),
         rgba(AMBER),
+        plane_line=rgba(STEEL, 120),
     )
     return render_polygons((size, size), shapes)
 
@@ -137,32 +146,47 @@ def script_icon(size):
 # --------------------------------------------------------------------------
 
 
-def _steel_backdrop(size, spacing, glow_at=(0.28, 0.42)):
-    """Deep steel gradient with construction lines and a warm accent glow."""
+def _workbench(size, spacing, glow_at=(0.72, 0.62)):
+    """The workbench: deep teal gradient, construction lines and a warm glow.
+
+    ``glow_at`` is a fraction of the canvas; put it where the ghost mark stands
+    so the light appears to fall on its sketch plane.
+    """
     width, height = size
-    canvas = linear_gradient(size, STEEL_LIT, (5, 26, 33), 52.0).convert("RGBA")
-    canvas.alpha_composite(isometric_grid(size, spacing, PAPER, 13))
+    canvas = linear_gradient(size, BENCH_LIT, BENCH_DEEP, 52.0).convert("RGBA")
+    canvas.alpha_composite(isometric_grid(size, spacing, PAPER, 11))
     canvas.alpha_composite(
-        radial_glow(size, (width * glow_at[0], height * glow_at[1]), width * 0.55, AMBER, 24)
+        radial_glow(size, (width * glow_at[0], height * glow_at[1]), width * 0.5, AMBER, 34)
     )
     return canvas
 
 
-def _ghost_mark(canvas, centre, height, alpha=(16, 26, 10)):
+def _ghost_mark(canvas, centre, height, alpha=(18, 30, 12, 40, 6)):
     """Composite an oversized, barely-there mark used as a watermark.
 
     ``centre`` and ``height`` are fractions of the canvas, so the watermark
-    keeps the same weight whatever surface it lands on.
+    keeps the same weight whatever surface it lands on. ``alpha`` holds the
+    opacity of the top face, lit walls, shaded walls, plane outline and plane
+    fill in that order.
     """
     canvas_width, canvas_height = canvas.size
     tall = canvas_height * height
     wide = tall * MARK_ASPECT
     box = (canvas_width * centre[0] - wide / 2, canvas_height * centre[1] - tall / 2, wide, tall)
-    shapes = mark_polygons(box, rgba(PAPER, alpha[0]), rgba(PAPER, alpha[1]), rgba(PAPER, alpha[2]))
+    shapes = mark_polygons(
+        box,
+        rgba(PAPER, alpha[0]),
+        rgba(PAPER, alpha[1]),
+        rgba(PAPER, alpha[2]),
+        plane_line=rgba(PAPER, alpha[3]),
+        plane_fill=rgba(PAPER, alpha[4]),
+    )
     canvas.alpha_composite(render_polygons(canvas.size, shapes))
 
 
-def _lockup(canvas, origin, scale, wordmark_size, tagline_size, ink=PAPER, subtle=MIST):
+def _lockup(
+    canvas, origin, scale, wordmark_size, tagline_size, ink=PAPER, subtle=MIST, wordmark=WORDMARK
+):
     """Draw the plate icon, the wordmark, the accent rule and the tagline."""
     draw = ImageDraw.Draw(canvas)
     plate_size = int(round(wordmark_size * 1.45))
@@ -174,7 +198,7 @@ def _lockup(canvas, origin, scale, wordmark_size, tagline_size, ink=PAPER, subtl
     word_font = load_font(int(round(wordmark_size)), "SemiBold")
     tracking = wordmark_size * 0.012
     baseline = origin[1] + wordmark_size * 0.06
-    width = draw_tracked(draw, (text_x, baseline), WORDMARK, word_font, rgba(ink), tracking)
+    width = draw_tracked(draw, (text_x, baseline), wordmark, word_font, rgba(ink), tracking)
 
     rule_y = baseline + wordmark_size * 0.24
     draw.rectangle(
@@ -196,8 +220,8 @@ def _lockup(canvas, origin, scale, wordmark_size, tagline_size, ink=PAPER, subtl
 def splash(scale=1):
     """Startup splash screen; the version string is painted on it at runtime."""
     size = (640 * scale, 400 * scale)
-    canvas = _steel_backdrop(size, 30 * scale)
-    _ghost_mark(canvas, (0.77, 0.50), 0.86)
+    canvas = _workbench(size, 30 * scale)
+    _ghost_mark(canvas, (0.76, 0.54), 0.74)
 
     _lockup(canvas, (52 * scale, 150 * scale), scale, 72 * scale, 14 * scale)
 
@@ -217,8 +241,8 @@ def splash(scale=1):
 def about_image(development):
     """Banner shown at the top of the About dialog."""
     size = (552, 189)
-    canvas = _steel_backdrop(size, 22, glow_at=(0.22, 0.5))
-    _ghost_mark(canvas, (0.86, 0.50), 1.05)
+    canvas = _workbench(size, 22, glow_at=(0.82, 0.62))
+    _ghost_mark(canvas, (0.84, 0.52), 0.95)
 
     _lockup(canvas, (32, 96), 1.0, 52, 12)
 
@@ -243,8 +267,8 @@ def about_image(development):
 def readme_banner():
     """Wide lockup used as the project hero image in the README."""
     size = (1200, 300)
-    canvas = _steel_backdrop(size, 34, glow_at=(0.24, 0.5))
-    _ghost_mark(canvas, (0.84, 0.50), 1.15)
+    canvas = _workbench(size, 34, glow_at=(0.8, 0.62))
+    _ghost_mark(canvas, (0.82, 0.52), 1.0)
     _lockup(canvas, (88, 158), 1.0, 96, 19)
     return canvas
 
@@ -257,14 +281,14 @@ def readme_banner():
 def installer_banner():
     """Left-hand panel of the Windows installer wizard."""
     size = (164, 314)
-    canvas = _steel_backdrop(size, 24, glow_at=(0.5, 0.28))
-    _ghost_mark(canvas, (0.50, 0.82), 0.52)
+    canvas = _workbench(size, 24, glow_at=(0.5, 0.88))
+    _ghost_mark(canvas, (0.50, 0.84), 0.42)
 
     plate = app_icon(76)
     canvas.alpha_composite(plate, ((size[0] - 76) // 2, 52))
 
     draw = ImageDraw.Draw(canvas)
-    word_font = load_font(34, "SemiBold")
+    word_font = load_font(29, "SemiBold")
     tracking = 0.6
     width = tracked_width(word_font, WORDMARK, tracking)
     left = (size[0] - width) / 2
@@ -323,7 +347,7 @@ def dmg_background():
     )
 
     hint_font = load_font(13, "Regular")
-    hint = "DRAG FUCAD INTO YOUR APPLICATIONS FOLDER"
+    hint = "DRAG FUCADUP INTO YOUR APPLICATIONS FOLDER"
     hint_width = tracked_width(hint_font, hint, 2.2)
     draw_tracked(draw, ((size[0] - hint_width) / 2, 296), hint, hint_font, rgba(STEEL), 2.2)
     return canvas.convert("RGB")
@@ -336,10 +360,17 @@ def dmg_background():
 
 def app_icon_svg():
     """Vector master of the application icon."""
-    inset = 48 * 0.175
-    shapes = mark_polygons((inset, inset, 48 - 2 * inset, 48 - 2 * inset), PAPER, AMBER_LIT, AMBER)
+    inset = 48 * 0.13
+    shapes = mark_polygons(
+        (inset, inset, 48 - 2 * inset, 48 - 2 * inset),
+        PAPER,
+        AMBER_LIT,
+        AMBER,
+        plane_line=rgba(PAPER, 90),
+        plane_fill=rgba(PAPER, 14),
+    )
     faces = "\n".join(
-        f'  <path d="{svg_path(points)}" fill="{hex_of(colour)}"/>' for points, colour in shapes
+        f'  <path d="{svg_path(points)}" {svg_fill(colour)}/>' for points, colour in shapes
     )
     body = (
         "  <defs>\n"
@@ -353,26 +384,28 @@ def app_icon_svg():
         f' stroke="{hex_of(PAPER)}" stroke-opacity="0.15" stroke-width="1"/>\n'
         f"{faces}"
     )
-    return svg_document(48, 48, body, "FuCad")
+    return svg_document(48, 48, body, "FuCadUp")
 
 
 def document_icon_svg():
     """Vector master of the ``.FCStd`` document icon."""
     shapes = [(PAGE_BORDER, STEEL), (PAGE, PAPER), (PAGE_FOLD, AMBER)]
-    shapes += mark_polygons((17.0, 21.0, 31.0, 31.0), STEEL, AMBER_LIT, AMBER)
-    body = "\n".join(
-        f'  <path d="{svg_path(points)}" fill="{hex_of(colour)}"/>' for points, colour in shapes
+    shapes += mark_polygons(
+        (16.0, 22.0, 33.0, 30.0), STEEL, AMBER_LIT, AMBER, plane_line=rgba(STEEL, 120)
     )
-    return svg_document(64, 64, body, "FuCad document")
+    body = "\n".join(
+        f'  <path d="{svg_path(points)}" {svg_fill(colour)}/>' for points, colour in shapes
+    )
+    return svg_document(64, 64, body, "FuCadUp document")
 
 
 def background_svg(colour, opacity):
     """Vector master of the watermark shown behind an empty workspace."""
-    width, height = 98.0, 102.0
-    shapes = mark_polygons((0.0, 0.0, width, height), colour, colour, colour)
+    width, height = WATERMARK_SIZE
+    shapes = mark_polygons((0.0, 0.0, width, height), colour, colour, colour, plane_line=colour)
     faces = "\n".join(f'    <path d="{svg_path(points)}"/>' for points, _ in shapes)
     body = f'  <g fill="{hex_of(colour)}" opacity="{opacity}">\n{faces}\n  </g>'
-    return svg_document(round(width), round(height), body, "FuCad")
+    return svg_document(round(width), round(height), body, "FuCadUp")
 
 
 # --------------------------------------------------------------------------
@@ -447,23 +480,22 @@ def generate(repo):
     for name, colour, opacity in watermarks:
         for folder in ("images_classic", "images_dark-light"):
             out.text(f"{stylesheets}/{folder}/{name}.svg", background_svg(colour, opacity))
-        shapes = [
-            (points, rgba(colour, round(opacity * 255)))
-            for points, _ in mark_polygons((0.0, 0.0, 98.0, 102.0), colour, colour, colour)
-        ]
-        out.image(f"{stylesheets}/images_classic/{name}.png", render_polygons((98, 102), shapes))
+        tint = rgba(colour, round(opacity * 255))
+        shapes = mark_polygons((0.0, 0.0) + WATERMARK_SIZE, tint, tint, tint, plane_line=tint)
+        pixels = (int(WATERMARK_SIZE[0]), int(WATERMARK_SIZE[1]))
+        out.image(f"{stylesheets}/images_classic/{name}.png", render_polygons(pixels, shapes))
 
     print("windows")
     windows_icons = [app_icon(size) for size in ICON_SIZES]
     out.ico("src/Main/icon.ico", windows_icons)
-    out.ico("package/WindowsInstaller/icons/FuCad.ico", windows_icons)
+    out.ico("package/WindowsInstaller/icons/FuCadUp.ico", windows_icons)
     out.image("package/WindowsInstaller/graphics/banner.bmp", installer_banner())
     out.image("package/WindowsInstaller/graphics/header.bmp", installer_header())
     out.ico("src/Doc/sphinx/_static/favicon.ico", [app_icon(size) for size in (16, 32, 48)])
 
     print("macos")
     for resources in (
-        "src/MacAppBundle/FuCad.app/Contents/Resources",
+        "src/MacAppBundle/FuCadUp.app/Contents/Resources",
         "package/rattler-build/osx/resources",
     ):
         out.icns(f"{resources}/fucad.icns", app_icon)

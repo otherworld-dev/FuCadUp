@@ -1,4 +1,4 @@
-specfile_path: package/fedora/fucad.spec
+specfile_path: package/fedora/fucadup.spec
 files_to_sync:
     - .packit.yaml
 actions:
@@ -11,7 +11,7 @@ actions:
     - git submodule update --init
     - bash -c 'git ls-files --recurse-submodules | tar  -caf fucad-sources.tar.gz -T-'
     - echo -n 'fucad-sources.tar.gz'
-downstream_package_name: fucad
+downstream_package_name: fucadup
 upstream_tag_exclude: '.*'
 notifications:
   pull_request:
@@ -46,7 +46,7 @@ jobs:
   trigger: commit
   manual_trigger: true
   branch: main
-  owner: 'fadyfaheem'
+  owner: 'otherworld-dev'
   project: nightly
 - job: tests
   identifier: main
@@ -58,14 +58,14 @@ jobs:
       without_opts:
       - debug_info
   fmf_path: package/fedora/tests
-  owner: 'fadyfaheem'
+  owner: 'otherworld-dev'
   project: nightly
 
 - job: copr_build
   identifier: release
   trigger: release
-  owner: 'fadyfaheem'
-  project: fucad
+  owner: 'otherworld-dev'
+  project: fucadup
   targets:
     fedora-all:
       without_opts:

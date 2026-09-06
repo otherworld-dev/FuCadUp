@@ -14,7 +14,7 @@
 %bcond_without debug_info
 
 
-Name:           fucad
+Name:           fucadup
 Epoch:          1
 Version:        26.3.2
 Release:        1%{?dist}
@@ -22,7 +22,7 @@ Release:        1%{?dist}
 Summary:        A general purpose 3D CAD modeler
 Group:          Applications/Engineering
 License:        LGPL-2.0-or-later
-URL:            https://github.com/FadyFaheem/FuCad
+URL:            https://github.com/otherworld-dev/FuCadUp
 
 Source0:        fucad-sources.tar.gz
 
@@ -100,22 +100,22 @@ Recommends:     python3-pysolar IfcOpenShell-python3
 
 
 %description
-FuCad is a general purpose Open Source 3D CAD/MCAD/CAx/CAE/PLM modeler, aimed
+FuCadUp is a general purpose Open Source 3D CAD/MCAD/CAx/CAE/PLM modeler, aimed
 directly at mechanical engineering and product design but also fits a wider
 range of uses in engineering, such as architecture or other engineering
 specialities. It is a feature-based parametric modeler with a modular software
 architecture which makes it easy to provide additional functionality without
-modifying the core system. FuCad is a fork of FreeCAD and is not affiliated
+modifying the core system. FuCadUp is a fork of FreeCAD and is not affiliated
 with or endorsed by the FreeCAD project.
 
 
 %package data
-Summary:        Data files for FuCad
+Summary:        Data files for FuCadUp
 BuildArch:      noarch
 Requires:       %{name} = %{epoch}:%{version}-%{release}
 
 %description data
-Data files for FuCad
+Data files for FuCadUp
 
 %package libondselsolver-devel
 Summary:        Development file for OndselSolver
@@ -126,7 +126,7 @@ Requires:       %{name} = %{epoch}:%{version}-%{release}
 Development file for OndselSolver
 
 
-#path that contain main FuCad sources for cmake
+#path that contain main FuCadUp sources for cmake
 %global tests_resultdir %{_datadir}/%{name}/tests_result/%{_arch}
 
 %if %{without debug_info}
@@ -135,7 +135,7 @@ Development file for OndselSolver
 %endif
 
 %prep
-    %setup -T -a 0 -q -c -n FuCad-%{version}
+    %setup -T -a 0 -q -c -n FuCadUp-%{version}
 
 %build
      # Deal with cmake projects that tend to link excessively.
@@ -180,8 +180,8 @@ Development file for OndselSolver
 
     # Symlink binaries to /usr/bin
     mkdir -p %{buildroot}%{_bindir}
-    ln -s ../%{_lib}/%{name}/bin/FuCad %{buildroot}%{_bindir}/FuCad
-    ln -s ../%{_lib}/%{name}/bin/FuCadCmd %{buildroot}%{_bindir}/FuCadCmd
+    ln -s ../%{_lib}/%{name}/bin/FuCadUp %{buildroot}%{_bindir}/FuCadUp
+    ln -s ../%{_lib}/%{name}/bin/FuCadUpCmd %{buildroot}%{_bindir}/FuCadUpCmd
 
     # Remove header from external library that's erroneously installed
     rm -rf %{buildroot}%{_libdir}/%{name}/include/E57Format
@@ -216,7 +216,7 @@ Development file for OndselSolver
     fi
 %endif
 
-    desktop-file-validate %{buildroot}%{_datadir}/applications/org.fucad.FuCad.desktop
+    desktop-file-validate %{buildroot}%{_datadir}/applications/org.fucadup.FuCadUp.desktop
     %{?fedora:appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/*.metainfo.xml}
 
     # Bug maintainers to keep %%{plugins} macro up to date.

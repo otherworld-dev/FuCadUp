@@ -1,7 +1,7 @@
 /*
 declaration.nsh
 
-Configuration and variables of FuCad installer
+Configuration and variables of FuCadUp installer
 */
 
 #--------------------------------
@@ -13,8 +13,8 @@ Configuration and variables of FuCad installer
 # Names and version
 
 !define APP_VERSION_NUMBER "${APP_VERSION_MAJOR}.${APP_VERSION_MINOR}.${APP_VERSION_PATCH}.${APP_VERSION_BUILD}"
-# For the proposed install folder we use the scheme "FuCad x.x"
-# however for the Registry, we need the scheme "FuCad x.x.x" in order
+# For the proposed install folder we use the scheme "FuCadUp x.x"
+# however for the Registry, we need the scheme "FuCadUp x.x.x" in order
 # to check if it is exactly this version (to support side-by-side installations)
 !define APP_SERIES_NAME "${APP_VERSION_MAJOR}.${APP_VERSION_MINOR}"
 !define APP_SERIES_KEY "${APP_VERSION_MAJOR}${APP_VERSION_MINOR}${APP_VERSION_PATCH}${APP_VERSION_EMERGENCY}"
@@ -26,7 +26,7 @@ Configuration and variables of FuCad installer
 #!define APP_DIR_USERDATA "${APP_NAME}${APP_VERSION_MAJOR}.${APP_VERSION_MINOR}"
 !define APP_SHORTCUT_INFO "${APP_NAME} - Your Own 3D Parametric Modeler"
 !define APP_INFO "Install/Uninstall ${APP_NAME}"
-!define APP_WEBPAGE "https://github.com/FadyFaheem/FuCad"
+!define APP_WEBPAGE "https://github.com/otherworld-dev/FuCadUp"
 !define APP_WEBPAGE_INFO "${APP_NAME} Website"
 !define APP_WIKI "https://wiki.freecad.org/Main_Page"
 !define APP_WIKI_INFO "FreeCAD Wiki (upstream documentation)"
@@ -36,7 +36,7 @@ Configuration and variables of FuCad installer
 !define BIN_FUCAD "${APP_NAME}.exe"
 !define BIN_FUCADCMD "${APP_NAME}Cmd.exe"
 
-!define APP_REGKEY "SOFTWARE\${APP_NAME}${APP_SERIES_KEY}" # like "FuCad0180"
+!define APP_REGKEY "SOFTWARE\${APP_NAME}${APP_SERIES_KEY}" # like "FuCadUp0180"
 !define APP_REGKEY_SETUP "${APP_REGKEY}\Setup"
 !define APP_REGKEY_SETTINGS "${APP_REGKEY}\Settings"
 
@@ -58,7 +58,7 @@ Configuration and variables of FuCad installer
 
 !define SETUP_EXE ${ExeFile}
 
-!define SETUP_ICON "icons\FuCad.ico"
+!define SETUP_ICON "icons\FuCadUp.ico"
 !define SETUP_HEADERIMAGE "graphics\header.bmp"
 !define SETUP_WIZARDIMAGE "graphics\banner.bmp"
 !define SETUP_UNINSTALLER "Uninstall-${APP_NAME}.exe"

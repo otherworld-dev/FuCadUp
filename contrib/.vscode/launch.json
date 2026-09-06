@@ -53,7 +53,7 @@
       "type": "cppdbg",
       "request": "launch",
       "cwd": "${workspaceFolder}",
-      "program": "${command:cmake.buildDirectory}/bin/FuCad",
+      "program": "${command:cmake.buildDirectory}/bin/FuCadUp",
       "args": ["${workspaceFolder}/.vscode/scripts/VSCodeAutostartDebug.FCMacro"],
       "environment": [
         {
@@ -122,7 +122,7 @@
   ],
   "compounds": [
     {
-      "name": "Debug FuCad",
+      "name": "Debug FuCadUp",
       "configurations": ["C/C++ debugger", "Python debugger"],
       "preLaunchTask": "CMake: build",
       "stopAll": true,

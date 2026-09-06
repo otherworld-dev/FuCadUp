@@ -59,9 +59,10 @@
 void PrintInitHelp();
 
 const auto sBanner = fmt::format(
-    "FuCad is a fork of FreeCAD (https://www.freecad.org), "
-    "(C) 2001-{} FreeCAD contributors.\n"
-    "FuCad is free and open-source software licensed under the terms of the "
+    "FuCadUp is a fork of FuCad (https://github.com/FadyFaheem/FuCad), "
+    "itself a fork of FreeCAD (https://www.freecad.org), "
+    "(C) 2001-{} FreeCAD and FuCad contributors.\n"
+    "FuCadUp is free and open-source software licensed under the terms of the "
     "LGPL-2.1-or-later license.\n\n",
     FCCopyrightYear
 );
@@ -212,10 +213,10 @@ int main(int argc, char** argv)
 #endif
 
     // Name and Version of the Application
-    App::Application::Config()["ExeName"] = "FuCad";
-    App::Application::Config()["ExeVendor"] = "FuCad";
+    App::Application::Config()["ExeName"] = "FuCadUp";
+    App::Application::Config()["ExeVendor"] = "FuCadUp";
     App::Application::Config()["AppDataSkipVendor"] = "true";
-    App::Application::Config()["MaintainerUrl"] = "https://github.com/FadyFaheem/FuCad";
+    App::Application::Config()["MaintainerUrl"] = "https://github.com/otherworld-dev/FuCadUp";
 
     // set the banner (for logging and console)
     App::Application::Config()["CopyrightInfo"] = sBanner;
@@ -233,7 +234,7 @@ int main(int argc, char** argv)
     App::Application::Config()["SplashTitleInImage"] = "true";
     App::Application::Config()["SplashInfoColor"] = "#7C98A1";
     App::Application::Config()["SplashInfoPosition"] = "52,258";
-    App::Application::Config()["DesktopFileName"] = "org.fucad.FuCad";
+    App::Application::Config()["DesktopFileName"] = "org.fucadup.FuCadUp";
 
     try {
         // Init phase ===========================================================

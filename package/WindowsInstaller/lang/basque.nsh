@@ -1,5 +1,5 @@
 ﻿/*
-FuCad Installer Language File
+FuCadUp Installer Language File
 Language: Basque
 */
 
@@ -14,18 +14,18 @@ ${LangFileString} TEXT_WELCOME "Morroi honek $(^NameDA) aplikazioaren instalazio
 #${LangFileString} TEXT_CONFIGURE_PYTHON "Python script-ak konpilatzen..."
 
 ${LangFileString} TEXT_FINISH_DESKTOP "Sortu mahaigaineko lasterbidea"
-${LangFileString} TEXT_FINISH_WEBSITE "Bisitatu fucad.org azken berriak, aholkuak eta laguntza lortzeko"
+${LangFileString} TEXT_FINISH_WEBSITE "Bisitatu github.com/otherworld-dev/FuCadUp azken berriak, aholkuak eta laguntza lortzeko"
 
-#${LangFileString} FileTypeTitle "FuCad-dokumentua"
+#${LangFileString} FileTypeTitle "FuCadUp-dokumentua"
 
 #${LangFileString} SecAllUsersTitle "Instalatu erabiltzaile guztientzako?"
 ${LangFileString} SecFileAssocTitle "Fitxategiaren esleipenak"
 ${LangFileString} SecDesktopTitle "Mahaigaineko ikonoa"
 
-${LangFileString} SecCoreDescription "FuCad fitxategiak."
-#${LangFileString} SecAllUsersDescription "Instalatu FuCad erabiltzaile guztientzako, edo soilik uneko erabiltzailearentzako."
-${LangFileString} SecFileAssocDescription ".FCStd luzapeneko fitxategiak FuCad-ekin irekiko dira automatikoki."
-${LangFileString} SecDesktopDescription "FuCad ikonoa mahaigainean."
+${LangFileString} SecCoreDescription "FuCadUp fitxategiak."
+#${LangFileString} SecAllUsersDescription "Instalatu FuCadUp erabiltzaile guztientzako, edo soilik uneko erabiltzailearentzako."
+${LangFileString} SecFileAssocDescription ".FCStd luzapeneko fitxategiak FuCadUp-ekin irekiko dira automatikoki."
+${LangFileString} SecDesktopDescription "FuCadUp ikonoa mahaigainean."
 #${LangFileString} SecDictionaries "Hiztegia"
 #${LangFileString} SecDictionariesDescription "Zuzentzaile ortografikoen hiztegiak deskarga eta instala daitezke."
 
@@ -34,37 +34,37 @@ ${LangFileString} SecDesktopDescription "FuCad ikonoa mahaigainean."
 
 #${LangFileString} DictionariesFailed 'Huts egin du  $\"$R3$\" hizkuntzaren hiztegia deskargatzean.'
 
-#${LangFileString} ConfigInfo "FuCad-en hurrengo konfigurazioak denbora piskat beharko du."
+#${LangFileString} ConfigInfo "FuCadUp-en hurrengo konfigurazioak denbora piskat beharko du."
 
 #${LangFileString} RunConfigureFailed "Ezin izan da konfigurazioaren script-a exekutatu"
 ${LangFileString} InstallRunning "Instalatzailea jadanik exekutatzen ari da."
-${LangFileString} AlreadyInstalled "FuCad ${APP_SERIES_KEY2} jadanik instalatuta dago!$\r$\n\
-				Dou you nevertheles want to install FuCad over the existing version?"
-${LangFileString} NewerInstalled "Instalatuta dagoen FuCad baino bertsio zaharragoa instalatzen saiatzen ari zara.$\r$\n\
-				  Hori egitea nahi baduzu, lehenbizi existitzen den FuCad $OldVersionNumber desinstalatu beharko duzu."
+${LangFileString} AlreadyInstalled "FuCadUp ${APP_SERIES_KEY2} jadanik instalatuta dago!$\r$\n\
+				Dou you nevertheles want to install FuCadUp over the existing version?"
+${LangFileString} NewerInstalled "Instalatuta dagoen FuCadUp baino bertsio zaharragoa instalatzen saiatzen ari zara.$\r$\n\
+				  Hori egitea nahi baduzu, lehenbizi existitzen den FuCadUp $OldVersionNumber desinstalatu beharko duzu."
 
-#${LangFileString} FinishPageMessage "Zorionak! FuCad ongi instalatu da.$\r$\n\
+#${LangFileString} FinishPageMessage "Zorionak! FuCadUp ongi instalatu da.$\r$\n\
 #					$\r$\n\
-#					(FuCad aurreneko aldiz abiatzean denbora piskat beharko du.)"
-${LangFileString} FinishPageRun "Abiarazi FuCad"
+#					(FuCadUp aurreneko aldiz abiatzean denbora piskat beharko du.)"
+${LangFileString} FinishPageRun "Abiarazi FuCadUp"
 
-${LangFileString} UnNotInRegistryLabel "Ezin da FuCad aurkitu erregistroan.$\r$\n\
+${LangFileString} UnNotInRegistryLabel "Ezin da FuCadUp aurkitu erregistroan.$\r$\n\
 					Mahaigaineko eta Hasiera menuko lasterbideak ez dira kenduko."
-${LangFileString} UnInstallRunning "Aurrenik FuCad itxi behar duzu."
-${LangFileString} UnNotAdminLabel "Administratzailearen baimenak behar dituzu FuCad desinstalatzeko."
-${LangFileString} UnReallyRemoveLabel "Ziur zaude FuCad eta bere osagai guztiak kentzea nahi dituzula??"
-${LangFileString} UnFuCadPreferencesTitle 'FuCad-eko erabiltzailearen hobespenak'
+${LangFileString} UnInstallRunning "Aurrenik FuCadUp itxi behar duzu."
+${LangFileString} UnNotAdminLabel "Administratzailearen baimenak behar dituzu FuCadUp desinstalatzeko."
+${LangFileString} UnReallyRemoveLabel "Ziur zaude FuCadUp eta bere osagai guztiak kentzea nahi dituzula??"
+${LangFileString} UnFuCadUpPreferencesTitle 'FuCadUp-eko erabiltzailearen hobespenak'
 
 #${LangFileString} SecUnProgDescription "xxx kudeatzailea desinstalatzen du."
-${LangFileString} SecUnPreferencesDescription 'FuCad-en konfigurazioa ezabatzen du$\r$\n\
+${LangFileString} SecUnPreferencesDescription 'FuCadUp-en konfigurazioa ezabatzen du$\r$\n\
 						($\"$AppPre\erabiltzailea\$\r$\n\
 						$AppSuff\$\r$\n\
 						\${APP_DIR_USERDATA}$\"$\r$\n\
 						zuretzako edo erabiltzaile guztientzako (administratzailea bazara).'
-${LangFileString} DialogUnPreferences 'You chose to delete the FuCads user configuration.$\r$\n\
-						This will also delete all installed FuCad addons.$\r$\n\
+${LangFileString} DialogUnPreferences 'You chose to delete the FuCadUps user configuration.$\r$\n\
+						This will also delete all installed FuCadUp addons.$\r$\n\
 						Do you agree with this?'
-${LangFileString} SecUnProgramFilesDescription "Desinstalatu FuCad eta bere osagai guztiak."
+${LangFileString} SecUnProgramFilesDescription "Desinstalatu FuCadUp eta bere osagai guztiak."
 
 ${LangFileString} DirNotEmptyWarning "The selected folder '$INSTDIR' is not empty.$\r$\n\
                         The installer will remove all its content before installing. Continue?"

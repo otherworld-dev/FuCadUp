@@ -47,9 +47,10 @@ using App::Application;
 using Base::Console;
 
 const auto sBanner = fmt::format(
-    "FuCad is a fork of FreeCAD (https://www.freecad.org), "
-    "(C) 2001-{} FreeCAD contributors.\n"
-    "FuCad is free and open-source software licensed under the terms of the "
+    "FuCadUp is a fork of FuCad (https://github.com/FadyFaheem/FuCad), "
+    "itself a fork of FreeCAD (https://www.freecad.org), "
+    "(C) 2001-{} FreeCAD and FuCad contributors.\n"
+    "FuCadUp is free and open-source software licensed under the terms of the "
     "LGPL-2.1-or-later license.\n\n",
     FCCopyrightYear
 );
@@ -69,8 +70,8 @@ int main(int argc, char** argv)
 #endif
 
     // Name and Version of the Application
-    App::Application::Config()["ExeName"] = "FuCad";
-    App::Application::Config()["ExeVendor"] = "FuCad";
+    App::Application::Config()["ExeName"] = "FuCadUp";
+    App::Application::Config()["ExeVendor"] = "FuCadUp";
     App::Application::Config()["AppDataSkipVendor"] = "true";
 
     // set the banner (for logging and console)

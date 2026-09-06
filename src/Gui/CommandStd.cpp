@@ -385,7 +385,7 @@ StdCmdRestartInSafeMode::StdCmdRestartInSafeMode()
 {
     sGroup = "Help";
     sMenuText = QT_TR_NOOP("Restart in Safe Mode");
-    sToolTipText = QT_TR_NOOP("Starts FuCad without any modules or plugins loaded");
+    sToolTipText = QT_TR_NOOP("Starts FuCadUp without any modules or plugins loaded");
     sWhatsThis = "Std_RestartInSafeMode";
     sStatusTip = sToolTipText;
     sPixmap = "safe-mode-restart";
@@ -399,7 +399,7 @@ void StdCmdRestartInSafeMode::activated(int iMsg)
     QMessageBox restartBox(Gui::getMainWindow());
     restartBox.setIcon(QMessageBox::Warning);
     restartBox.setWindowTitle(QObject::tr("Restart in Safe Mode"));
-    restartBox.setText(QObject::tr("Restart FuCad and enter safe mode?"));
+    restartBox.setText(QObject::tr("Restart FuCadUp and enter safe mode?"));
     restartBox.setInformativeText(
         QObject::tr("Safe mode temporarily disables the configuration and addons.")
     );
@@ -702,8 +702,8 @@ StdCmdFreeCADWebsite::StdCmdFreeCADWebsite()
     : Command("Std_FreeCADWebsite")
 {
     sGroup = "Help";
-    sMenuText = QT_TR_NOOP("FuCad W&ebsite");
-    sToolTipText = QT_TR_NOOP("Navigates to the official FuCad website");
+    sMenuText = QT_TR_NOOP("FuCadUp W&ebsite");
+    sToolTipText = QT_TR_NOOP("Navigates to the official FuCadUp website");
     sWhatsThis = "Std_FreeCADWebsite";
     sStatusTip = sToolTipText;
     sPixmap = "internet-web-browser";
@@ -714,7 +714,7 @@ void StdCmdFreeCADWebsite::activated(int iMsg)
 {
     Q_UNUSED(iMsg);
     std::string defaulturl
-        = QCoreApplication::translate(this->className(), "https://github.com/FadyFaheem/FuCad")
+        = QCoreApplication::translate(this->className(), "https://github.com/otherworld-dev/FuCadUp")
               .toStdString();
     ParameterGrp::handle hURLGrp = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Websites"

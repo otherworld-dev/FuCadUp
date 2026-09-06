@@ -79,5 +79,5 @@ cmake \
 cmake --build build
 cmake --install build
 
-mv ${PREFIX}/bin/FuCad ${PREFIX}/bin/fucad || true
-mv ${PREFIX}/bin/FuCadCmd ${PREFIX}/bin/fucadcmd || true
+mv ${PREFIX}/bin/FuCadUp ${PREFIX}/bin/fucadup || true
+mv ${PREFIX}/bin/FuCadUpCmd ${PREFIX}/bin/fucadupcmd || true

@@ -174,7 +174,7 @@ void StartupProcess::registerEventType()
 void StartupProcess::setThemePaths()
 {
 #if !defined(Q_OS_LINUX)
-    QIcon::setThemeSearchPaths(QIcon::themeSearchPaths() << QStringLiteral(":/icons/FuCad-default"));
+    QIcon::setThemeSearchPaths(QIcon::themeSearchPaths() << QStringLiteral(":/icons/FuCadUp-default"));
 #endif
 
     ParameterGrp::handle hTheme = App::GetApplication().GetParameterGroupByPath(
@@ -370,7 +370,7 @@ void StartupPostProcess::checkOpenGL()
         if (major < 2) {
             auto message = QObject::tr(
                                "This system is running OpenGL %1.%2. "
-                               "FuCad requires OpenGL 2.0 or above. "
+                               "FuCadUp requires OpenGL 2.0 or above. "
                                "Upgrade the graphics driver and/or card as required."
                            )
                                .arg(major)

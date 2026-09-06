@@ -377,7 +377,7 @@ bool EditorView::saveAs()
         this,
         QObject::tr("Save Macro"),
         QString(),
-        FileDialog::FilterList {{tr("FuCad macro"), {"*.FCMacro"}}, {"Python", {"*.py"}}}
+        FileDialog::FilterList {{tr("FuCadUp macro"), {"*.FCMacro"}}, {"Python", {"*.py"}}}
     );
     if (fn.isEmpty()) {
         return false;

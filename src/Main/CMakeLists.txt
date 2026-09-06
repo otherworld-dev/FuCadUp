@@ -35,7 +35,7 @@ if(BUILD_GUI)
         target_compile_warn_error(FreeCADMain)
     endif()
 
-    SET_BIN_DIR(FreeCADMain FuCad)
+    SET_BIN_DIR(FreeCADMain FuCadUp)
 
     if(WIN32)
         INSTALL(TARGETS FreeCADMain
@@ -87,7 +87,7 @@ if (FREECAD_WARN_ERROR)
     target_compile_warn_error(FreeCADMainCmd)
 endif()
 
-SET_BIN_DIR(FreeCADMainCmd FuCadCmd)
+SET_BIN_DIR(FreeCADMainCmd FuCadUpCmd)
 
 if(WIN32)
     INSTALL(TARGETS FreeCADMainCmd

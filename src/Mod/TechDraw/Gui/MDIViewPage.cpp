@@ -600,7 +600,7 @@ void MDIViewPage::exportAsPdf() const
         QMessageBox::critical(
             Gui::getMainWindow(),
             QObject::tr("Unable to Write File"),
-            QObject::tr("FuCad is unable to open file %1 for writing.  The file may be open in another program.").arg(filename));
+            QObject::tr("FuCadUp is unable to open file %1 for writing.  The file may be open in another program.").arg(filename));
         return;
     }
 

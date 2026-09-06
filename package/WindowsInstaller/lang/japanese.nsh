@@ -1,5 +1,5 @@
 ﻿/*
-FuCad Installer Language File
+FuCadUp Installer Language File
 Language: Japanese
 */
 
@@ -7,25 +7,25 @@ Language: Japanese
 
 ${LangFileString} TEXT_INSTALL_CURRENTUSER "(現ユーザー用に導入を行う)"
 
-${LangFileString} TEXT_WELCOME "このウィザードが、あなたのFuCad導入作業中のご案内をします。$\r$\n\
+${LangFileString} TEXT_WELCOME "このウィザードが、あなたのFuCadUp導入作業中のご案内をします。$\r$\n\
 				$\r$\n\
 				$_CLICK"
 
 #${LangFileString} TEXT_CONFIGURE_PYTHON "Pythonスクリプトをコンパイルしています..."
 
 ${LangFileString} TEXT_FINISH_DESKTOP "デスクトップにショートカットを作成する"
-${LangFileString} TEXT_FINISH_WEBSITE "fucad.orgを開いて最新ニュースやサポート、ヒントなどを入手する"
+${LangFileString} TEXT_FINISH_WEBSITE "github.com/otherworld-dev/FuCadUpを開いて最新ニュースやサポート、ヒントなどを入手する"
 
-#${LangFileString} FileTypeTitle "FuCad文書"
+#${LangFileString} FileTypeTitle "FuCadUp文書"
 
 #${LangFileString} SecAllUsersTitle "すべてのユーザー用に導入を行いますか？"
 ${LangFileString} SecFileAssocTitle "ファイル関連付け"
 ${LangFileString} SecDesktopTitle "デスクトップ・アイコン"
 
-${LangFileString} SecCoreDescription "FuCadのファイル。"
-#${LangFileString} SecAllUsersDescription "FuCadをすべてのユーザー用に導入するか、現在のユーザー向けだけに導入するか。"
-${LangFileString} SecFileAssocDescription "拡張子が.FCStdのファイルは自動的にFuCadで開かれる。"
-${LangFileString} SecDesktopDescription "デスクトップ上のFuCadアイコン"
+${LangFileString} SecCoreDescription "FuCadUpのファイル。"
+#${LangFileString} SecAllUsersDescription "FuCadUpをすべてのユーザー用に導入するか、現在のユーザー向けだけに導入するか。"
+${LangFileString} SecFileAssocDescription "拡張子が.FCStdのファイルは自動的にFuCadUpで開かれる。"
+${LangFileString} SecDesktopDescription "デスクトップ上のFuCadUpアイコン"
 #${LangFileString} SecDictionaries "辞書"
 #${LangFileString} SecDictionariesDescription "ダウンロード及び導入が可能なスペルチェック用辞書"
 
@@ -34,37 +34,37 @@ ${LangFileString} SecDesktopDescription "デスクトップ上のFuCadアイコ�
 
 #${LangFileString} DictionariesFailed '言語$\"$R3$\"用辞書のダウンロードに失敗しました。'
 
-#${LangFileString} ConfigInfo "以下のFuCadの設定には少々時間がかかります。"
+#${LangFileString} ConfigInfo "以下のFuCadUpの設定には少々時間がかかります。"
 
 #${LangFileString} RunConfigureFailed "configureスクリプトを実行することができませんでした"
 ${LangFileString} InstallRunning "導入プログラムは既に動作中です！"
-${LangFileString} AlreadyInstalled "FuCad${APP_SERIES_KEY2}は既に導入済みです！$\r$\n\
-				これらを承知の上で、既存のFuCadを上書きしますか？"
-${LangFileString} NewerInstalled "あなたは、既に導入済みのFuCadよりも古い版を導入しようとしています。$\r$\n\
-				  本当にそうしたいのであれば、既存の FuCad $OldVersionNumber をまず導入解除してください。"
+${LangFileString} AlreadyInstalled "FuCadUp${APP_SERIES_KEY2}は既に導入済みです！$\r$\n\
+				これらを承知の上で、既存のFuCadUpを上書きしますか？"
+${LangFileString} NewerInstalled "あなたは、既に導入済みのFuCadUpよりも古い版を導入しようとしています。$\r$\n\
+				  本当にそうしたいのであれば、既存の FuCadUp $OldVersionNumber をまず導入解除してください。"
 
-#${LangFileString} FinishPageMessage "おめでとうございます！FuCadが正しく導入されました。$\r$\n\
+#${LangFileString} FinishPageMessage "おめでとうございます！FuCadUpが正しく導入されました。$\r$\n\
 #					$\r$\n\
-#					初回のFuCadの起動には時間がかかります。）"
-${LangFileString} FinishPageRun "FuCadを起動する"
+#					初回のFuCadUpの起動には時間がかかります。）"
+${LangFileString} FinishPageRun "FuCadUpを起動する"
 
-${LangFileString} UnNotInRegistryLabel "レジストリにFuCadが見当たりません。$\r$\n\
+${LangFileString} UnNotInRegistryLabel "レジストリにFuCadUpが見当たりません。$\r$\n\
 					デスクトップとスタートメニューのショートカットは削除されません。"
-${LangFileString} UnInstallRunning "まずFuCadを閉じてください！"
-${LangFileString} UnNotAdminLabel "FuCadの導入解除を行うには、管理者権限を持っていなくてはなりません！"
-${LangFileString} UnReallyRemoveLabel "本当に、FuCadとすべての附属コンポーネントを削除してしまう積もりですか？"
-${LangFileString} UnFuCadPreferencesTitle 'FuCadのユーザー設定'
+${LangFileString} UnInstallRunning "まずFuCadUpを閉じてください！"
+${LangFileString} UnNotAdminLabel "FuCadUpの導入解除を行うには、管理者権限を持っていなくてはなりません！"
+${LangFileString} UnReallyRemoveLabel "本当に、FuCadUpとすべての附属コンポーネントを削除してしまう積もりですか？"
+${LangFileString} UnFuCadUpPreferencesTitle 'FuCadUpのユーザー設定'
 
 #${LangFileString} SecUnProgDescription "文献管理プログラムxxxの導入解除を行います。"
-${LangFileString} SecUnPreferencesDescription 'ユーザー共通のFuCadの設定フォルダ$\r$\n\
+${LangFileString} SecUnPreferencesDescription 'ユーザー共通のFuCadUpの設定フォルダ$\r$\n\
 						$\"$AppPre\username\$\r$\n\
 						$AppSuff\$\r$\n\
 						${APP_DIR_USERDATA}$\")$\r$\n\
 						を削除します。'
-${LangFileString} DialogUnPreferences 'You chose to delete the FuCads user configuration.$\r$\n\
-						This will also delete all installed FuCad addons.$\r$\n\
+${LangFileString} DialogUnPreferences 'You chose to delete the FuCadUps user configuration.$\r$\n\
+						This will also delete all installed FuCadUp addons.$\r$\n\
 						Do you agree with this?'
-${LangFileString} SecUnProgramFilesDescription "FuCadとすべての附属コンポーネントの導入解除を行います。"
+${LangFileString} SecUnProgramFilesDescription "FuCadUpとすべての附属コンポーネントの導入解除を行います。"
 
 ${LangFileString} DirNotEmptyWarning "The selected folder '$INSTDIR' is not empty.$\r$\n\
                         The installer will remove all its content before installing. Continue?"

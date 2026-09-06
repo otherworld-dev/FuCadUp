@@ -1,5 +1,5 @@
 ﻿/*
-FuCad Installer Language File
+FuCadUp Installer Language File
 Language: English
 */
 
@@ -14,18 +14,18 @@ ${LangFileString} TEXT_WELCOME "This wizard will guide you through the installat
 #${LangFileString} TEXT_CONFIGURE_PYTHON "Compiling Python scripts..."
 
 ${LangFileString} TEXT_FINISH_DESKTOP "Create desktop shortcut"
-${LangFileString} TEXT_FINISH_WEBSITE "Visit github.com/FadyFaheem/FuCad for the latest news, support and tips"
+${LangFileString} TEXT_FINISH_WEBSITE "Visit github.com/otherworld-dev/FuCadUp for the latest news, support and tips"
 
-#${LangFileString} FileTypeTitle "FuCad-Document"
+#${LangFileString} FileTypeTitle "FuCadUp-Document"
 
 #${LangFileString} SecAllUsersTitle "Install for all users?"
 ${LangFileString} SecFileAssocTitle "File associations"
 ${LangFileString} SecDesktopTitle "Desktop icon"
 
-${LangFileString} SecCoreDescription "The FuCad files."
-#${LangFileString} SecAllUsersDescription "Install FuCad for all users or just the current user."
-${LangFileString} SecFileAssocDescription "Files with a .FCStd extension will automatically open in FuCad."
-${LangFileString} SecDesktopDescription "A FuCad icon on the desktop."
+${LangFileString} SecCoreDescription "The FuCadUp files."
+#${LangFileString} SecAllUsersDescription "Install FuCadUp for all users or just the current user."
+${LangFileString} SecFileAssocDescription "Files with a .FCStd extension will automatically open in FuCadUp."
+${LangFileString} SecDesktopDescription "A FuCadUp icon on the desktop."
 #${LangFileString} SecDictionaries "Dictionaries"
 #${LangFileString} SecDictionariesDescription "Spell-checker dictionaries that can be downloaded and installed."
 
@@ -34,38 +34,38 @@ ${LangFileString} SecDesktopDescription "A FuCad icon on the desktop."
 
 #${LangFileString} DictionariesFailed 'Download of dictionary for language $\"$R3$\" failed.'
 
-#${LangFileString} ConfigInfo "The following configuration of FuCad could take a while."
+#${LangFileString} ConfigInfo "The following configuration of FuCadUp could take a while."
 
 #${LangFileString} RunConfigureFailed "Could not run configure script."
 ${LangFileString} InstallRunning "The installer is already running!"
-${LangFileString} AlreadyInstalled "FuCad ${APP_SERIES_KEY2} is already installed!$\r$\n\
-				Do you nevertheless want to install FuCad over the existing version?"
-${LangFileString} NewerInstalled "You are trying to install an older version of FuCad than what you have installed.$\r$\n\
-				  If you really want this, you must uninstall the existing FuCad $OldVersionNumber before."
+${LangFileString} AlreadyInstalled "FuCadUp ${APP_SERIES_KEY2} is already installed!$\r$\n\
+				Do you nevertheless want to install FuCadUp over the existing version?"
+${LangFileString} NewerInstalled "You are trying to install an older version of FuCadUp than what you have installed.$\r$\n\
+				  If you really want this, you must uninstall the existing FuCadUp $OldVersionNumber before."
 
-#${LangFileString} FinishPageMessage "Congratulations! FuCad has been installed successfully.$\r$\n\
+#${LangFileString} FinishPageMessage "Congratulations! FuCadUp has been installed successfully.$\r$\n\
 #					$\r$\n\
-#					(The first start of FuCad might take some seconds.)"
-${LangFileString} FinishPageRun "Launch FuCad"
+#					(The first start of FuCadUp might take some seconds.)"
+${LangFileString} FinishPageRun "Launch FuCadUp"
 
-${LangFileString} UnNotInRegistryLabel "Unable to find FuCad in the registry.$\r$\n\
+${LangFileString} UnNotInRegistryLabel "Unable to find FuCadUp in the registry.$\r$\n\
 					Shortcuts on the desktop and in the Start Menu will not be removed."
-${LangFileString} UnInstallRunning "You must close FuCad first!"
-${LangFileString} UnNotAdminLabel "You must have administrator privileges to uninstall FuCad!"
-${LangFileString} UnReallyRemoveLabel "Are you sure you want to completely remove FuCad and all of its components?"
-${LangFileString} UnFuCadPreferencesTitle 'FuCad$\'s user preferences'
+${LangFileString} UnInstallRunning "You must close FuCadUp first!"
+${LangFileString} UnNotAdminLabel "You must have administrator privileges to uninstall FuCadUp!"
+${LangFileString} UnReallyRemoveLabel "Are you sure you want to completely remove FuCadUp and all of its components?"
+${LangFileString} UnFuCadUpPreferencesTitle 'FuCadUp$\'s user preferences'
 
 #${LangFileString} SecUnProgDescription "Uninstalls xxx."
-${LangFileString} SecUnPreferencesDescription 'Deletes FuCad$\'s configuration$\r$\n\
+${LangFileString} SecUnPreferencesDescription 'Deletes FuCadUp$\'s configuration$\r$\n\
 						(folder $\"$AppPre\username\$\r$\n\
 						$AppSuff\$\r$\n\
 						${APP_DIR_USERDATA}$\")$\r$\n\
 						for you or for all users (if you are admin).'
-${LangFileString} DialogUnPreferences 'You chose to delete the FuCad user configuration.$\r$\n\
-						This will also delete all installed FuCad addons, and will affect the$\r$\n\
-						preferences for all versions of FuCad.$\r$\n\
+${LangFileString} DialogUnPreferences 'You chose to delete the FuCadUp user configuration.$\r$\n\
+						This will also delete all installed FuCadUp addons, and will affect the$\r$\n\
+						preferences for all versions of FuCadUp.$\r$\n\
 						Are you sure you want to proceed?'
-${LangFileString} SecUnProgramFilesDescription "Uninstall FuCad and all of its components."
+${LangFileString} SecUnProgramFilesDescription "Uninstall FuCadUp and all of its components."
 
 ${LangFileString} DirNotEmptyWarning "The selected folder '$INSTDIR' is not empty.$\r$\n\
                         The installer will remove all its content before installing. Continue?"

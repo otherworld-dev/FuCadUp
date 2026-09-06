@@ -2025,7 +2025,7 @@ bool Document::saveToFile(const char* filename) const
             throw Base::FileException("Failed to open file", tmp);
         }
 
-        writer.setComment("FuCad Document");
+        writer.setComment("FuCadUp Document");
         writer.setLevel(compression);
         writer.putNextEntry("Document.xml");
 
@@ -2035,7 +2035,7 @@ bool Document::saveToFile(const char* filename) const
 
         writer.Stream() << "<?xml version='1.0' encoding='utf-8'?>" << '\n'
                         << "<!--" << '\n'
-                        << " FuCad Document, see https://github.com/FadyFaheem/FuCad for more"
+                        << " FuCadUp Document, see https://github.com/otherworld-dev/FuCadUp for more"
                            " information..."
                         << '\n'
                         << "-->" << '\n';

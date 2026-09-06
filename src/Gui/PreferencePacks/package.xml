@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <package format="1">
   <name>Built-In Preference Packs</name>
-  <description>Preference Packs included with the FuCad distribution</description>
+  <description>Preference Packs included with the FuCadUp distribution</description>
   <version>1.0.0</version>
   <maintainer email="noreply@fucad.invalid">FuCad contributors</maintainer>
   <license file="../../LICENSE">LGPL2</license>
-  <url type="repository">https://github.com/FadyFaheem/FuCad</url>
+  <url type="repository">https://github.com/otherworld-dev/FuCadUp</url>
   <content>
     <preferencepack>
       <name>Classic</name>

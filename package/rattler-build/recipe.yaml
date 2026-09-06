@@ -2,7 +2,7 @@ context:
   version: "26.3.2"
 
 package:
-  name: fucad
+  name: fucadup
   version: "${{ version }}"
 
 source:

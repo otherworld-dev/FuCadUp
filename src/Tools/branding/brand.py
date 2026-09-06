@@ -1,19 +1,20 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # Copyright (c) 2026 FuCad contributors
 
-"""Single source of truth for the FuCad visual identity.
+"""Single source of truth for the FuCadUp visual identity.
 
-The palette and the geometry of the FuCad mark are defined here once and are
+The palette and the geometry of the FuCadUp mark are defined here once and are
 consumed by ``generate_brand_assets.py`` to emit every logo, icon, splash and
 packaging graphic in the repository. Nothing else should hard-code brand
 colours or redraw the mark.
 
-The mark is an extruded "F": a sketch profile pushed along an axonometric
-direction, the operation every parametric CAD model starts with. The front
-face reads as the letter, the swept faces give it the depth and the accent
-colour.
+The mark is a padded "F": the letter sketched on an isometric plane and pushed
+straight up out of it, the operation every parametric CAD model starts with.
+The top face reads as the letter, the walls give it the depth and the accent
+colour, and the sketch plane it rises from stays visible underneath.
 """
 
+import math
 import struct
 from io import BytesIO
 from pathlib import Path
@@ -29,6 +30,8 @@ INK = (7, 31, 39)  # near-black teal, text on light surfaces
 STEEL_DEEP = (8, 45, 56)  # darkest plate tone
 STEEL = (11, 61, 74)  # primary
 STEEL_LIT = (18, 82, 95)  # lightest plate tone
+BENCH_LIT = (16, 52, 68)  # bright end of the workbench backdrop
+BENCH_DEEP = (4, 18, 26)  # dark end of the workbench backdrop
 AMBER = (240, 162, 2)  # accent
 AMBER_LIT = (255, 194, 77)  # accent highlight
 PAPER = (242, 247, 248)  # near-white
@@ -48,10 +51,12 @@ def rgba(rgb, alpha=255):
 
 
 # --------------------------------------------------------------------------
-# Mark geometry, expressed in a 48 unit design box with y pointing down
+# Mark geometry: the letter is sketched on an isometric plane and padded up.
+# Sketch coordinates live in a 48 unit design box with y pointing down the
+# page; the projection below lays that page flat and views it from the front.
 # --------------------------------------------------------------------------
 
-# Clockwise profile of the letter, drawn as it faces the viewer.
+# Clockwise profile of the letter as drawn on the sketch plane.
 F_PROFILE = (
     (11.0, 14.0),
     (31.0, 14.0),
@@ -65,38 +70,54 @@ F_PROFILE = (
     (11.0, 37.0),
 )
 
-# Direction the profile is swept along, up and to the right.
-EXTRUDE = (4.5, -2.6)
+# The rectangle of sketch plane the profile sits on, in the same coordinates.
+SKETCH_PLANE = ((7.0, 10.0), (35.0, 10.0), (35.0, 41.0), (7.0, 41.0))
+
+# How far the profile is padded up out of the plane, in screen units.
+PAD_HEIGHT = 13.0
+
+# Width of the sketch plane's outline, in screen units.
+PLANE_LINE = 0.9
+
+_COS30 = math.cos(math.radians(30.0))
+_SIN30 = math.sin(math.radians(30.0))
 
 
-def _visible_faces(profile, extrude):
-    """Split the swept faces of an extruded profile into top and side faces.
+def _project(point):
+    """Map a sketch-plane point onto the screen.
 
-    ``profile`` is wound clockwise in screen coordinates, so the outward normal
-    of the edge ``p1 -> p2`` is ``(dy, -dx)``. A face is visible when its normal
-    points towards the sweep direction; faces pointing away are hidden behind
-    the solid and are never drawn.
+    Sketch x runs down and to the right, sketch y runs down and to the left, so
+    the page appears to lie flat with its top edge furthest from the viewer.
     """
-    top, side = [], []
-    count = len(profile)
+    x, y = point
+    return ((x - y) * _COS30, (x + y) * _SIN30)
+
+
+def _pad_faces(profile, height):
+    """Return the top face of the padded profile and the walls that face the viewer.
+
+    The walls hang straight down from the projected outline, so an edge only has a
+    visible wall when its projection runs leftwards; every other wall sits behind
+    the solid. Walls come back sorted far to near, each tagged with whether it faces
+    the light, so painting them in order produces the right overlaps.
+    """
+    top = [_project(p) for p in profile]
+    walls = []
+    count = len(top)
     for index in range(count):
-        p1 = profile[index]
-        p2 = profile[(index + 1) % count]
-        edge = (p2[0] - p1[0], p2[1] - p1[1])
-        normal = (edge[1], -edge[0])
-        if normal[0] * extrude[0] + normal[1] * extrude[1] <= 0:
+        p1 = top[index]
+        p2 = top[(index + 1) % count]
+        dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+        if dx >= 0:
             continue
-        quad = [
-            p1,
-            p2,
-            (p2[0] + extrude[0], p2[1] + extrude[1]),
-            (p1[0] + extrude[0], p1[1] + extrude[1]),
-        ]
-        (top if abs(normal[1]) > abs(normal[0]) else side).append(quad)
-    return top, side
+        quad = [p1, p2, (p2[0], p2[1] + height), (p1[0], p1[1] + height)]
+        walls.append((quad, dy > 0))
+    walls.sort(key=lambda wall: max(y for _, y in wall[0]))
+    return top, walls
 
 
-TOP_FACES, SIDE_FACES = _visible_faces(F_PROFILE, EXTRUDE)
+PAD_TOP, PAD_WALLS = _pad_faces(F_PROFILE, PAD_HEIGHT)
+PLANE_OUTLINE = [(x, y + PAD_HEIGHT) for x, y in map(_project, SKETCH_PLANE)]
 
 
 def _bounds(polygons):
@@ -105,16 +126,44 @@ def _bounds(polygons):
     return min(xs), min(ys), max(xs), max(ys)
 
 
-MARK_BOUNDS = _bounds([list(F_PROFILE)] + TOP_FACES + SIDE_FACES)
+MARK_BOUNDS = _bounds([PLANE_OUTLINE] + [quad for quad, _ in PAD_WALLS] + [PAD_TOP])
 MARK_ASPECT = (MARK_BOUNDS[2] - MARK_BOUNDS[0]) / (MARK_BOUNDS[3] - MARK_BOUNDS[1])
 
 
-def mark_polygons(box, front, top, side):
+def _edge_bands(polygon, width):
+    """Return thin quads tracing each edge of ``polygon``: a stroke built from fills.
+
+    Renderers here only fill polygons, so an outline is drawn as one band per edge.
+    Each band runs half a width past its corners so neighbours meet without a notch.
+    """
+    bands = []
+    count = len(polygon)
+    for index in range(count):
+        (x1, y1), (x2, y2) = polygon[index], polygon[(index + 1) % count]
+        length = math.hypot(x2 - x1, y2 - y1)
+        along = ((x2 - x1) / length * width / 2, (y2 - y1) / length * width / 2)
+        across = (-along[1], along[0])
+        start = (x1 - along[0], y1 - along[1])
+        end = (x2 + along[0], y2 + along[1])
+        bands.append(
+            [
+                (start[0] + across[0], start[1] + across[1]),
+                (end[0] + across[0], end[1] + across[1]),
+                (end[0] - across[0], end[1] - across[1]),
+                (start[0] - across[0], start[1] - across[1]),
+            ]
+        )
+    return bands
+
+
+def mark_polygons(box, face, lit, shade, plane_line=None, plane_fill=None):
     """Return ``(points, colour)`` pairs for the mark fitted into ``box``.
 
     ``box`` is ``(x, y, width, height)``; the mark keeps its aspect ratio and is
-    centred inside it. Faces are returned back to front, so painting them in
-    order produces the correct silhouette.
+    centred inside it. Shapes are returned back to front, so painting them in
+    order produces the correct silhouette: the sketch plane first (only when a
+    colour is given for its fill or outline), then the walls, then the top face
+    that carries the letter.
     """
     x, y, width, height = box
     min_x, min_y, max_x, max_y = MARK_BOUNDS
@@ -125,9 +174,13 @@ def mark_polygons(box, front, top, side):
     def place(polygon):
         return [(px * scale + offset_x, py * scale + offset_y) for px, py in polygon]
 
-    shapes = [(place(quad), side) for quad in SIDE_FACES]
-    shapes += [(place(quad), top) for quad in TOP_FACES]
-    shapes.append((place(F_PROFILE), front))
+    shapes = []
+    if plane_fill is not None:
+        shapes.append((place(PLANE_OUTLINE), plane_fill))
+    if plane_line is not None:
+        shapes += [(place(band), plane_line) for band in _edge_bands(PLANE_OUTLINE, PLANE_LINE)]
+    shapes += [(place(quad), lit if is_lit else shade) for quad, is_lit in PAD_WALLS]
+    shapes.append((place(PAD_TOP), face))
     return shapes
 
 
@@ -264,7 +317,7 @@ def load_font(pixels, weight="SemiBold"):
             except OSError:
                 pass
         return font
-    raise RuntimeError("no usable font found for the FuCad wordmark")
+    raise RuntimeError("no usable font found for the FuCadUp wordmark")
 
 
 def tracked_width(font, text, tracking):
@@ -364,6 +417,14 @@ def write_icns(path, render):
 # --------------------------------------------------------------------------
 # SVG helpers
 # --------------------------------------------------------------------------
+
+
+def svg_fill(colour):
+    """Return the fill attributes for an RGB or RGBA colour."""
+    attributes = f'fill="{hex_of(colour)}"'
+    if len(colour) > 3 and colour[3] < 255:
+        attributes += f' fill-opacity="{colour[3] / 255:.3f}"'
+    return attributes
 
 
 def svg_path(points):

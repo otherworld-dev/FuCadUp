@@ -7,19 +7,19 @@ platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
 preview = ["pixi-build"]
 
 [package]
-name = "fucad"
+name = "fucadup"
 version = "26.3.2"
-homepage = "https://github.com/FadyFaheem/FuCad"
-repository = "https://github.com/FadyFaheem/FuCad"
-description = "FuCad"
+homepage = "https://github.com/otherworld-dev/FuCadUp"
+repository = "https://github.com/otherworld-dev/FuCadUp"
+description = "FuCadUp"
 
 [package.build]
 backend = { name = "pixi-build-rattler-build", version = "*" }
 
-[feature.fucad.dependencies]
-fucad = { path = "." }
+[feature.fucadup.dependencies]
+fucadup = { path = "." }
 
-[feature.fucad.target.win-64.dependencies]
+[feature.fucadup.target.win-64.dependencies]
 ucrt = "==10.0.20348.0"
 
 [feature.package.dependencies]
@@ -61,5 +61,5 @@ ucrt = "==10.0.20348.0"
 vs2022_win-64 = "*"
 
 [environments]
-default = ["fucad"]
+default = ["fucadup"]
 package = ["package"]

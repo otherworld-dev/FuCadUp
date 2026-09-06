@@ -1,42 +1,42 @@
 /tests:
   /TestAssemblyWorkbench :
-    test: /usr/bin/FuCadCmd -t  TestAssemblyWorkbench
+    test: /usr/bin/FuCadUpCmd -t  TestAssemblyWorkbench
   /TestArch              :
-    test: /usr/bin/FuCadCmd -t  TestArch
+    test: /usr/bin/FuCadUpCmd -t  TestArch
   /TestCAMApp            :
-    test: /usr/bin/FuCadCmd -t  TestCAMApp
+    test: /usr/bin/FuCadUpCmd -t  TestCAMApp
   /TestDraft             :
-    test: /usr/bin/FuCadCmd -t  TestDraft
+    test: /usr/bin/FuCadUpCmd -t  TestDraft
   /TestFemApp            :
-    test: /usr/bin/FuCadCmd -t  TestFemApp
+    test: /usr/bin/FuCadUpCmd -t  TestFemApp
   /TestMaterialsApp      :
-    test: /usr/bin/FuCadCmd -t  TestMaterialsApp
+    test: /usr/bin/FuCadUpCmd -t  TestMaterialsApp
   /MeshTestsApp          :
-    test: /usr/bin/FuCadCmd -t  MeshTestsApp
+    test: /usr/bin/FuCadUpCmd -t  MeshTestsApp
   /TestPartApp           :
-    test: /usr/bin/FuCadCmd -t  TestPartApp
+    test: /usr/bin/FuCadUpCmd -t  TestPartApp
   /TestPartDesignApp     :
-    test: /usr/bin/FuCadCmd -t  TestPartDesignApp
+    test: /usr/bin/FuCadUpCmd -t  TestPartDesignApp
   /TestSketcherApp       :
-    test: /usr/bin/FuCadCmd -t  TestSketcherApp
+    test: /usr/bin/FuCadUpCmd -t  TestSketcherApp
   /TestSpreadsheet       :
-    test: /usr/bin/FuCadCmd -t  TestSpreadsheet
+    test: /usr/bin/FuCadUpCmd -t  TestSpreadsheet
   /TestSurfaceApp        :
-    test: /usr/bin/FuCadCmd -t  TestSurfaceApp
+    test: /usr/bin/FuCadUpCmd -t  TestSurfaceApp
   /TestTechDrawApp       :
-    test: /usr/bin/FuCadCmd -t  TestTechDrawApp
+    test: /usr/bin/FuCadUpCmd -t  TestTechDrawApp
   /BaseTests             :
-    test: /usr/bin/FuCadCmd -t  BaseTests
+    test: /usr/bin/FuCadUpCmd -t  BaseTests
   /UnitTests             :
-    test: /usr/bin/FuCadCmd -t  UnitTests
+    test: /usr/bin/FuCadUpCmd -t  UnitTests
   /Document              :
-    test: /usr/bin/FuCadCmd -t  Document
+    test: /usr/bin/FuCadUpCmd -t  Document
   /Metadata              :
-    test: /usr/bin/FuCadCmd -t  Metadata
+    test: /usr/bin/FuCadUpCmd -t  Metadata
   /StringHasher          :
-    test: /usr/bin/FuCadCmd -t  StringHasher
+    test: /usr/bin/FuCadUpCmd -t  StringHasher
   /UnicodeTests          :
-    test: /usr/bin/FuCadCmd -t  UnicodeTests
+    test: /usr/bin/FuCadUpCmd -t  UnicodeTests
   /TestPythonSyntax      :
-    test: /usr/bin/FuCadCmd -t  TestPythonSyntax
+    test: /usr/bin/FuCadUpCmd -t  TestPythonSyntax
 

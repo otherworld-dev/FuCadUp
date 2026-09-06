@@ -30,7 +30,7 @@ Section -ProgramFiles SecProgramFiles
   # to $INSTDIR must have a valid path before logging can be turned on
   LogSet on
 
-  # Install and register the core FuCad files
+  # Install and register the core FuCadUp files
 
   # Initializes the plug-ins dir ($PLUGINSDIR) if not already initialized.
   # $PLUGINSDIR is automatically deleted when the installer exits.

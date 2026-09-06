@@ -35,7 +35,7 @@
 			<true/>
 			<key>QLSupportedContentTypes</key>
 			<array>
-				<string>org.fucad.fcstd</string>
+				<string>org.fucadup.fcstd</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>
