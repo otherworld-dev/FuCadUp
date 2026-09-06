@@ -21,6 +21,7 @@
 
 
 #include <QAction>
+#include <QApplication>
 #include <QEvent>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -110,7 +111,9 @@ void AppBar::createMenuButton()
     menuButton->setAutoRaise(true);
     menuButton->setFocusPolicy(Qt::NoFocus);
     menuButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    menuButton->setIcon(style()->standardIcon(QStyle::SP_TitleBarMenuButton));
+    // The application icon is set before the main window is built, so it is available
+    // here; the style's title-bar menu pixmap would show the toolkit's logo instead.
+    menuButton->setIcon(QApplication::windowIcon());
     menuButton->setIconSize(QSize(quickAccessIconExtent, quickAccessIconExtent));
     menuButton->setText(tr("Menu"));
     menuButton->setToolTip(tr("Show the application menus"));
