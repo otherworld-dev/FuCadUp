@@ -155,12 +155,15 @@ class ViewerTestCase(unittest.TestCase):
                 self._process_events(20)
 
     def _post(self, widget, event_type, pos, button, buttons, modifiers=NO_MODIFIER):
-        """Deliver a mouse event to ``widget`` without moving the real cursor.
+        """Deliver a mouse event to ``widget``, leaving the real cursor alone.
 
-        Warping the cursor queues a move event of the system's own, which lands
-        later, after a synthetic press and with the button already down. It reads
-        as travel the test never asked for, and it re-picks whatever the pointer
-        ended up over, which is what a context menu says it is about.
+        Warping the cursor makes the system send moves of its own. They arrive
+        interleaved with these, carrying the modifiers actually held down -- none
+        -- so the viewer sees Shift or Ctrl let go in the middle of a drag and
+        switches from a zoom to an orbit, or from an orbit to a pan. They also
+        re-pick whatever the pointer ends up over, which is what a context menu
+        says it is about. Nothing in the paths under test needs the cursor to be
+        where the events say it is.
         """
 
         app = QtGui.QApplication.instance()
@@ -174,41 +177,26 @@ class ViewerTestCase(unittest.TestCase):
         )
         app.sendEvent(widget, event)
 
-    def _send_mouse_event(self, event_type, pos, button, buttons, modifiers):
-        """Deliver a mouse event and take the real cursor with it."""
-
-        self._refresh_view_widgets()
-        app = QtGui.QApplication.instance()
-        global_pos = self.viewport.mapToGlobal(pos)
-        QtGui.QCursor.setPos(global_pos)
-        event = QtGui.QMouseEvent(
-            event_type,
-            pos,
-            global_pos,
-            button,
-            buttons,
-            modifiers,
-        )
-        app.sendEvent(self.viewport, event)
-
     def _drag(self, button, modifiers=NO_MODIFIER, steps=4):
         """Press ``button`` near the centre of the view and drag it diagonally."""
 
-        start = self.viewport.rect().center() + QtCore.QPoint(-60, 30)
+        self._refresh_view_widgets()
+        viewport = self.viewport
+        start = viewport.rect().center() + QtCore.QPoint(-60, 30)
         end = start + QtCore.QPoint(120, -40)
 
-        self._send_mouse_event(MOUSE_MOVE, start, NO_BUTTON, NO_BUTTON, modifiers)
+        self._post(viewport, MOUSE_MOVE, start, NO_BUTTON, NO_BUTTON, modifiers)
         self._process_events(10)
-        self._post(self.viewport, MOUSE_PRESS, start, button, button, modifiers)
+        self._post(viewport, MOUSE_PRESS, start, button, button, modifiers)
         self._process_events(10)
         for step in range(1, steps + 1):
             point = QtCore.QPoint(
                 start.x() + (end.x() - start.x()) * step // steps,
                 start.y() + (end.y() - start.y()) * step // steps,
             )
-            self._send_mouse_event(MOUSE_MOVE, point, NO_BUTTON, button, modifiers)
+            self._post(viewport, MOUSE_MOVE, point, NO_BUTTON, button, modifiers)
             self._process_events(10)
-        self._post(self.viewport, MOUSE_RELEASE, end, button, NO_BUTTON, modifiers)
+        self._post(viewport, MOUSE_RELEASE, end, button, NO_BUTTON, modifiers)
         self._process_events()
 
     def _click(self, button, modifiers=NO_MODIFIER):
@@ -219,10 +207,11 @@ class ViewerTestCase(unittest.TestCase):
         """
 
         self._refresh_view_widgets()
-        where = self.viewport.rect().center()
-        self._post(self.viewport, MOUSE_PRESS, where, button, button, modifiers)
+        viewport = self.viewport
+        where = viewport.rect().center()
+        self._post(viewport, MOUSE_PRESS, where, button, button, modifiers)
         self._process_events(10)
-        self._post(self.viewport, MOUSE_RELEASE, where, button, NO_BUTTON, modifiers)
+        self._post(viewport, MOUSE_RELEASE, where, button, NO_BUTTON, modifiers)
         self._process_events()
 
     def _camera_state(self):

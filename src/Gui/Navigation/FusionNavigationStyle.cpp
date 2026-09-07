@@ -21,8 +21,11 @@
  *                                                                         *
  ***************************************************************************/
 
+#include <cmath>
+
 #include <Inventor/nodes/SoCamera.h>
 #include <QApplication>
+#include <QWidget>
 
 #include "Navigation/NavigationStyle.h"
 #include "View3DInventorViewer.h"
@@ -38,11 +41,20 @@ namespace
 /// context menu and the Sketcher's tools are both waiting for.
 constexpr int clickTravel = 4;
 
-bool hasLeftTheClick(const SbVec2s& from, const SbVec2s& to)
+/// The same distance in the device pixels events are measured in, so that the
+/// threshold is the same reach of the hand on a scaled display as on a plain one.
+int clickTravelOn(const View3DInventorViewer* viewer)
+{
+    const QWidget* widget = viewer ? viewer->getGLWidget() : nullptr;
+    const double ratio = widget ? widget->devicePixelRatioF() : 1.0;
+    return static_cast<int>(std::lround(clickTravel * ratio));
+}
+
+bool hasLeftTheClick(const SbVec2s& from, const SbVec2s& to, int travel)
 {
     const int across = to[0] - from[0];
     const int down = to[1] - from[1];
-    return across * across + down * down > clickTravel * clickTravel;
+    return across * across + down * down > travel * travel;
 }
 }  // namespace
 
@@ -239,23 +251,15 @@ SbBool FusionNavigationStyle::processSoEvent(const SoEvent* const ev)
     if (type.isDerivedFrom(SoLocation2Event::getClassTypeId())) {
         this->lockrecenter = true;
         const auto* const event = (const SoLocation2Event*)ev;
-
-        // A right press starts an orbit, a pan or a zoom, but a right click is
-        // also how the context menu and the Sketcher's tools are reached. Until
-        // the pointer has left the click behind nothing moves, and the release
-        // falls through to them untouched.
-        const bool rightIsNavigating = !this->button2down
-            || hasLeftTheClick(this->rightPressPosition, pos);
-
         if (this->currentmode == NavigationStyle::SELECTION && this->button1down) {
             triedSelectionDrag = true;
             processed = handleSelectionDragMotion(event, newmode, this->ctrldown);
         }
-        else if (this->currentmode == NavigationStyle::ZOOMING && rightIsNavigating) {
+        else if (this->currentmode == NavigationStyle::ZOOMING) {
             this->zoomByCursor(posn, prevnormalized);
             processed = true;
         }
-        else if (this->currentmode == NavigationStyle::PANNING && rightIsNavigating) {
+        else if (this->currentmode == NavigationStyle::PANNING) {
             float ratio = vp.getViewportAspectRatio();
             panCamera(
                 viewer->getSoRenderManager()->getCamera(),
@@ -266,14 +270,14 @@ SbBool FusionNavigationStyle::processSoEvent(const SoEvent* const ev)
             );
             processed = true;
         }
-        else if (this->currentmode == NavigationStyle::DRAGGING && rightIsNavigating) {
+        else if (this->currentmode == NavigationStyle::DRAGGING) {
             this->addToLog(event->getPosition(), event->getTime());
             this->spin(posn);
             moveCursorPosition();
             // spin() only counts as a drag once it has two positions to turn the
             // camera between, and the right button has a context menu waiting on
-            // the answer: past the threshold above, the first move is already a
-            // drag rather than a click.
+            // the answer. Getting here with it down already took a drag's worth
+            // of travel, so this is one too.
             if (this->button2down) {
                 hasDragged = true;
             }
@@ -301,6 +305,12 @@ SbBool FusionNavigationStyle::processSoEvent(const SoEvent* const ev)
     unsigned int combo = (this->button1down ? BUTTON1DOWN : 0)
         | (this->button2down ? BUTTON2DOWN : 0) | (this->button3down ? BUTTON3DOWN : 0)
         | (this->ctrldown ? CTRLDOWN : 0) | (this->shiftdown ? SHIFTDOWN : 0);
+
+    // Whether the right button has gone far enough from where it went down to
+    // be navigating rather than clicking. Once a mode has been entered it stays
+    // entered, so coming back to the middle of the drag does not stop it.
+    const bool rightHasTravelled = this->button2down
+        && hasLeftTheClick(this->rightPressPosition, pos, clickTravelOn(viewer));
 
     switch (combo) {
         case 0:
@@ -347,8 +357,14 @@ SbBool FusionNavigationStyle::processSoEvent(const SoEvent* const ev)
             break;
         case BUTTON2DOWN:
             // The right button orbits for the mice and trackpads that have no
-            // middle button to hold. Letting go without having turned anything
-            // still opens the context menu.
+            // middle button to hold, but not until the pointer has left the
+            // click behind. Entering the mode on the press would show the
+            // rotation centre and the orbit cursor on every right click, and
+            // the jitter of one would swallow the release the context menu and
+            // the Sketcher's tools are waiting for.
+            if (curmode != NavigationStyle::DRAGGING && !rightHasTravelled) {
+                break;
+            }
             if (newmode != NavigationStyle::DRAGGING) {
                 saveCursorPosition(ev);
             }
@@ -356,10 +372,16 @@ SbBool FusionNavigationStyle::processSoEvent(const SoEvent* const ev)
             break;
         case SHIFTDOWN | BUTTON2DOWN:
             // Shift + right button pans, as Shift does on the middle button
+            if (curmode != NavigationStyle::PANNING && !rightHasTravelled) {
+                break;
+            }
             newmode = NavigationStyle::PANNING;
             break;
         case CTRLDOWN | BUTTON2DOWN:
             // Ctrl + right button zooms
+            if (curmode != NavigationStyle::ZOOMING && !rightHasTravelled) {
+                break;
+            }
             newmode = NavigationStyle::ZOOMING;
             break;
 
