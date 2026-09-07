@@ -206,7 +206,7 @@ void ThemeSelectorWidget::preselectThemeFromSystemSettings()
     );
     auto styleSheetName = QString::fromStdString(hGrp->GetASCII("StyleSheet", nullStyle));
     if (styleSheetName == QString::fromStdString(nullStyle)) {
-        auto theme = isSystemInDarkMode() ? Theme::Dark : Theme::Light;
+        auto theme = isSystemInDarkMode() ? Theme::FuCadDark : Theme::Light;
         themeChanged(theme);
     }
 }

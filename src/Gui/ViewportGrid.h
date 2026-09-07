@@ -150,6 +150,8 @@ private:
     View3DInventorViewer* viewer;
     SoSeparator* root;
     SoNodeSensor cameraSensor;
+    /// 10 mm for a metric unit schema, 25.4 mm (1 in) for an imperial one; read once at setup.
+    double baseSpacing;
     bool enabled {true};
     bool suspended {false};
     SbVec3f lastFocalPoint {0.0F, 0.0F, 0.0F};

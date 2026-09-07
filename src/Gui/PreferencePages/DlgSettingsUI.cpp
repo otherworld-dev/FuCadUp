@@ -85,6 +85,10 @@ void DlgSettingsUI::saveSettings()
 
     // Main Window
     ui->useRibbonCheckBox->onSave();
+    ui->useMarkingMenuCheckBox->onSave();
+    ui->useNavigationBarCheckBox->onSave();
+    ui->framelessWindowCheckBox->onSave();
+    ui->showTimelineCheckBox->onSave();
 
     // TaskWatcher
     ui->showTaskWatcherCheckBox->onSave();
@@ -117,6 +121,10 @@ void DlgSettingsUI::loadSettings()
 
     // Main Window
     ui->useRibbonCheckBox->onRestore();
+    ui->useMarkingMenuCheckBox->onRestore();
+    ui->useNavigationBarCheckBox->onRestore();
+    ui->framelessWindowCheckBox->onRestore();
+    ui->showTimelineCheckBox->onRestore();
 
     // TaskWatcher
     ui->showTaskWatcherCheckBox->onRestore();

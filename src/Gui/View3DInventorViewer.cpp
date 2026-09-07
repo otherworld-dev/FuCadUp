@@ -2591,6 +2591,14 @@ void View3DInventorViewer::savePicture(
     auto gl = new SoCallback;
     gl->setCallback(setGLWidgetCB, this->getGLWidget());
     root->addChild(gl);
+    if (viewportGrid) {
+        ParameterGrp::handle hGridGrp = App::GetApplication().GetParameterGroupByPath(
+            "User parameter:BaseApp/Preferences/View"
+        );
+        if (hGridGrp->GetBool("GridInScreenshots", true)) {
+            root->addChild(viewportGrid->getNode());
+        }
+    }
     root->addChild(pcViewProviderRoot);
     root->addChild(foregroundroot);
     if (shouldRenderDecorations(intent)) {

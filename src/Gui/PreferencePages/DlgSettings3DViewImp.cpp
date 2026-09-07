@@ -64,7 +64,9 @@ void DlgSettings3DViewImp::saveSettings()
     ui->SpinBox_CornerCoordSystemSize->onSave();
     ui->CheckBox_ShowAxisCross->onSave();
     ui->CheckBox_ShowGrid->onSave();
+    ui->CheckBox_GridInScreenshots->onSave();
     ui->CheckBox_ShowFPS->onSave();
+    ui->DoubleSpinBox_NaviCubeDragSensitivity->onSave();
     ui->CheckBox_use_SW_OpenGL->onSave();
     ui->CheckBox_useVBO->onSave();
     ui->FloatSpinBox_EyeDistance->onSave();
@@ -83,7 +85,9 @@ void DlgSettings3DViewImp::loadSettings()
     ui->SpinBox_CornerCoordSystemSize->onRestore();
     ui->CheckBox_ShowAxisCross->onRestore();
     ui->CheckBox_ShowGrid->onRestore();
+    ui->CheckBox_GridInScreenshots->onRestore();
     ui->CheckBox_ShowFPS->onRestore();
+    ui->DoubleSpinBox_NaviCubeDragSensitivity->onRestore();
     ui->CheckBox_use_SW_OpenGL->onRestore();
     ui->CheckBox_useVBO->onRestore();
     ui->FloatSpinBox_EyeDistance->onRestore();

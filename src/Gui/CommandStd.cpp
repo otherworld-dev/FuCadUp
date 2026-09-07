@@ -811,7 +811,7 @@ void StdCmdReportBug::activated(int iMsg)
     ParameterGrp::handle hURLGrp = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Websites"
     );
-    std::string url = hURLGrp->GetASCII("IssuesPage", "https://github.com/FreeCAD/FreeCAD/issues");
+    std::string url = hURLGrp->GetASCII("IssuesPage", "https://github.com/otherworld-dev/FuCadUp/issues");
     hURLGrp->SetASCII("IssuesPage", url.c_str());
     OpenURLInBrowser(url.c_str());
 }
@@ -890,7 +890,9 @@ StdCmdCommandPalette::StdCmdCommandPalette()
 {
     sGroup = "Tools";
     sMenuText = QT_TR_NOOP("Command Palette");
-    sToolTipText = QT_TR_NOOP("Opens a searchable palette of pinned, recent and all commands");
+    sToolTipText = QT_TR_NOOP(
+        "Opens a searchable palette of pinned, recent and all commands. Press S anywhere in the 3D view."
+    );
     sWhatsThis = "Std_CommandPalette";
     sStatusTip = sToolTipText;
     sPixmap = "Std_CommandPalette";

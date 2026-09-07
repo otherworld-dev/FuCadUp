@@ -37,6 +37,7 @@
 #include <Inventor/nodes/SoVertexProperty.h>
 
 #include <Base/Console.h>
+#include <Base/UnitsApi.h>
 
 #include "Inventor/SoFCBoundingBox.h"
 #include "View3DInventorViewer.h"
@@ -49,8 +50,21 @@ namespace
 {
 // The sketch grid's defaults, so that the two grids agree where one takes over
 // from the other.
-constexpr double baseSpacing = 10.0;
+constexpr double metricBaseSpacing = 10.0;
+// 1 inch, so that the grid steps in whole inches rather than decimal
+// millimetres while the user works in an imperial unit schema.
+constexpr double imperialBaseSpacing = 25.4;
 constexpr int subdivision = 10;
+
+/// 10 mm for a metric unit schema, 25.4 mm (1 in) for an imperial one.
+double baseSpacingForUnitSchema()
+{
+    const std::string basicLengthUnit = Base::UnitsApi::getBasicLengthUnit();
+    if (basicLengthUnit == "in" || basicLengthUnit == "ft") {
+        return imperialBaseSpacing;
+    }
+    return metricBaseSpacing;
+}
 constexpr int pixelThreshold = 15;
 // How far beyond the visible area the lines reach, so that a pan of less than
 // a tenth of the view needs no rebuild.
@@ -149,6 +163,7 @@ int ViewportGridLayout::lineCount() const
 ViewportGrid::ViewportGrid(View3DInventorViewer* viewer)
     : viewer(viewer)
     , root(new SoSeparator)
+    , baseSpacing(baseSpacingForUnitSchema())
 {
     root->ref();
     root->setName("ViewportGrid");

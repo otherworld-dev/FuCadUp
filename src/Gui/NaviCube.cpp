@@ -53,7 +53,9 @@
 #include <QMenu>
 #include <QPainterPath>
 
+#include <App/Application.h>
 #include <Base/Color.h>
+#include <Base/Parameter.h>
 #include <Base/Tools.h>
 #include "NaviCube.h"
 #include "Application.h"
@@ -1215,7 +1217,14 @@ void NaviCubeImplementation::startCameraRotationDrag()
 {
     constexpr float minCameraDistanceFactor = 1.05F;
     constexpr float clippingRadiusFactor = 1.0F;
-    constexpr float dragSensitivity = 0.325F;
+    constexpr float defaultDragSensitivity = 0.325F;
+
+    ParameterGrp::handle hViewGrp = App::GetApplication().GetParameterGroupByPath(
+        "User parameter:BaseApp/Preferences/View"
+    );
+    const auto dragSensitivity = static_cast<float>(
+        hViewGrp->GetFloat("NaviCubeDragSensitivity", defaultDragSensitivity)
+    );
 
     dragStarted = true;
     setHilite(PickId::None);

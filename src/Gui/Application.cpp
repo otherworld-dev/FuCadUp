@@ -2951,7 +2951,7 @@ QString Application::replaceVariablesInQss(const QString& qssText)
 void Application::setStyle(const QString& name)
 {
     const auto createStyleFromName = [](const QString& name) -> QStyle* {
-        if (name == QStringLiteral("FuCad")) {
+        if (name == QStringLiteral("FuCad") || name == QStringLiteral("FuCadUp")) {
             return new FreeCADStyle();
         }
 

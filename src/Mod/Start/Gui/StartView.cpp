@@ -70,6 +70,8 @@ StartView::StartView(QWidget* parent)
     , _examplesLabel {nullptr}
     , _recentFilesLabel {nullptr}
     , _customFolderLabel {nullptr}
+    , _fusionControlsLabel {nullptr}
+    , _fusionControlsBodyLabel {nullptr}
     , _showOnStartupCheckBox {nullptr}
 {
     setObjectName(QLatin1String("StartView"));
@@ -134,6 +136,12 @@ StartView::StartView(QWidget* parent)
     auto recentFilesListWidget = gsl::owner<FileCardView*>(new FileCardView(_contents));
     connect(recentFilesListWidget, &QListView::clicked, this, &StartView::fileCardSelected);
     documentsContentLayout->addWidget(recentFilesListWidget);
+
+    _fusionControlsLabel = gsl::owner<QLabel*>(new QLabel());
+    documentsContentLayout->addWidget(_fusionControlsLabel);
+    _fusionControlsBodyLabel = gsl::owner<QLabel*>(new QLabel());
+    _fusionControlsBodyLabel->setWordWrap(true);
+    documentsContentLayout->addWidget(_fusionControlsBodyLabel);
 
     FileCardView* customFolderListWidget {};
     if (showCustomFolder) {
@@ -522,6 +530,15 @@ void StartView::retranslateUi()
         _examplesLabel->setText(h1Start + tr("Examples") + h1End);
     }
     _recentFilesLabel->setText(h1Start + tr("Recent Files") + h1End);
+
+    _fusionControlsLabel->setText(h1Start + tr("Fusion-style controls") + h1End);
+    const QLatin1String lineBreak("<br>");
+    _fusionControlsBodyLabel->setText(
+        tr("S opens the command palette") + lineBreak
+        + tr("E extrudes, Q presses and pulls, H holes, F fillets, D dimensions") + lineBreak
+        + tr("Right-click the 3D view for the marking menu") + lineBreak
+        + tr("The timeline at the bottom rolls the history back and forward")
+    );
 
     auto hGrp = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Mod/Start"

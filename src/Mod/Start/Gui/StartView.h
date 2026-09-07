@@ -115,6 +115,8 @@ private:
     QLabel* _examplesLabel;
     QLabel* _recentFilesLabel;
     QLabel* _customFolderLabel;
+    QLabel* _fusionControlsLabel;
+    QLabel* _fusionControlsBodyLabel;
     QPushButton* _openFirstStart;
     QCheckBox* _showOnStartupCheckBox;
 

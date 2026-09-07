@@ -140,6 +140,11 @@ void SketcherSettings::saveSettings()
     ui->checkBoxAutoProjectSupportEdges->onSave();
     ui->checkBoxMakeInternals->onSave();
 
+    // Snapping
+    ui->snapRadiusSpinBox->onSave();
+    ui->gridSnapToleranceSpinBox->onSave();
+    ui->showStatusChipCheckBox->onSave();
+
     enum
     {
         DimensionSingleTool,
@@ -221,6 +226,11 @@ void SketcherSettings::loadSettings()
     ui->checkBoxAddExtGeo->onRestore();
     ui->checkBoxAutoProjectSupportEdges->onRestore();
     ui->checkBoxMakeInternals->onRestore();
+
+    // Snapping
+    ui->snapRadiusSpinBox->onRestore();
+    ui->gridSnapToleranceSpinBox->onRestore();
+    ui->showStatusChipCheckBox->onRestore();
 
     // Dimensioning constraints mode
     ui->dimensioningMode->clear();

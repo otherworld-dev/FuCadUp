@@ -272,6 +272,25 @@ opening or creation</string>
        </widget>
       </item>
       <item>
+       <widget class="Gui::PrefCheckBox" name="CheckBox_GridInScreenshots">
+        <property name="toolTip">
+         <string>Include the grid on the XY plane when saving a picture of the 3D view</string>
+        </property>
+        <property name="text">
+         <string>Include grid in saved pictures</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+        <property name="prefEntry" stdset="0">
+         <cstring>GridInScreenshots</cstring>
+        </property>
+        <property name="prefPath" stdset="0">
+         <cstring>View</cstring>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="Gui::PrefCheckBox" name="CheckBox_ShowFPS">
         <property name="toolTip">
          <string>Time needed for last operation and resulting frame rate
@@ -287,6 +306,51 @@ will be shown at the lower left corner in opened files</string>
          <cstring>View</cstring>
         </property>
        </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayoutNaviCubeDragSensitivity">
+        <item>
+         <widget class="QLabel" name="naviCubeDragSensitivityLabel">
+          <property name="text">
+           <string>NaviCube drag sensitivity</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="Gui::PrefDoubleSpinBox" name="DoubleSpinBox_NaviCubeDragSensitivity">
+          <property name="minimumSize">
+           <size>
+            <width>120</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>How far the camera rotates while dragging the NaviCube</string>
+          </property>
+          <property name="decimals">
+           <number>3</number>
+          </property>
+          <property name="minimum">
+           <double>0.050000000000000</double>
+          </property>
+          <property name="maximum">
+           <double>2.000000000000000</double>
+          </property>
+          <property name="singleStep">
+           <double>0.025000000000000</double>
+          </property>
+          <property name="value">
+           <double>0.325000000000000</double>
+          </property>
+          <property name="prefEntry" stdset="0">
+           <cstring>NaviCubeDragSensitivity</cstring>
+          </property>
+          <property name="prefPath" stdset="0">
+           <cstring>View</cstring>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
      </layout>
     </widget>
