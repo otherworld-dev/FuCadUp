@@ -38,6 +38,7 @@
 #include <QRect>
 #include <QScreen>
 #include <QSize>
+#include <QStringList>
 #include <QTimer>
 
 #include <App/Application.h>
@@ -65,9 +66,24 @@ constexpr int margin = 6;
 constexpr int deadZone = 26;
 constexpr int cornerRadius = 4;
 
-/// Compass order, so that the first and most used entries land on the four
-/// directions a hand reaches most easily.
+/// Compass order: the four directions a hand reaches without aiming come first,
+/// then the diagonals.
 constexpr std::array<int, 8> slotAngles = {90, 0, 270, 180, 45, 315, 225, 135};
+
+/// The view commands that own the compass directions, in slot order. They are
+/// the same in every menu, whatever the cursor is over, because a direction that
+/// moves with the number of entries an object brought along has to be read
+/// rather than remembered.
+constexpr std::size_t cardinalSlots = 4;
+constexpr std::array<const char*, cardinalSlots> cardinalCommands = {
+    "Std_ViewFitAll",       // north
+    "Std_ViewIsometric",    // east
+    "Std_ViewHome",         // south
+    "Std_ViewFitSelection"  // west
+};
+/// A menu built without a home view still has a front view for the south.
+constexpr std::size_t southSlot = 2;
+const char* const southAlternative = "Std_ViewFront";
 
 const char* const viewParameters = "User parameter:BaseApp/Preferences/View";
 
@@ -78,6 +94,30 @@ QPoint slotOffset(int slot)
         static_cast<int>(std::lround(std::cos(radians) * ringRadiusX)),
         static_cast<int>(std::lround(-std::sin(radians) * ringRadiusY))
     );
+}
+
+/// The entry \a command names, among \a actions and one level into the menus
+/// they open, which is where the standard views sit.
+QAction* findEntry(const QList<QAction*>& actions, const char* command)
+{
+    const QString name = QString::fromLatin1(command);
+    for (QAction* action : actions) {
+        if (action->objectName() == name) {
+            return action;
+        }
+    }
+
+    for (QAction* action : actions) {
+        if (const QMenu* submenu = action->menu()) {
+            for (QAction* nested : submenu->actions()) {
+                if (nested->objectName() == name) {
+                    return nested;
+                }
+            }
+        }
+    }
+
+    return nullptr;
 }
 }  // namespace
 
@@ -166,14 +206,37 @@ void MarkingMenu::collect()
         usable.append(action);
     }
 
-    if (usable.isEmpty()) {
+    // The compass directions belong to the view commands before anything else
+    // gets a say, so that reaching for Fit All is the same flick over a body as
+    // it is over empty space.
+    std::array<QAction*, cardinalSlots> pinned {};
+    bool anyPinned = false;
+    for (std::size_t slot = 0; slot < cardinalSlots; ++slot) {
+        QAction* found = findEntry(actions, cardinalCommands.at(slot));
+        if (!found && slot == southSlot) {
+            found = findEntry(actions, southAlternative);
+        }
+        if (!found || !found->isVisible() || found->text().isEmpty()) {
+            continue;
+        }
+
+        pinned.at(slot) = found;
+        anyPinned = true;
+        usable.removeAll(found);
+    }
+
+    if (!anyPinned && usable.isEmpty()) {
         return;
     }
 
-    const bool overflows = usable.size() > static_cast<int>(slotAngles.size());
-    const int placed = overflows ? static_cast<int>(slotAngles.size()) - 1 : usable.size();
+    // A menu carrying none of the view commands has nothing to hold the compass
+    // directions, so its entries take the ring from the top as they come.
+    const std::size_t reserved = anyPinned ? cardinalSlots : 0;
+    const std::size_t room = slotAngles.size() - reserved;
+    const bool overflows = static_cast<std::size_t>(usable.size()) > room;
+    const std::size_t placed = overflows ? room - 1 : static_cast<std::size_t>(usable.size());
 
-    sectors.resize(overflows ? slotAngles.size() : static_cast<std::size_t>(placed));
+    sectors.resize(slotAngles.size());
 
     for (std::size_t slot = 0; slot < sectors.size(); ++slot) {
         Sector& sector = sectors[slot];
@@ -185,55 +248,49 @@ void MarkingMenu::collect()
             itemHeight
         );
 
-        if (static_cast<int>(slot) < placed) {
-            sector.action = usable.at(static_cast<int>(slot));
-            sector.label = Action::cleanTitle(sector.action->text());
+        if (slot < reserved) {
+            sector.action = pinned.at(slot);
         }
-        else {
+        else if (slot - reserved < placed) {
+            sector.action = usable.at(static_cast<int>(slot - reserved));
+        }
+        else if (overflows && slot + 1 == sectors.size()) {
             sector.overflow = true;
             sector.label = tr("More…");
         }
+
+        if (sector.action) {
+            sector.label = Action::cleanTitle(sector.action->text());
+        }
     }
+}
+
+QStringList MarkingMenu::sectorCommands() const
+{
+    QStringList commands;
+    commands.reserve(static_cast<int>(sectors.size()));
+    for (const Sector& sector : sectors) {
+        commands.append(sector.action ? sector.action->objectName() : QString());
+    }
+    return commands;
 }
 
 int MarkingMenu::sectorAt(const QPoint& pos) const
 {
     for (std::size_t i = 0; i < sectors.size(); ++i) {
-        if (sectors[i].box.contains(pos)) {
+        if (sectors[i].filled() && sectors[i].box.contains(pos)) {
             return static_cast<int>(i);
         }
     }
 
+    return -1;
+}
+
+bool MarkingMenu::withinDeadZone(const QPoint& pos) const
+{
     const QPoint centre(width() / 2, height() / 2);
     const QPoint delta = pos - centre;
-    const double distance = std::hypot(delta.x(), delta.y());
-    if (distance < deadZone) {
-        return -1;
-    }
-
-    // Measured on the circle the ellipse came from, so that the direction a
-    // slot sits in is the direction the cursor has to point.
-    const double pointing = std::atan2(
-                                -delta.y() / static_cast<double>(ringRadiusY),
-                                delta.x() / static_cast<double>(ringRadiusX)
-                            )
-        * 180.0 / M_PI;
-
-    int nearest = -1;
-    double smallest = 360.0;
-    for (std::size_t i = 0; i < sectors.size(); ++i) {
-        double difference = std::fabs(pointing - slotAngles.at(i));
-        if (difference > 180.0) {
-            difference = 360.0 - difference;
-        }
-
-        if (difference < smallest) {
-            smallest = difference;
-            nearest = static_cast<int>(i);
-        }
-    }
-
-    return nearest;
+    return std::hypot(delta.x(), delta.y()) < deadZone;
 }
 
 void MarkingMenu::paintEvent(QPaintEvent*)
@@ -267,6 +324,10 @@ void MarkingMenu::paintEvent(QPaintEvent*)
 
     for (std::size_t i = 0; i < sectors.size(); ++i) {
         const Sector& sector = sectors[i];
+        if (!sector.filled()) {
+            continue;
+        }
+
         const bool enabled = sector.overflow || (sector.action && sector.action->isEnabled());
         const bool active = static_cast<int>(i) == hovered && enabled;
 
@@ -329,12 +390,18 @@ void MarkingMenu::mouseMoveEvent(QMouseEvent* event)
 void MarkingMenu::mouseReleaseEvent(QMouseEvent* event)
 {
     const int chosen = sectorAt(event->pos());
-    if (chosen < 0) {
-        close();
+    if (chosen >= 0) {
+        activate(chosen);
         return;
     }
 
-    activate(chosen);
+    // Letting go in the middle is the cancel the ring opened with, and letting
+    // go outside it altogether is the click-away any menu closes on. Between two
+    // entries is neither: the ring waits rather than guessing which of them the
+    // flick was aimed at and running a command nobody asked for.
+    if (withinDeadZone(event->pos()) || !rect().contains(event->pos())) {
+        close();
+    }
 }
 
 void MarkingMenu::keyPressEvent(QKeyEvent* event)

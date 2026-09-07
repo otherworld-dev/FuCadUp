@@ -37,6 +37,7 @@ FUSION_STYLE = "Gui::FusionNavigationStyle"
 NO_BUTTON = QtCore.Qt.NoButton
 LEFT_BUTTON = QtCore.Qt.LeftButton
 MIDDLE_BUTTON = QtCore.Qt.MiddleButton
+RIGHT_BUTTON = QtCore.Qt.RightButton
 NO_MODIFIER = QtCore.Qt.NoModifier
 CONTROL_MODIFIER = QtCore.Qt.ControlModifier
 SHIFT_MODIFIER = QtCore.Qt.ShiftModifier
@@ -74,6 +75,9 @@ class ViewerTestCase(unittest.TestCase):
         self._refresh_view()
 
     def tearDown(self):
+        # A context menu holds the mouse and the keyboard until it is dismissed,
+        # so one left open by a test would swallow the events of the next.
+        self._close_popups()
         FreeCADGui.Selection.clearSelection()
         if self.doc is not None:
             FreeCAD.closeDocument(self.doc.Name)
@@ -110,6 +114,15 @@ class ViewerTestCase(unittest.TestCase):
             and first[1].isSame(second[1], ROTATION_TOLERANCE)
             and abs(first[2] - second[2]) <= DISTANCE_TOLERANCE
         )
+
+    def _close_popups(self, attempts=5):
+        app = QtGui.QApplication.instance()
+        for _ in range(attempts):
+            popup = app.activePopupWidget()
+            if popup is None:
+                return
+            popup.close()
+            self._process_events(10)
 
     def _process_events(self, wait_ms=50):
         FreeCADGui.updateGui()
@@ -176,6 +189,15 @@ class ViewerTestCase(unittest.TestCase):
         self._send_mouse_event(MOUSE_RELEASE, end, button, NO_BUTTON, modifiers)
         self._process_events()
 
+    def _click(self, button, modifiers=NO_MODIFIER):
+        """Press and release ``button`` in the middle of the view without moving."""
+
+        where = self.viewport.rect().center()
+        self._send_mouse_event(MOUSE_PRESS, where, button, button, modifiers)
+        self._process_events(10)
+        self._send_mouse_event(MOUSE_RELEASE, where, button, NO_BUTTON, modifiers)
+        self._process_events()
+
     def _camera_state(self):
         camera = self.view.getCameraNode()
         position = FreeCAD.Vector(*camera.position.getValue().getValue())
@@ -223,10 +245,18 @@ class ViewerTestCase(unittest.TestCase):
             "Expected the orthographic camera height to stay the same",
         )
 
+    def assertNoPopup(self, message):
+        self.assertIsNone(QtGui.QApplication.instance().activePopupWidget(), message)
+
 
 class TestFusionNavigationStyle(ViewerTestCase):
     """The Fusion style copies the default mouse preset of Autodesk Fusion:
-    middle button pans, Shift + middle orbits, Ctrl + Shift + middle zooms."""
+    middle button pans, Shift + middle orbits, Ctrl + Shift + middle zooms.
+
+    A mouse without a usable middle button would leave the view stuck, so the
+    right button carries the same three moves: on its own it orbits, with Shift
+    it pans and with Ctrl it zooms. A right click that does not drag still opens
+    the context menu, which is the only thing the right button used to do."""
 
     def _use_fusion(self):
         self.view.setNavigationType(FUSION_STYLE)
@@ -266,6 +296,55 @@ class TestFusionNavigationStyle(ViewerTestCase):
         after = self._camera_state()
         self.assertCameraZoomed(before, after)
         self.assertCameraKeptOrientation(before, after)
+
+    def test_right_drag_orbits(self):
+        self._use_fusion()
+        before = self._camera_state()
+
+        self._drag(RIGHT_BUTTON)
+
+        after = self._camera_state()
+        self.assertCameraTurned(before, after)
+        self.assertCameraKeptZoom(before, after)
+        self.assertNoPopup("A right drag must orbit rather than open the context menu")
+
+    def test_shift_right_drag_pans(self):
+        self._use_fusion()
+        before = self._camera_state()
+
+        self._drag(RIGHT_BUTTON, SHIFT_MODIFIER)
+
+        after = self._camera_state()
+        self.assertCameraMoved(before, after)
+        self.assertCameraKeptOrientation(before, after)
+        self.assertCameraKeptZoom(before, after)
+        self.assertNoPopup("A Shift + right drag must pan rather than open the context menu")
+
+    def test_ctrl_right_drag_zooms(self):
+        self._use_fusion()
+        before = self._camera_state()
+
+        self._drag(RIGHT_BUTTON, CONTROL_MODIFIER)
+
+        after = self._camera_state()
+        self.assertCameraZoomed(before, after)
+        self.assertCameraKeptOrientation(before, after)
+        self.assertNoPopup("A Ctrl + right drag must zoom rather than open the context menu")
+
+    def test_right_click_opens_the_context_menu(self):
+        self._use_fusion()
+        before = self._camera_state()
+
+        self._click(RIGHT_BUTTON)
+
+        after = self._camera_state()
+        self.assertIsNotNone(
+            QtGui.QApplication.instance().activePopupWidget(),
+            "A right click that does not drag must still open the context menu",
+        )
+        self.assertCameraStayedPut(before, after)
+        self.assertCameraKeptOrientation(before, after)
+        self.assertCameraKeptZoom(before, after)
 
     def test_left_drag_leaves_camera_alone(self):
         self._use_fusion()

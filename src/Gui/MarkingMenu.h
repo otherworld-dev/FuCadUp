@@ -28,6 +28,7 @@
 #include <QPointer>
 #include <QRect>
 #include <QString>
+#include <QStringList>
 #include <QWidget>
 
 #include <FCGlobal.h>
@@ -59,6 +60,7 @@ class GuiExport MarkingMenu: public QWidget
     Q_PROPERTY(QColor backdropColor READ backdropColor WRITE setBackdropColor)
     Q_PROPERTY(QColor outlineColor READ outlineColor WRITE setOutlineColor)
     Q_PROPERTY(QColor accentColor READ accentColor WRITE setAccentColor)
+    Q_PROPERTY(QStringList sectorCommands READ sectorCommands)
 
 public:
     /// Whether a right-click in the 3D view opens the ring instead of a list.
@@ -100,6 +102,15 @@ public:
         accent = color;
     }
 
+    /**
+     * The command each direction of the ring runs, in slot order, and empty for
+     * a direction that carries nothing.
+     *
+     * The ring paints its entries rather than holding a widget for each of them,
+     * so this is what says from the outside where an entry ended up.
+     */
+    QStringList sectorCommands() const;
+
 protected:
     void paintEvent(QPaintEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
@@ -117,14 +128,23 @@ private:
         QRect box;
         /// Opens the source menu rather than running an action of its own.
         bool overflow {false};
+
+        /// A direction the ring reserved but found nothing for carries no box.
+        bool filled() const
+        {
+            return action != nullptr || overflow;
+        }
     };
 
     /// Fills the ring from the top level entries of the source menu.
     void collect();
-    /// The sector under \a pos, or -1. Beyond the dead zone the nearest
-    /// direction wins even when the cursor has not reached its box, so that a
-    /// flick outwards is enough to choose.
+    /// The sector under \a pos, or -1. Only a point inside an entry's own box
+    /// counts: between two of them there is no telling which was meant, and
+    /// guessing runs a command that was never asked for.
     int sectorAt(const QPoint& pos) const;
+    /// Whether \a pos is still in the middle of the ring, where letting go
+    /// cancels rather than chooses.
+    bool withinDeadZone(const QPoint& pos) const;
     void activate(int index);
     /**
      * Closes the ring and shows \a menu at the cursor instead. Either the source

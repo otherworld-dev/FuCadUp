@@ -38,6 +38,11 @@ using namespace Gui;
  * Mirrors the default "Fusion" mouse preset of Autodesk Fusion:
  * the middle button pans, Shift + middle orbits, and the wheel or
  * Ctrl + Shift + middle zooms. Selection stays on the left button.
+ *
+ * A laptop trackpad or a two-button mouse has no middle button to press, which
+ * would leave the view stuck, so the right button carries the same three moves:
+ * on its own it orbits, with Shift it pans and with Ctrl it zooms. A right
+ * click that does not drag still opens the context menu.
  */
 
 TYPESYSTEM_SOURCE(Gui::FusionNavigationStyle, Gui::UserNavigationStyle)
@@ -52,13 +57,20 @@ const char* FusionNavigationStyle::mouseButtons(ViewerMode mode)
         case NavigationStyle::SELECTION:
             return QT_TR_NOOP("Press left mouse button");
         case NavigationStyle::PANNING:
-            return QT_TR_NOOP("Press middle mouse button");
+            return QT_TR_NOOP("Press middle mouse button\nor press Shift and right mouse button");
         case NavigationStyle::DRAGGING:
-            return QT_TR_NOOP("Press Shift and middle mouse button");
+            return QT_TR_NOOP("Press Shift and middle mouse button\nor press right mouse button");
         case NavigationStyle::ZOOMING:
-            return QT_TR_NOOP("Scroll mouse wheel\nor press Ctrl, Shift and middle mouse button");
+            return QT_TR_NOOP(
+                "Scroll mouse wheel\nor press Ctrl, Shift and middle mouse button"
+                "\nor press Ctrl and right mouse button"
+            );
         default:
-            return "No description";
+            return QT_TR_NOOP(
+                "Select with the left mouse button, orbit with the right one or with Shift and "
+                "the middle one, pan with the middle one or with Shift and the right one, and "
+                "zoom with the wheel or with Ctrl and the right one."
+            );
     }
 }
 
@@ -158,9 +170,11 @@ SbBool FusionNavigationStyle::processSoEvent(const SoEvent* const ev)
                     processed = true;
                 }
                 else if (!press && !viewer->isEditing()) {
+                    // Pressing the button is what starts an orbit, so the mode is
+                    // already DRAGGING by the time a plain click is let go of;
+                    // the flags above are what tell a click from a drag.
                     if (this->currentmode != NavigationStyle::ZOOMING
-                        && this->currentmode != NavigationStyle::PANNING
-                        && this->currentmode != NavigationStyle::DRAGGING) {
+                        && this->currentmode != NavigationStyle::PANNING) {
                         if (this->isPopupMenuEnabled()) {
                             this->openPopupMenu(event->getPosition());
                         }
@@ -226,6 +240,12 @@ SbBool FusionNavigationStyle::processSoEvent(const SoEvent* const ev)
             this->addToLog(event->getPosition(), event->getTime());
             this->spin(posn);
             moveCursorPosition();
+            // spin() only counts as a drag once it has two positions to turn the
+            // camera between, and the right button has a context menu waiting on
+            // the answer: the first move away is already a drag, not a click.
+            if (this->button2down) {
+                hasDragged = true;
+            }
             processed = true;
         }
     }
@@ -294,13 +314,31 @@ SbBool FusionNavigationStyle::processSoEvent(const SoEvent* const ev)
             // Ctrl + Shift + middle button zooms
             newmode = NavigationStyle::ZOOMING;
             break;
+        case BUTTON2DOWN:
+            // The right button orbits for the mice and trackpads that have no
+            // middle button to hold. Letting go without having turned anything
+            // still opens the context menu.
+            if (newmode != NavigationStyle::DRAGGING) {
+                saveCursorPosition(ev);
+            }
+            newmode = NavigationStyle::DRAGGING;
+            break;
+        case SHIFTDOWN | BUTTON2DOWN:
+            // Shift + right button pans, as Shift does on the middle button
+            newmode = NavigationStyle::PANNING;
+            break;
+        case CTRLDOWN | BUTTON2DOWN:
+            // Ctrl + right button zooms
+            newmode = NavigationStyle::ZOOMING;
+            break;
 
         default:
-            // Reset mode to IDLE when button 3 is released while a modifier is still held.
-            // Without this an orbit or zoom would keep going after the mouse button is up.
+            // Reset mode to IDLE when a navigation button is released while a modifier is
+            // still held. Without this an orbit or zoom would keep going after the mouse
+            // button is up.
             if ((curmode == NavigationStyle::PANNING || curmode == NavigationStyle::ZOOMING
                  || curmode == NavigationStyle::DRAGGING)
-                && !this->button3down) {
+                && !this->button2down && !this->button3down) {
                 newmode = NavigationStyle::IDLE;
             }
             break;

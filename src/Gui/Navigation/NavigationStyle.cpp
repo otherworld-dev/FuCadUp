@@ -2574,12 +2574,39 @@ SbBool NavigationStyle::isPopupMenuEnabled() const
 
 namespace
 {
+/// "Pad · Face3": an object's label with the element of it that is meant.
+QString labelWithElement(const QString& label, const char* element)
+{
+    if (!element || element[0] == 0) {
+        return label;
+    }
+
+    return QStringLiteral("%1 · %2").arg(label, QString::fromUtf8(element));
+}
+
+/// What the menu is about when nothing is selected: the object under the cursor
+/// is where the entries below came from and what a click would pick, so it names
+/// the menu rather than a row saying nothing is.
+QString preselectionHeading()
+{
+    const SelectionChanges& hovered = Selection().getPreselection();
+    const App::DocumentObject* object = hovered.Object.getObject();
+    if (!object) {
+        return QObject::tr("Nothing selected");
+    }
+
+    return labelWithElement(
+        QString::fromUtf8(object->Label.getValue()),
+        hovered.Object.getElementName()
+    );
+}
+
 /// What the context menu is about, for the row that heads it.
 QString selectionHeading()
 {
     const std::vector<SelectionObject> selection = Selection().getSelectionEx();
     if (selection.empty()) {
-        return QObject::tr("Nothing selected");
+        return preselectionHeading();
     }
 
     if (selection.size() > 1) {
@@ -2593,7 +2620,7 @@ QString selectionHeading()
 
     const std::vector<std::string> subs = only.getSubNames();
     if (subs.size() == 1 && !subs.front().empty()) {
-        return QStringLiteral("%1 · %2").arg(label, QString::fromStdString(subs.front()));
+        return labelWithElement(label, subs.front().c_str());
     }
     if (subs.size() > 1) {
         return QObject::tr("%1 · %n elements", "", static_cast<int>(subs.size())).arg(label);
@@ -2704,7 +2731,9 @@ void NavigationStyle::openPopupMenu(const SbVec2s& position)
     }
 
     // A row at the top naming what the menu is about, so a menu opened on a face
-    // of one body among several says which one it will act on.
+    // of one body among several says which one it will act on. It comes from the
+    // selection, which is what the commands act on, and falls back to the object
+    // under the cursor, which is where the entries above came from.
     auto* header = new QAction(selectionHeading(), contextMenu);
     header->setObjectName(QStringLiteral("ContextMenuHeader"));
     header->setEnabled(false);
