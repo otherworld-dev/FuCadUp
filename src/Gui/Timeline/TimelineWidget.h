@@ -100,6 +100,7 @@ public Q_SLOTS:
     void rollToEnd();
 
 protected:
+    bool event(QEvent* event) override;
     bool eventFilter(QObject* watched, QEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     /// Observer message from the Selection
@@ -161,6 +162,10 @@ private:
     void positionPlayhead();
     void moveTo(int index);
     bool rollTo(int index);
+    /// Whether the key is one the strip rolls the history with. Asked twice: once to claim
+    /// the key from a command shortcut that would otherwise answer it first, and again
+    /// when the press itself arrives.
+    bool wantsKey(const QKeyEvent* event) const;
     /// Answers the timeline's own keys wherever they arrive, either on the widget or on a
     /// marker whose scroll area would otherwise eat the arrows. True when one was used.
     bool handleKey(QKeyEvent* event);

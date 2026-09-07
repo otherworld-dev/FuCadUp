@@ -707,7 +707,7 @@ void TimelineWidget::applyRollbackVisibility()
     }
 }
 
-bool TimelineWidget::handleKey(QKeyEvent* event)
+bool TimelineWidget::wantsKey(const QKeyEvent* event) const
 {
     // Nothing to roll without a body, and swallowing the arrows would then only stop the
     // strip's neighbours from seeing them.
@@ -717,6 +717,23 @@ bool TimelineWidget::handleKey(QKeyEvent* event)
 
     // The number pad sends the same keys with a modifier of its own.
     if ((event->modifiers() & ~Qt::KeypadModifier) != Qt::NoModifier) {
+        return false;
+    }
+
+    switch (event->key()) {
+        case Qt::Key_Left:
+        case Qt::Key_Right:
+        case Qt::Key_Home:
+        case Qt::Key_End:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool TimelineWidget::handleKey(QKeyEvent* event)
+{
+    if (!wantsKey(event)) {
         return false;
     }
 
@@ -748,8 +765,32 @@ void TimelineWidget::keyPressEvent(QKeyEvent* event)
     QWidget::keyPressEvent(event);
 }
 
+bool TimelineWidget::event(QEvent* event)
+{
+    // Home already belongs to the Home view command, and a command shortcut is answered
+    // before the widget that has the focus ever sees the key. Qt offers the focused widget
+    // the first refusal through this event: claiming the key here is what hands the press
+    // to the strip instead of the camera, and only while the strip holds the focus, so the
+    // command keeps Home everywhere else.
+    if (event->type() == QEvent::ShortcutOverride
+        && wantsKey(static_cast<QKeyEvent*>(event))) {
+        event->accept();
+        return true;
+    }
+
+    return QWidget::event(event);
+}
+
 bool TimelineWidget::eventFilter(QObject* watched, QEvent* event)
 {
+    // A focused marker is offered the key before the strip is, so the claim has to be
+    // made here as well as in event() above.
+    if (event->type() == QEvent::ShortcutOverride
+        && wantsKey(static_cast<QKeyEvent*>(event))) {
+        event->accept();
+        return true;
+    }
+
     if (event->type() == QEvent::KeyPress && handleKey(static_cast<QKeyEvent*>(event))) {
         return true;
     }

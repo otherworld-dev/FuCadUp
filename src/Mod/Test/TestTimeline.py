@@ -190,9 +190,26 @@ class TestTimeline(unittest.TestCase):
         self._settle()
 
     def _press(self, key):
+        """Hand a key press to the strip the way the focused widget receives one.
+
+        Not through the application: Home is the shortcut of the Home view command, and
+        the shortcut map answers it inside QApplication::notify before any widget or event
+        filter sees it. The strip takes the key back by claiming the shortcut override Qt
+        sends ahead of a real press, which the claim test above covers on its own; what is
+        left for here is what the strip does with the press once it arrives.
+        """
+
         event = QtGui.QKeyEvent(QtCore.QEvent.KeyPress, key, QtCore.Qt.NoModifier)
-        QtWidgets.QApplication.instance().sendEvent(self.widget, event)
+        self.widget.event(event)
         self._settle()
+
+    def _claims(self, key):
+        """Whether the strip takes the key off whatever command shortcut owns it."""
+
+        override = QtGui.QKeyEvent(QtCore.QEvent.ShortcutOverride, key, QtCore.Qt.NoModifier)
+        override.ignore()
+        QtWidgets.QApplication.instance().sendEvent(self.widget, override)
+        return override.isAccepted()
 
     def _marker_for(self, label):
         """Markers carry the feature's label as the first line of their tooltip."""
@@ -357,6 +374,24 @@ class TestTimeline(unittest.TestCase):
 
         self._press(QtCore.Qt.Key_End)
         self.assertIs(self.body.Tip, self.pad2)
+
+    def test_the_strip_claims_home_from_the_home_view_shortcut(self):
+        """Home already belongs to Std_ViewHome, whose shortcut is answered inside
+        QApplication::notify before the focused widget or any event filter sees the key.
+        Qt offers the widget the first refusal through a shortcut override, and the strip
+        has to take it or its Home is dead however the keys are wired up behind it."""
+
+        for key in (
+            QtCore.Qt.Key_Home,
+            QtCore.Qt.Key_End,
+            QtCore.Qt.Key_Left,
+            QtCore.Qt.Key_Right,
+        ):
+            self.assertTrue(self._claims(key), "The strip has to claim key {0}".format(key))
+
+        # Everything the strip does not roll with is left to whoever else wants it.
+        self.assertFalse(self._claims(QtCore.Qt.Key_Up))
+        self.assertFalse(self._claims(QtCore.Qt.Key_F5))
 
     def test_markers_and_step_buttons_can_be_reached_by_tab(self):
         marker = self._marker_for("Sketch001")
