@@ -1042,7 +1042,11 @@ void EditModeCoinManager::drawEditMarkers(
 namespace
 {
 
-/// Marker bitmap standing for each kind of point snap.
+/// Marker bitmap standing for each kind of snap.
+///
+/// Every kind carries a glyph of its own, so the pointer is never moved without saying what
+/// caught it: an outlined square on the grid, an hourglass on an axis and a small disc on a
+/// curve, next to the glyphs the point snaps already had.
 const char* snapMarkerName(Sketcher::SnapGeometry::SnapKind kind)
 {
     using Sketcher::SnapGeometry::SnapKind;
@@ -1057,6 +1061,12 @@ const char* snapMarkerName(Sketcher::SnapGeometry::SnapKind kind)
             return "DIAMOND_FILLED";
         case SnapKind::Quadrant:
             return "CIRCLE_LINE";
+        case SnapKind::Axis:
+            return "HOURGLASS_FILLED";
+        case SnapKind::OnCurve:
+            return "CIRCLE_FILLED";
+        case SnapKind::Grid:
+            return "SQUARE_LINE";
         default:
             return nullptr;
     }

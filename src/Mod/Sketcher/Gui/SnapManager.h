@@ -61,6 +61,24 @@ enum class SnapType
     All = Angle | Point | Edge | Grid
 };
 
+/// The kinds of either mask.
+constexpr SnapType operator|(SnapType lhs, SnapType rhs)
+{
+    return static_cast<SnapType>(static_cast<int>(lhs) | static_cast<int>(rhs));
+}
+
+/// The kinds both masks have.
+constexpr SnapType operator&(SnapType lhs, SnapType rhs)
+{
+    return static_cast<SnapType>(static_cast<int>(lhs) & static_cast<int>(rhs));
+}
+
+/// The kinds @a type leaves out, so a caller can ask for everything but one of them.
+constexpr SnapType operator~(SnapType type)
+{
+    return static_cast<SnapType>(~static_cast<int>(type) & static_cast<int>(SnapType::All));
+}
+
 /* This class is used to manage the overriding of mouse pointer coordinates in Sketcher
  *  (in Edit-Mode) depending on the situation. Those situations are in priority order :
  *  1 - Snap at angle: For tools like Slot, Arc, Line, Ellipse, this enables to constrain the angle

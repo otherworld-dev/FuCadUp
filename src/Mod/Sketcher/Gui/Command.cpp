@@ -372,10 +372,13 @@ CmdSketcherLeaveSketch::CmdSketcherLeaveSketch()
     sAppModule = "Sketcher";
     sGroup = "Sketcher";
     sMenuText = QT_TR_NOOP("Leave Sketch");
-    sToolTipText = QT_TR_NOOP("Finishes editing the active sketch. Press Escape to exit.");
+    sToolTipText = QT_TR_NOOP("Finishes editing the active sketch");
     sWhatsThis = "Sketcher_LeaveSketch";
     sStatusTip = sToolTipText;
     sPixmap = "Sketcher_LeaveSketch";
+    // Escape stops the running tool and stays in the sketch, so leaving needs a key of
+    // its own. Ctrl+Enter is already the sketcher's "accept every on-view parameter".
+    sAccel = "Ctrl+Shift+Return";
     eType = 0;
 }
 
@@ -1700,13 +1703,9 @@ void CmdSketcherGrid::languageChange()
 
 bool CmdSketcherGrid::isActive()
 {
-    auto* vp = getInactiveHandlerEditModeSketchViewProvider();
-
-    if (vp) {
-        return true;
-    }
-
-    return false;
+    // The grid panel is a widget in a popup: it never takes the sketch out of the tool
+    // that is drawing, so it stays available for as long as the sketch is being edited.
+    return isSketchInEdit(getActiveGuiDocument());
 }
 
 /* Snap tool */
@@ -1928,13 +1927,9 @@ void CmdSketcherSnap::languageChange()
 
 bool CmdSketcherSnap::isActive()
 {
-    auto* vp = getInactiveHandlerEditModeSketchViewProvider();
-
-    if (vp) {
-        return true;
-    }
-
-    return false;
+    // Same as the grid: changing how the pointer snaps is exactly what someone wants
+    // halfway through drawing, and the popup leaves the tool running.
+    return isSketchInEdit(getActiveGuiDocument());
 }
 
 

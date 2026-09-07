@@ -243,7 +243,13 @@ Base::Vector2d SnapManager::snap(Base::Vector2d inputPos, SnapType mask)
         && viewProvider.ShowGrid.getValue()) {
         Base::Vector2d gridSnapResult = snapPos;
         if (snapToGrid(snapPos, gridSnapResult)) {
-            if (!lastSnapResult) {
+            if (lastSnapResult) {
+                // An axis lock the grid then finished off: the axis is what caught the
+                // pointer, but the point it lands on is the grid's, and that is where
+                // the marker belongs.
+                lastSnapResult->position = gridSnapResult;
+            }
+            else {
                 lastSnapResult = SnapResult {SnapKind::Grid, gridSnapResult};
             }
             return gridSnapResult;

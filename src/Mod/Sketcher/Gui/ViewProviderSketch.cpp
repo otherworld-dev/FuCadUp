@@ -126,6 +126,22 @@ bool isFiniteVector(const Base::Vector3d& vector)
 {
     return std::isfinite(vector.x) && std::isfinite(vector.y) && std::isfinite(vector.z);
 }
+
+/** What a drag of existing geometry is allowed to snap to.
+ *
+ * Everything but the grid: a drag adjusts geometry that is already placed, so it follows the
+ * pointer instead of stepping from grid line to grid line, while the points that matter - the
+ * origin, vertices, crossings, midpoints and quadrants - still catch it. Holding Ctrl, the key
+ * the sketcher already reserves for changing how the pointer behaves, suspends the lot.
+ */
+SnapType dragSnapMask()
+{
+    if (QApplication::keyboardModifiers() & Qt::ControlModifier) {
+        return SnapType::None;
+    }
+
+    return SnapType::All & ~SnapType::Grid;
+}
 }  // namespace
 
 /************** ViewProviderSketch::ParameterObserver *********************/
@@ -1426,9 +1442,13 @@ bool ViewProviderSketch::mouseButtonPressed(int Button, bool pressed, const SbVe
                     return true;
                 }
                 case STATUS_SKETCH_Drag: {
-                    Base::Vector2d snappedPos = snapHandle->compute();
+                    // The same mask the drag itself used, or the geometry would jump onto the
+                    // grid on release after a drag that stayed clear of it.
+                    Base::Vector2d snappedPos = snapHandle->compute(dragSnapMask());
                     commitDragMove(snappedPos.x, snappedPos.y);
                     setSketchMode(STATUS_NONE);
+                    snapManager->resetLastSnap();
+                    updateSnapMarker();
                     return true;
                 }
                 case STATUS_SKETCH_DragConstraint: {
@@ -1920,7 +1940,8 @@ bool ViewProviderSketch::mouseMove(const SbVec2s& cursorPos, Gui::View3DInventor
             return true;
         }
         case STATUS_SKETCH_Drag: {
-            Base::Vector2d dragPos = snapHandle->compute();
+            Base::Vector2d dragPos = snapHandle->compute(dragSnapMask());
+            updateSnapMarker();
             const bool temporaryMoveSucceeded = doDragStep(dragPos.x, dragPos.y);
 
             if (dragAutoConstraintHandler) {
@@ -2098,7 +2119,9 @@ void ViewProviderSketch::initDragging(int geoId, Sketcher::PointPos pos, Gui::Vi
         }
 
         auto snapHandle = std::make_unique<SnapManager::SnapHandle>(snapManager.get(), Base::Vector2d(x, y));
-        Base::Vector2d snappedPos = snapHandle->compute();
+        // The reference the whole drag is measured from, so it has to snap the way the drag
+        // does; a grid snap here alone would offset every step that follows.
+        Base::Vector2d snappedPos = snapHandle->compute(dragSnapMask());
         drag.xInit = snappedPos.x;
         drag.yInit = snappedPos.y;
         return true;
@@ -3659,19 +3682,15 @@ float ViewProviderSketch::getEditPickRadius(const Gui::View3DInventorViewer* vie
 
 void ViewProviderSketch::updateSnapMarker()
 {
-    using Sketcher::SnapGeometry::SnapKind;
-
     if (!editCoinManager || !snapManager) {
         return;
     }
 
+    // Every snap is marked, the grid, the axes and a curve included: the pointer is moved for
+    // the same reason each time, so it is shown the same way. The coin manager clears the
+    // glyph itself for any kind it has no bitmap for.
     const auto snap = snapManager->lastSnap();
-    const bool isPointSnap = snap
-        && (snap->kind == SnapKind::Origin || snap->kind == SnapKind::Vertex
-            || snap->kind == SnapKind::Intersection || snap->kind == SnapKind::Midpoint
-            || snap->kind == SnapKind::Quadrant);
-
-    if (isPointSnap) {
+    if (snap) {
         editCoinManager->drawSnapMarker(snap->position, snap->kind);
     }
     else {
