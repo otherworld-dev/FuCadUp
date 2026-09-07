@@ -46,6 +46,17 @@ CUT = 1
 INTERSECT = 2
 NEW_BODY = 3
 
+# ui->sidesMode, see TaskExtrudeParameters::translateSidesList.
+ONE_SIDED = 0
+SYMMETRIC = 2
+
+# The two halves of the operation combo's tooltip. They are asked for the way Qt asks
+# for them, so the assertions hold whatever language the tests run in.
+UI_TOOLTIP = "How the extrusion is combined with the existing solid"
+COLOUR_HINT = (
+    "The preview is coloured by operation: green adds, red removes, yellow keeps the overlap"
+)
+
 
 class TestExtrudeFlip(unittest.TestCase):
     """A length dragged or typed past the profile turns the extrude around exactly once."""
@@ -152,6 +163,44 @@ class TestExtrudeFlip(unittest.TestCase):
 
     def _set_raw_length(self, value):
         self.lengthEdit.setProperty("rawValue", float(value))
+        self._process_events()
+
+    def _task_panel(self):
+        """The TaskExtrudeParameters box the length field lives in.
+
+        PySide has no wrapper for the C++ class, so it comes back as a plain QWidget
+        and its methods have to be reached through the meta object.
+        """
+
+        widget = self.lengthEdit
+        while widget is not None:
+            meta = widget.metaObject()
+            if meta.indexOfMethod("setLengthDragActive(int,bool)") >= 0:
+                return widget
+            widget = widget.parent()
+        return None
+
+    def _set_drag_active(self, active, side=0):
+        """Report a length drag starting or finishing, the way the dragger does."""
+
+        panel = self._task_panel()
+        self.assertIsNotNone(panel, "could not reach the extrude task panel")
+        try:
+            invoked = QtCore.QMetaObject.invokeMethod(
+                panel,
+                "setLengthDragActive",
+                QtCore.Qt.DirectConnection,
+                QtCore.Q_ARG(int, int(side)),
+                QtCore.Q_ARG(bool, bool(active)),
+            )
+        except TypeError:
+            invoked = QtCore.QMetaObject.invokeMethod(
+                panel,
+                "setLengthDragActive",
+                QtCore.Q_ARG(int, int(side)),
+                QtCore.Q_ARG(bool, bool(active)),
+            )
+        self.assertTrue(invoked, "setLengthDragActive could not be invoked")
         self._process_events()
 
     def _length(self):
@@ -291,8 +340,93 @@ class TestExtrudeFlip(unittest.TestCase):
         self.assertEqual(join.rgb(), newBody.rgb())
 
     def test_the_operation_combo_explains_the_preview_colours(self):
-        tooltip = self.operationMode.toolTip()
-        self.assertTrue(tooltip)
-        # The colour hint is added below whatever the .ui file already said.
-        self.assertIn("\n", tooltip)
-        self.assertTrue(tooltip.split("\n")[-1].strip())
+        """The hint goes below what the .ui file already said, not instead of it."""
+
+        lines = self.operationMode.toolTip().split("\n")
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(
+            lines[0],
+            QtCore.QCoreApplication.translate(
+                "PartDesignGui::TaskPadPocketParameters", UI_TOOLTIP
+            ),
+        )
+        self.assertEqual(
+            lines[1],
+            QtCore.QCoreApplication.translate(
+                "PartDesignGui::TaskExtrudeParameters", COLOUR_HINT
+            ),
+        )
+
+    # -- the drag path ---------------------------------------------------
+
+    def test_a_drag_flips_once_per_crossing_and_is_forgotten_when_it_ends(self):
+        """The gizmo's own path: a start, a run of raw values, then a finish.
+
+        This is where the bug lived. The arrow keeps reporting the same negative
+        distance while the pointer stays past the profile, and the crossing it made is
+        that drag's own business: a value arriving afterwards must not undo it.
+        """
+
+        self._set_drag_active(True)
+
+        self._set_raw_length(-3.0)
+        self.assertEqual(self.operationMode.currentIndex(), CUT)
+        self.assertTrue(self.pad.Reversed)
+
+        for raw in (-5.0, -7.0):
+            self._set_raw_length(raw)
+            self.assertEqual(self.operationMode.currentIndex(), CUT)
+            self.assertTrue(self.pad.Reversed)
+            self.assertAlmostEqual(self._length(), abs(raw))
+
+        # Dragged back over the profile within the same drag: it turns around again.
+        self._set_raw_length(2.0)
+        self.assertEqual(self.operationMode.currentIndex(), JOIN)
+        self.assertFalse(self.pad.Reversed)
+
+        # And out the far side once more, where the drag is released.
+        self._set_raw_length(-4.0)
+        self.assertEqual(self.operationMode.currentIndex(), CUT)
+        self.assertTrue(self.pad.Reversed)
+        self._set_drag_active(False)
+
+        # A distance typed after the drag is a fresh start, not a crossing.
+        self._set_raw_length(9.0)
+        self.assertEqual(self.operationMode.currentIndex(), CUT)
+        self.assertTrue(self.pad.Reversed)
+        self.assertAlmostEqual(self._length(), 9.0)
+
+    def test_a_new_drag_does_not_inherit_the_last_one_s_crossing(self):
+        self._set_drag_active(True)
+        self._set_raw_length(-5.0)
+        self.assertEqual(self.operationMode.currentIndex(), CUT)
+        self._set_drag_active(False)
+
+        # The arrow now points the other way, so the next drag pulls positive first.
+        self._set_drag_active(True)
+        self._set_raw_length(8.0)
+        self.assertEqual(self.operationMode.currentIndex(), CUT)
+        self.assertTrue(self.pad.Reversed)
+        self.assertAlmostEqual(self._length(), 8.0)
+
+        # Only crossing zero within this drag turns it around.
+        self._set_raw_length(-2.0)
+        self.assertEqual(self.operationMode.currentIndex(), JOIN)
+        self.assertFalse(self.pad.Reversed)
+        self._set_drag_active(False)
+
+    def test_a_symmetric_extrude_has_nothing_to_turn_around(self):
+        """It grows both ways at once, so a crossing is a no-op there."""
+
+        sidesMode = self._find_widget("sidesMode")
+        self.assertIsNotNone(sidesMode)
+        sidesMode.setCurrentIndex(SYMMETRIC)
+        self._process_events()
+        self.assertFalse(self.checkBoxReversed.isEnabled())
+
+        self._set_raw_length(-5.0)
+
+        self.assertEqual(self.operationMode.currentIndex(), JOIN)
+        self.assertFalse(self.pad.Reversed)
+        self.assertFalse(self.checkBoxReversed.isChecked())
+        self.assertAlmostEqual(self._length(), 5.0)

@@ -83,6 +83,34 @@ void ViewProvider::attach(App::DocumentObject* pcObject)
     updatePreviewColor();
 }
 
+Base::Color PartDesignGui::previewColor(PartDesign::FeatureAddSub::OperationType operation)
+{
+    using Operation = PartDesign::FeatureAddSub::OperationType;
+    using ColorParameter = Gui::StyleParameters::ParameterDefinition<Base::Color>;
+
+    const ColorParameter* parameter = nullptr;
+    switch (operation) {
+        case Operation::Join:
+        case Operation::NewBody:
+            // Starting a new body adds material just the same, only somewhere else.
+            parameter = &StyleParameters::PreviewAdditiveColor;
+            break;
+        case Operation::Cut:
+            parameter = &StyleParameters::PreviewSubtractiveColor;
+            break;
+        case Operation::Intersect:
+            parameter = &StyleParameters::PreviewCommonColor;
+            break;
+        default:
+            throw Base::ValueError("Unhandled value of the Operation property");
+    }
+
+    auto* styleParameterManager = Base::provideService<Gui::StyleParameters::ParameterManager>();
+
+    return styleParameterManager ? styleParameterManager->resolve(*parameter)
+                                 : parameter->defaultValue;
+}
+
 void ViewProvider::updatePreviewColor()
 {
     auto addSubFeature = getObject<PartDesign::FeatureAddSub>();
@@ -90,24 +118,7 @@ void ViewProvider::updatePreviewColor()
         return;
     }
 
-    auto* styleParameterManager = Base::provideService<Gui::StyleParameters::ParameterManager>();
-
-    auto parameter = StyleParameters::PreviewAdditiveColor;
-    switch (addSubFeature->getOperationType()) {
-        case PartDesign::FeatureAddSub::OperationType::Cut:
-            parameter = StyleParameters::PreviewSubtractiveColor;
-            break;
-        case PartDesign::FeatureAddSub::OperationType::Intersect:
-            parameter = StyleParameters::PreviewCommonColor;
-            break;
-        case PartDesign::FeatureAddSub::OperationType::Join:
-        case PartDesign::FeatureAddSub::OperationType::NewBody:
-            break;
-        default:
-            throw Base::ValueError("Unhandled value of the Operation property");
-    }
-
-    PreviewColor.setValue(styleParameterManager->resolve(parameter));
+    PreviewColor.setValue(previewColor(addSubFeature->getOperationType()));
 }
 
 bool ViewProvider::doubleClicked()

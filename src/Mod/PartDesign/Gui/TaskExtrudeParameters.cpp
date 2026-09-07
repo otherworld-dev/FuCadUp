@@ -33,7 +33,6 @@
 
 
 #include <App/Document.h>
-#include <Base/ServiceProvider.h>
 #include <Base/Tools.h>
 #include <Base/UnitsApi.h>
 #include <Gui/BitmapFactory.h>
@@ -47,10 +46,10 @@
 #include <Mod/Part/App/GizmoHelper.h>
 
 #include "ui_TaskPadPocketParameters.h"
-#include "StyleParameters.h"
 #include "TaskExtrudeParameters.h"
 #include "TaskTransformedParameters.h"
 #include "ReferenceSelection.h"
+#include "ViewProvider.h"
 
 
 using namespace PartDesignGui;
@@ -81,6 +80,23 @@ TaskExtrudeParameters::TaskExtrudeParameters(
     group->setExclusive(true);
 
     this->groupLayout()->addWidget(proxy);
+}
+
+TaskExtrudeParameters::~TaskExtrudeParameters()
+{
+    // These callbacks carry a pointer to this object's own side controllers, so they
+    // go before anything here does rather than relying on the order of the members.
+    const auto stopWatchingDrags = [](Gui::LinearGizmo* gizmo, SideController* side) {
+        if (!gizmo) {
+            return;
+        }
+        SoLinearDragger* dragger = gizmo->getDraggerContainer()->getDragger();
+        dragger->removeStartCallback(lengthDragStarted, side);
+        dragger->removeFinishCallback(lengthDragFinished, side);
+    };
+
+    stopWatchingDrags(lengthGizmo1, &m_side1);
+    stopWatchingDrags(lengthGizmo2, &m_side2);
 }
 
 void TaskExtrudeParameters::setupDialog()
@@ -282,6 +298,8 @@ void TaskExtrudeParameters::createSideControllers()
     m_side1.upToShapeList = ui->upToShapeList;
     m_side1.upToShapeFaces = ui->upToShapeFaces;
     m_side1.unselectShapeFaceAction = unselectShapeFaceAction;
+    m_side1.side = Side::First;
+    m_side1.owner = this;
 
     m_side1.Type = &extrude->Type;
     m_side1.Length = &extrude->Length;
@@ -308,6 +326,8 @@ void TaskExtrudeParameters::createSideControllers()
     m_side2.upToShapeList = ui->upToShapeList2;
     m_side2.upToShapeFaces = ui->upToShapeFaces2;
     m_side2.unselectShapeFaceAction = unselectShapeFaceAction2;
+    m_side2.side = Side::Second;
+    m_side2.owner = this;
 
     m_side2.Type = &extrude->Type2;
     m_side2.Length = &extrude->Length2;
@@ -515,6 +535,12 @@ void TaskExtrudeParameters::setSelectionMode(SelectionMode mode, Side side)
 
 void TaskExtrudeParameters::tryRecomputeFeature()
 {
+    if (recomputeSuspended) {
+        // A crossing of the profile is being applied; the caller recomputes once at
+        // the end of it rather than after each of the properties it changes.
+        return;
+    }
+
     try {
         // recompute and update the direction
         recomputeFeature();
@@ -740,9 +766,7 @@ void TaskExtrudeParameters::onLengthChanged(double len, Side side)
     // distance for as long as the pointer stays there, so the extrude turns around
     // once per crossing of zero rather than once per mouse move.
     const int rawSign = len < 0.0 ? -1 : +1;
-    if (rawSign != controller.lastRawLengthSign && flipThroughZero(side)) {
-        controller.lastRawLengthSign = rawSign;
-    }
+    const bool crossed = rawSign != controller.lastRawLengthSign;
 
     // The distance is reported the way it is now meant, and neither the field nor
     // the property ever shows the negative that got us here.
@@ -751,8 +775,17 @@ void TaskExtrudeParameters::onLengthChanged(double len, Side side)
         QSignalBlocker mirroring(controller.lengthEdit);
         controller.lengthEdit->setValue(len);
     }
-
     controller.Length->setValue(len);
+
+    if (crossed) {
+        // The length is already the one the crossing is about, so the operation and
+        // the direction can change without a recompute of their own in between.
+        Base::StateLocker turning(recomputeSuspended);
+        if (flipThroughZero(side)) {
+            controller.lastRawLengthSign = rawSign;
+        }
+    }
+
     tryRecomputeFeature();
 }
 
@@ -761,6 +794,13 @@ bool TaskExtrudeParameters::flipThroughZero(Side side)
     // Only a plain distance can be dragged through zero; the up-to modes end
     // somewhere of their own and have no length to reverse.
     if (static_cast<Mode>(getSideController(side).changeMode->currentIndex()) != Mode::Dimension) {
+        return false;
+    }
+
+    // A symmetric extrude grows both ways at once, so it has no other side to move
+    // to and nothing to turn around: that is exactly when the Reversed box is
+    // disabled. Crossing zero there is a no-op, and the length just loses its sign.
+    if (!ui->checkBoxReversed->isEnabled()) {
         return false;
     }
 
@@ -777,13 +817,38 @@ bool TaskExtrudeParameters::flipThroughZero(Side side)
         ui->operationMode->setCurrentIndex(static_cast<int>(Operation::Join));
     }
 
-    // A symmetric extrude grows both ways at once and so has nothing to reverse;
-    // that is exactly when the box is disabled, as it is for a click on the gizmo.
-    if (ui->checkBoxReversed->isEnabled()) {
-        ui->checkBoxReversed->setChecked(!ui->checkBoxReversed->isChecked());
-    }
+    ui->checkBoxReversed->setChecked(!ui->checkBoxReversed->isChecked());
 
     return true;
+}
+
+void TaskExtrudeParameters::setLengthDragActive(int side, bool active)
+{
+    auto& controller = getSideController(side == 0 ? Side::First : Side::Second);
+
+    controller.draggingLength = active;
+    // Every drag decides for itself which side of the profile it is on, so a crossing
+    // left over from another one must not turn this one around on its first value,
+    // nor may one left behind by a finished drag catch a distance typed afterwards.
+    controller.lastRawLengthSign = +1;
+
+    if (!active) {
+        // The arrow stayed where the drag found it; put it where the extrude ended up
+        // now that moving it can no longer disturb anything.
+        setGizmoPositions();
+    }
+}
+
+void TaskExtrudeParameters::lengthDragStarted(void* data, SoDragger*)
+{
+    auto* controller = static_cast<SideController*>(data);
+    controller->owner->setLengthDragActive(static_cast<int>(controller->side), true);
+}
+
+void TaskExtrudeParameters::lengthDragFinished(void* data, SoDragger*)
+{
+    auto* controller = static_cast<SideController*>(data);
+    controller->owner->setLengthDragActive(static_cast<int>(controller->side), false);
 }
 
 void TaskExtrudeParameters::onStartOffsetChanged(double len)
@@ -1587,39 +1652,21 @@ void TaskExtrudeParameters::translateOperationList(int index)
     ui->operationMode->addItem(tr("New body"));
     ui->operationMode->setCurrentIndex(index);
 
+    // The list is rebuilt right after retranslateUi has put the tooltip the .ui file
+    // carries back, so the hint is appended to that rather than replacing it. It is
+    // written here and not with the swatches, which a missing theme service can skip.
+    ui->operationMode->setToolTip(
+        ui->operationMode->toolTip() + QLatin1String("\n")
+        + tr("The preview is coloured by operation: green adds, red removes, yellow keeps "
+             "the overlap")
+    );
+
     applyOperationColors();
 }
 
 void TaskExtrudeParameters::applyOperationColors()
 {
     using Operation = PartDesign::FeatureAddSub::OperationType;
-
-    auto* styleParameterManager = Base::provideService<Gui::StyleParameters::ParameterManager>();
-    if (!styleParameterManager) {
-        return;
-    }
-
-    // The very parameters ViewProvider::updatePreviewColor resolves, so a theme that
-    // recolours the preview recolours the swatches along with it.
-    const auto colorOf = [styleParameterManager](Operation operation) {
-        switch (operation) {
-            case Operation::Cut:
-                return styleParameterManager->resolve(
-                    PartDesignGui::StyleParameters::PreviewSubtractiveColor
-                );
-            case Operation::Intersect:
-                return styleParameterManager->resolve(
-                    PartDesignGui::StyleParameters::PreviewCommonColor
-                );
-            case Operation::Join:
-            case Operation::NewBody:
-                break;
-        }
-        // A new body is material added just the same, only somewhere else.
-        return styleParameterManager->resolve(
-            PartDesignGui::StyleParameters::PreviewAdditiveColor
-        );
-    };
 
     constexpr int swatchSize = 12;
     constexpr int swatchRadius = 3;
@@ -1630,20 +1677,14 @@ void TaskExtrudeParameters::applyOperationColors()
         QPainter painter(&swatch);
         painter.setRenderHint(QPainter::Antialiasing);
         painter.setPen(Qt::NoPen);
-        painter.setBrush(colorOf(static_cast<Operation>(index)).asValue<QColor>());
+        // The colour the preview of that operation is drawn in, so that a theme
+        // recolours the swatch and the preview together.
+        painter.setBrush(previewColor(static_cast<Operation>(index)).asValue<QColor>());
         painter.drawRoundedRect(QRect {0, 0, swatchSize, swatchSize}, swatchRadius, swatchRadius);
         painter.end();
 
         ui->operationMode->setItemIcon(index, QIcon(swatch));
     }
-
-    // The list is rebuilt right after retranslateUi has put the tooltip the .ui file
-    // carries back, so the hint is appended to that rather than replacing it.
-    ui->operationMode->setToolTip(
-        ui->operationMode->toolTip() + QLatin1String("\n")
-        + tr("The preview is coloured by operation: green adds, red removes, yellow keeps "
-             "the overlap")
-    );
 }
 
 void TaskExtrudeParameters::handleLineFaceNameClick(QLineEdit* lineEdit)
@@ -1686,20 +1727,15 @@ void TaskExtrudeParameters::setupGizmos()
         vp
     );
 
-    // A crossing belongs to the drag that made it. Forgetting it at both ends of a
-    // drag keeps the next one, or a distance typed afterwards, from turning the
-    // extrude around again on its first value.
-    const auto forgetCrossing = [](void* data, SoDragger*) {
-        static_cast<SideController*>(data)->lastRawLengthSign = +1;
+    // Both ends of a length drag are reported to the panel: a crossing belongs to
+    // the drag that made it, and the arrow of a drag in progress must be left alone.
+    const auto watchDrags = [](Gui::LinearGizmo* gizmo, SideController* side) {
+        SoLinearDragger* dragger = gizmo->getDraggerContainer()->getDragger();
+        dragger->addStartCallback(lengthDragStarted, side);
+        dragger->addFinishCallback(lengthDragFinished, side);
     };
-    const auto forgetCrossingAroundDrags =
-        [&forgetCrossing](Gui::LinearGizmo* gizmo, SideController* side) {
-            SoLinearDragger* dragger = gizmo->getDraggerContainer()->getDragger();
-            dragger->addStartCallback(forgetCrossing, side);
-            dragger->addFinishCallback(forgetCrossing, side);
-        };
-    forgetCrossingAroundDrags(lengthGizmo1, &m_side1);
-    forgetCrossingAroundDrags(lengthGizmo2, &m_side2);
+    watchDrags(lengthGizmo1, &m_side1);
+    watchDrags(lengthGizmo2, &m_side2);
 
     setGizmoPositions();
     showDraggerHints();
@@ -1746,13 +1782,23 @@ void TaskExtrudeParameters::setGizmoPositions()
 
     startOffsetGizmo->setVisibility(hasStartOffset);
 
-    lengthGizmo1->Gizmo::setDraggerPlacement(center1, direction);
+    // An arrow that is being dragged is never moved. Turning its direction around
+    // turns the dragger's own frame around under the pointer, so the very next
+    // motion would report the drag with the opposite sign and flip the operation
+    // straight back; and placing the taper gizmo over it touches its translation.
+    // A drag puts its arrow right when it ends, see setLengthDragActive.
+    if (!m_side1.draggingLength) {
+        lengthGizmo1->Gizmo::setDraggerPlacement(center1, direction);
+        taperAngleGizmo1->placeOverLinearGizmo(lengthGizmo1);
+    }
     lengthGizmo1->setVisibility(extrudeType == "Length");
-    taperAngleGizmo1->placeOverLinearGizmo(lengthGizmo1);
     taperAngleGizmo1->setVisibility(extrudeType == "Length");
-    lengthGizmo2->Gizmo::setDraggerPlacement(center2, -direction);
+
+    if (!m_side2.draggingLength) {
+        lengthGizmo2->Gizmo::setDraggerPlacement(center2, -direction);
+        taperAngleGizmo2->placeOverLinearGizmo(lengthGizmo2);
+    }
     lengthGizmo2->setVisibility(sideType == "Two sides" && extrudeType2 == "Length");
-    taperAngleGizmo2->placeOverLinearGizmo(lengthGizmo2);
     taperAngleGizmo2->setVisibility(sideType == "Two sides" && extrudeType2 == "Length");
 
     Base::Vector3d padDir = extrude->Direction.getValue().Normalized();
@@ -1764,13 +1810,16 @@ void TaskExtrudeParameters::setGizmoPositions()
     // Important note: This code assumes that nothing other than alongSketchNormal
     // and symmetric option influence the multFactor. If some custom gizmos changes
     // it then that also should be handled properly here
-    if (extrude->AlongSketchNormal.getValue()) {
-        lengthGizmo1->setMultFactor(multFactor / lengthFactor);
-        lengthGizmo2->setMultFactor(multFactor / lengthFactor);
+    const double lengthMultFactor = extrude->AlongSketchNormal.getValue()
+        ? multFactor / lengthFactor
+        : multFactor;
+
+    // setMultFactor writes the dragger's translation, which is the drag in progress.
+    if (!m_side1.draggingLength) {
+        lengthGizmo1->setMultFactor(lengthMultFactor);
     }
-    else {
-        lengthGizmo1->setMultFactor(multFactor);
-        lengthGizmo2->setMultFactor(multFactor);
+    if (!m_side2.draggingLength) {
+        lengthGizmo2->setMultFactor(lengthMultFactor);
     }
 
     gizmoContainer->calculateScaleAndOrientation();

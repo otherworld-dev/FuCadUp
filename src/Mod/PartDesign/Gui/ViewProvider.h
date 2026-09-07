@@ -26,12 +26,14 @@
 #pragma once
 
 #include <App/DocumentObject.h>
+#include <Base/Color.h>
 #include <Gui/ViewProviderFeaturePython.h>
 #include <Gui/ViewProviderSuppressibleExtension.h>
 #include <Mod/Part/Gui/ViewProvider.h>
 #include <Mod/Part/Gui/ViewProviderAttachExtension.h>
 #include <Mod/Part/Gui/ViewProviderPreviewExtension.h>
 #include <Mod/PartDesign/App/Feature.h>
+#include <Mod/PartDesign/App/FeatureAddSub.h>
 
 #include "ViewProviderBody.h"
 
@@ -40,6 +42,13 @@ namespace PartDesignGui
 {
 
 class TaskDlgFeatureParameters;
+
+/**
+ * The colour the preview of @p operation is drawn in, resolved through the style
+ * parameters so that a theme recolours every place it is shown at once. Falls back to
+ * the built-in default when no style parameter service is available.
+ */
+PartDesignGuiExport Base::Color previewColor(PartDesign::FeatureAddSub::OperationType operation);
 
 /**
  * A common base class for all part design features view providers

@@ -123,9 +123,19 @@ public:
         const std::string& pixmapname,
         const QString& parname
     );
-    ~TaskExtrudeParameters() override = default;
+    ~TaskExtrudeParameters() override;
 
     void saveHistory() override;
+
+    /**
+     * Reports that a drag of one side's length arrow has begun or ended; @p side is
+     * 0 for the first side and 1 for the second, matching Side. The gizmo's dragger
+     * calls this. While a drag runs the arrow is left where it is, because moving it
+     * turns the dragger's own frame around under the pointer, and the crossing the
+     * drag made belongs to that drag alone. Invokable so a test can drive the drag
+     * path without a 3D view.
+     */
+    Q_INVOKABLE void setLengthDragActive(int side, bool active);
 
     void fillDirectionCombo();
     void addAxisToCombo(
@@ -169,10 +179,18 @@ protected:
         App::PropertyLinkSub* UpToFace = nullptr;
         App::PropertyLinkSubList* UpToShape = nullptr;
 
+        // Which side this is, and the panel it belongs to, so that a dragger callback
+        // holding nothing but this controller can find its way back.
+        Side side = Side::First;
+        TaskExtrudeParameters* owner = nullptr;
+
         // Sign of the last raw length this side reported. The gizmo repeats the same
         // negative distance on every mouse move while the pointer stays past the
         // profile, so the extrude may only turn around when this sign changes.
         int lastRawLengthSign = +1;
+
+        // True while this side's length arrow is being dragged.
+        bool draggingLength = false;
     };
 
     SideController m_side1;
@@ -286,6 +304,14 @@ private:
     void createSideControllers();
     void updateStartUI();
     void updateStartReferenceName();
+
+    static void lengthDragStarted(void* data, SoDragger* dragger);
+    static void lengthDragFinished(void* data, SoDragger* dragger);
+
+    // Set while one crossing of the profile is being applied. The operation and the
+    // direction each recompute as they change; this holds them off so that one
+    // crossing costs exactly one recompute.
+    bool recomputeSuspended = false;
 
     std::unique_ptr<Gui::GizmoContainer> gizmoContainer;
     Gui::LinearGizmo* startOffsetGizmo = nullptr;
