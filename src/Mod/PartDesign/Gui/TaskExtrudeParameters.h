@@ -168,6 +168,11 @@ protected:
         App::PropertyAngle* TaperAngle = nullptr;
         App::PropertyLinkSub* UpToFace = nullptr;
         App::PropertyLinkSubList* UpToShape = nullptr;
+
+        // Sign of the last raw length this side reported. The gizmo repeats the same
+        // negative distance on every mouse move while the pointer stays past the
+        // profile, so the extrude may only turn around when this sign changes.
+        int lastRawLengthSign = +1;
     };
 
     SideController m_side1;
@@ -196,11 +201,12 @@ private:
     void onModeChanged_Side2(int index);
     void onLengthChanged(double len, Side side);
     /**
-     * Turns Join into Cut and back when the drag carries the extrusion past the
-     * profile, the way Fusion swaps between adding and removing material as the
-     * arrow crosses over. Returns whether anything was swapped.
+     * Turns the extrude around when the length crosses the profile, the way Fusion
+     * swaps between adding and removing material as the arrow crosses over: Join
+     * becomes Cut and back, and the extrusion is reversed along with it. Returns
+     * whether the crossing counted, which it only does for a plain distance.
      */
-    bool flipOperationThroughZero(Side side);
+    bool flipThroughZero(Side side);
     void onStartModeChanged(int type);
     void onStartOffsetChanged(double len);
     void onOffsetChanged(double len, Side side);
@@ -264,6 +270,8 @@ private:
 
     void tryRecomputeFeature();
     void translateFaceName(QLineEdit*);
+    /// Gives every entry of the operation combo the colour its preview is drawn in.
+    void applyOperationColors();
     void connectSlots();
     bool hasProfileFace(PartDesign::ProfileBased*) const;
     void clearFaceName(QLineEdit*);

@@ -22,16 +22,24 @@
  *                                                                         *
  ***************************************************************************/
 
+#include <cmath>
+
 #include <QAction>
 #include <QAbstractButton>
+#include <QIcon>
+#include <QPainter>
+#include <QPixmap>
 #include <QSignalBlocker>
 
 
 #include <App/Document.h>
+#include <Base/ServiceProvider.h>
 #include <Base/Tools.h>
 #include <Base/UnitsApi.h>
+#include <Gui/BitmapFactory.h>
 #include <Gui/Command.h>
 #include <Gui/Tools.h>
+#include <Gui/Utilities.h>
 #include <Gui/Inventor/Draggers/Gizmo.h>
 #include <Gui/Inventor/Draggers/SoLinearDragger.h>
 #include <Gui/Inventor/Draggers/SoRotationDragger.h>
@@ -39,6 +47,7 @@
 #include <Mod/Part/App/GizmoHelper.h>
 
 #include "ui_TaskPadPocketParameters.h"
+#include "StyleParameters.h"
 #include "TaskExtrudeParameters.h"
 #include "TaskTransformedParameters.h"
 #include "ReferenceSelection.h"
@@ -727,11 +736,18 @@ void TaskExtrudeParameters::onLengthChanged(double len, Side side)
 {
     auto& controller = getSideController(side);
 
-    if (len < 0.0 && flipOperationThroughZero(side)) {
-        // The drag has crossed the profile, so what was being added is now being
-        // taken away. The distance is reported the way it is now meant, and the
-        // property never sees the negative that got us here.
-        len = -len;
+    // A drag that has gone past the profile keeps reporting the same negative
+    // distance for as long as the pointer stays there, so the extrude turns around
+    // once per crossing of zero rather than once per mouse move.
+    const int rawSign = len < 0.0 ? -1 : +1;
+    if (rawSign != controller.lastRawLengthSign && flipThroughZero(side)) {
+        controller.lastRawLengthSign = rawSign;
+    }
+
+    // The distance is reported the way it is now meant, and neither the field nor
+    // the property ever shows the negative that got us here.
+    len = std::abs(len);
+    {
         QSignalBlocker mirroring(controller.lengthEdit);
         controller.lengthEdit->setValue(len);
     }
@@ -740,7 +756,7 @@ void TaskExtrudeParameters::onLengthChanged(double len, Side side)
     tryRecomputeFeature();
 }
 
-bool TaskExtrudeParameters::flipOperationThroughZero(Side side)
+bool TaskExtrudeParameters::flipThroughZero(Side side)
 {
     // Only a plain distance can be dragged through zero; the up-to modes end
     // somewhere of their own and have no length to reverse.
@@ -751,18 +767,23 @@ bool TaskExtrudeParameters::flipOperationThroughZero(Side side)
     using Operation = PartDesign::FeatureAddSub::OperationType;
     const auto operation = static_cast<Operation>(ui->operationMode->currentIndex());
 
-    // Intersecting and starting a new body are not each other's opposite, so
-    // there is nothing for them to become.
+    // One crossing of the profile turns the extrude around: what was being added is
+    // now being taken away on the other side. Intersecting and starting a new body
+    // are not each other's opposite, so those only turn around.
     if (operation == Operation::Join) {
         ui->operationMode->setCurrentIndex(static_cast<int>(Operation::Cut));
-        return true;
     }
-    if (operation == Operation::Cut) {
+    else if (operation == Operation::Cut) {
         ui->operationMode->setCurrentIndex(static_cast<int>(Operation::Join));
-        return true;
     }
 
-    return false;
+    // A symmetric extrude grows both ways at once and so has nothing to reverse;
+    // that is exactly when the box is disabled, as it is for a click on the gizmo.
+    if (ui->checkBoxReversed->isEnabled()) {
+        ui->checkBoxReversed->setChecked(!ui->checkBoxReversed->isChecked());
+    }
+
+    return true;
 }
 
 void TaskExtrudeParameters::onStartOffsetChanged(double len)
@@ -1565,6 +1586,64 @@ void TaskExtrudeParameters::translateOperationList(int index)
     ui->operationMode->addItem(tr("Intersect"));
     ui->operationMode->addItem(tr("New body"));
     ui->operationMode->setCurrentIndex(index);
+
+    applyOperationColors();
+}
+
+void TaskExtrudeParameters::applyOperationColors()
+{
+    using Operation = PartDesign::FeatureAddSub::OperationType;
+
+    auto* styleParameterManager = Base::provideService<Gui::StyleParameters::ParameterManager>();
+    if (!styleParameterManager) {
+        return;
+    }
+
+    // The very parameters ViewProvider::updatePreviewColor resolves, so a theme that
+    // recolours the preview recolours the swatches along with it.
+    const auto colorOf = [styleParameterManager](Operation operation) {
+        switch (operation) {
+            case Operation::Cut:
+                return styleParameterManager->resolve(
+                    PartDesignGui::StyleParameters::PreviewSubtractiveColor
+                );
+            case Operation::Intersect:
+                return styleParameterManager->resolve(
+                    PartDesignGui::StyleParameters::PreviewCommonColor
+                );
+            case Operation::Join:
+            case Operation::NewBody:
+                break;
+        }
+        // A new body is material added just the same, only somewhere else.
+        return styleParameterManager->resolve(
+            PartDesignGui::StyleParameters::PreviewAdditiveColor
+        );
+    };
+
+    constexpr int swatchSize = 12;
+    constexpr int swatchRadius = 3;
+
+    for (int index = 0; index < ui->operationMode->count(); ++index) {
+        QPixmap swatch = Gui::BitmapFactory().empty({swatchSize, swatchSize});
+
+        QPainter painter(&swatch);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(colorOf(static_cast<Operation>(index)).asValue<QColor>());
+        painter.drawRoundedRect(QRect {0, 0, swatchSize, swatchSize}, swatchRadius, swatchRadius);
+        painter.end();
+
+        ui->operationMode->setItemIcon(index, QIcon(swatch));
+    }
+
+    // The list is rebuilt right after retranslateUi has put the tooltip the .ui file
+    // carries back, so the hint is appended to that rather than replacing it.
+    ui->operationMode->setToolTip(
+        ui->operationMode->toolTip() + QLatin1String("\n")
+        + tr("The preview is coloured by operation: green adds, red removes, yellow keeps "
+             "the overlap")
+    );
 }
 
 void TaskExtrudeParameters::handleLineFaceNameClick(QLineEdit* lineEdit)
@@ -1606,6 +1685,21 @@ void TaskExtrudeParameters::setupGizmos()
         {lengthGizmo1, lengthGizmo2, startOffsetGizmo, taperAngleGizmo1, taperAngleGizmo2},
         vp
     );
+
+    // A crossing belongs to the drag that made it. Forgetting it at both ends of a
+    // drag keeps the next one, or a distance typed afterwards, from turning the
+    // extrude around again on its first value.
+    const auto forgetCrossing = [](void* data, SoDragger*) {
+        static_cast<SideController*>(data)->lastRawLengthSign = +1;
+    };
+    const auto forgetCrossingAroundDrags =
+        [&forgetCrossing](Gui::LinearGizmo* gizmo, SideController* side) {
+            SoLinearDragger* dragger = gizmo->getDraggerContainer()->getDragger();
+            dragger->addStartCallback(forgetCrossing, side);
+            dragger->addFinishCallback(forgetCrossing, side);
+        };
+    forgetCrossingAroundDrags(lengthGizmo1, &m_side1);
+    forgetCrossingAroundDrags(lengthGizmo2, &m_side2);
 
     setGizmoPositions();
     showDraggerHints();
