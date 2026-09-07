@@ -84,11 +84,21 @@ class TestSketcherSnapFeedback(unittest.TestCase):
         try:
             self._refresh_view_widgets(timeout_ms=3000)
         except RuntimeError as exc:
-            self._discard_document()
+            self._abandon_set_up()
             raise unittest.SkipTest(
                 "3D view widget wrapping is unavailable in this test environment: " + str(exc)
             )
 
+        # tearDown does not run for a set-up that raises, so from here on a skip - or a
+        # failure out of one of the waits - has to hand back the document and the
+        # preferences itself.
+        try:
+            self._prepare_the_sketch_view()
+        except Exception:
+            self._abandon_set_up()
+            raise
+
+    def _prepare_the_sketch_view(self):
         self.viewer.setEnabledNaviCube(False)
         self.view.setAxisCross(False)
         self.view.setCameraType("Orthographic")
@@ -111,15 +121,25 @@ class TestSketcherSnapFeedback(unittest.TestCase):
         self._require_a_square_on_view()
 
     def tearDown(self):
+        self._leave_edit_mode()
+        self._restore_snap_parameters()
+        self._discard_document()
+
+    # -- set-up helpers --------------------------------------------------
+
+    def _leave_edit_mode(self):
         try:
             FreeCADGui.ActiveDocument.resetEdit()
         except Exception:  # noqa: BLE001 - the document may already be gone
             pass
         self._process_events(50)
+
+    def _abandon_set_up(self):
+        """Undo a half-finished set-up, which tearDown will never be called to do."""
+
+        self._leave_edit_mode()
         self._restore_snap_parameters()
         self._discard_document()
-
-    # -- set-up helpers --------------------------------------------------
 
     def _override_snap_parameters(self):
         self.params = FreeCAD.ParamGet(SNAP_PARAMS)
@@ -334,6 +354,32 @@ class TestSketcherSnapFeedback(unittest.TestCase):
         point = coordinate.point.getValues()[0].getValue()
         return point[0], point[1]
 
+    def _snap_marker_index(self):
+        """Which bitmap the snap glyph is currently drawn with."""
+
+        marker = self._find_edit_node("SnapMarkerSet")
+        self.assertIsNotNone(marker, "The sketch edit scene graph has no SnapMarkerSet node")
+        field = marker.markerIndex
+        values = field.getValues() if hasattr(field, "getValues") else [field.getValue()]
+        self.assertTrue(len(values), "A snap glyph has to name the bitmap it uses")
+        return int(values[0])
+
+    def _built_in_marker_indices(self, family):
+        """The indices Coin names itself, for the handful of sizes it ships bitmaps for.
+
+        FreeCAD registers the larger bitmaps at run time and their indices have no name, so
+        this comes back empty whenever the glyph landed on one of those.
+        """
+
+        from pivy import coin
+
+        indices = set()
+        for size in (5, 7, 9):
+            name = "{}_{}_{}".format(family, size, size)
+            if hasattr(coin.SoMarkerSet, name):
+                indices.add(int(getattr(coin.SoMarkerSet, name)))
+        return indices
+
     def _snapped_marker_at(self, u, v, message):
         """Move the pointer to (u, v) and return the glyph, retrying the first frame."""
 
@@ -392,20 +438,50 @@ class TestSketcherSnapFeedback(unittest.TestCase):
 
     # -- tests -----------------------------------------------------------
 
-    def test_snapping_to_the_grid_draws_a_marker(self):
+    def test_snapping_to_the_grid_draws_a_marker_of_its_own(self):
         grid_x, grid_y = self._grid_point()
-        self._require_on_screen([(grid_x, grid_y)])
+        half = GRID_SIZE / 2.0
+        # Half a cell out on both axes, so the grid cannot reach it and only the vertex can.
+        vertex = (grid_x + half, grid_y + half)
+        far_end = (vertex[0] + GRID_SIZE, vertex[1])
+        self._require_on_screen([(grid_x, grid_y), vertex, far_end])
         offset = 0.35 * self._grid_tolerance()
 
+        self._reset_line(vertex, far_end)
         self._start_line_tool()
+
         marker = self._snapped_marker_at(
             grid_x + offset,
             grid_y + offset,
             "Snapping the pointer onto a grid intersection must draw a marker",
         )
-
+        grid_index = self._snap_marker_index()
         self.assertAlmostEqual(marker[0], grid_x, delta=0.01)
         self.assertAlmostEqual(marker[1], grid_y, delta=0.01)
+
+        # One glyph for every kind of snap would say no more than none at all: catching a
+        # vertex has to look different from settling onto a grid line.
+        caught = self._snapped_marker_at(
+            vertex[0], vertex[1], "Snapping the pointer onto a vertex must draw a marker"
+        )
+        vertex_index = self._snap_marker_index()
+        self.assertAlmostEqual(caught[0], vertex[0], delta=0.01)
+        self.assertAlmostEqual(caught[1], vertex[1], delta=0.01)
+
+        self.assertNotEqual(
+            grid_index,
+            vertex_index,
+            "the grid and a vertex must not be marked with the same glyph",
+        )
+
+        # Both glyphs pick their size by the same rule out of the same table, so when the
+        # vertex landed on a size Coin names, the grid glyph can be named exactly too.
+        if vertex_index in self._built_in_marker_indices("SQUARE_FILLED"):
+            self.assertIn(
+                grid_index,
+                self._built_in_marker_indices("SQUARE_LINE"),
+                "the grid snap must be marked with an outlined square",
+            )
 
     def test_the_marker_goes_away_between_the_grid_lines(self):
         grid_x, grid_y = self._grid_point()
@@ -463,6 +539,14 @@ class TestSketcherSnapFeedback(unittest.TestCase):
         self.assertAlmostEqual(snapped.y, free.y, delta=0.01)
 
     def test_grid_and_snap_stay_available_while_a_tool_draws(self):
+        """A lock, not a verification.
+
+        Both toggles already answered yes mid-tool before this change - the helper they used
+        never looked at the running handler, whatever its name says. The test is here so that
+        a future tightening of either isActive() cannot quietly take the Grid and Snap panels
+        away from someone halfway through drawing.
+        """
+
         grid_x, grid_y = self._grid_point()
         self._require_on_screen([(grid_x, grid_y)])
         offset = 0.35 * self._grid_tolerance()

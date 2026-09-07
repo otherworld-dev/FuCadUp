@@ -127,19 +127,21 @@ bool isFiniteVector(const Base::Vector3d& vector)
     return std::isfinite(vector.x) && std::isfinite(vector.y) && std::isfinite(vector.z);
 }
 
-/** What a drag of existing geometry is allowed to snap to.
+/** What a drag of existing geometry is allowed to snap to: everything but the grid.
  *
- * Everything but the grid: a drag adjusts geometry that is already placed, so it follows the
- * pointer instead of stepping from grid line to grid line, while the points that matter - the
- * origin, vertices, crossings, midpoints and quadrants - still catch it. Holding Ctrl, the key
- * the sketcher already reserves for changing how the pointer behaves, suspends the lot.
+ * A drag adjusts geometry that is already placed, so it follows the pointer instead of stepping
+ * from grid line to grid line. Nothing else catches it either, but for a different reason:
+ * preselection is off for the length of a drag - mouseMove skips detecting it and initDragging
+ * cleared what was there - so SnapManager::snapToObject finds no vertex, axis or curve to work
+ * from and the pointer runs free. That is the upstream behaviour and it is deliberate.
+ *
+ * Where the mask earns its keep is initDragging's setRelative(): the press point is snapped
+ * while the geometry under the cursor is still preselected, and it is the reference every later
+ * step is measured against, so it has to catch the same things the drag does - which means
+ * geometry yes, grid no.
  */
 SnapType dragSnapMask()
 {
-    if (QApplication::keyboardModifiers() & Qt::ControlModifier) {
-        return SnapType::None;
-    }
-
     return SnapType::All & ~SnapType::Grid;
 }
 }  // namespace
@@ -1447,8 +1449,6 @@ bool ViewProviderSketch::mouseButtonPressed(int Button, bool pressed, const SbVe
                     Base::Vector2d snappedPos = snapHandle->compute(dragSnapMask());
                     commitDragMove(snappedPos.x, snappedPos.y);
                     setSketchMode(STATUS_NONE);
-                    snapManager->resetLastSnap();
-                    updateSnapMarker();
                     return true;
                 }
                 case STATUS_SKETCH_DragConstraint: {
@@ -1941,7 +1941,6 @@ bool ViewProviderSketch::mouseMove(const SbVec2s& cursorPos, Gui::View3DInventor
         }
         case STATUS_SKETCH_Drag: {
             Base::Vector2d dragPos = snapHandle->compute(dragSnapMask());
-            updateSnapMarker();
             const bool temporaryMoveSucceeded = doDragStep(dragPos.x, dragPos.y);
 
             if (dragAutoConstraintHandler) {

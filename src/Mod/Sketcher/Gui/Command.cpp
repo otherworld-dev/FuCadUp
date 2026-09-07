@@ -376,8 +376,13 @@ CmdSketcherLeaveSketch::CmdSketcherLeaveSketch()
     sWhatsThis = "Sketcher_LeaveSketch";
     sStatusTip = sToolTipText;
     sPixmap = "Sketcher_LeaveSketch";
-    // Escape stops the running tool and stays in the sketch, so leaving needs a key of
-    // its own. Ctrl+Enter is already the sketcher's "accept every on-view parameter".
+    // Escape stops the running tool and stays in the sketch, so leaving needs a key of its
+    // own, and not Ctrl+Return: while a tool draws, the on-view parameter spin boxes read
+    // that as "accept every parameter as typed" (EditableDatumLabel::eventFilter), and a
+    // window-context shortcut is offered the key before the focused widget, so it would
+    // swallow the gesture. The Shift is not what tells them apart - that filter only tests
+    // Ctrl, so it would have matched this combination too - what matters is that the
+    // combination people actually press for it, Ctrl+Return, is left alone.
     sAccel = "Ctrl+Shift+Return";
     eType = 0;
 }
