@@ -34,6 +34,7 @@
 
 #include "SketchWorkflow.h"
 #include "DlgActiveBody.h"
+#include "SketchPlanePicker.h"
 #include "TaskFeaturePick.h"
 #include "Utils.h"
 #include "ViewProviderBody.h"
@@ -86,6 +87,27 @@ struct SupportNotPlanarException
 struct MissingPlanesException
 {
 };
+
+std::tuple<Gui::SelectionFilter, Gui::SelectionFilter, Gui::SelectionFilter>
+sketchFilters(PartDesign::Body* activeBody)
+{
+    // Hint:
+    // The behaviour of this command has changed with respect to a selected sketch:
+    // It doesn't try any more to edit a selected sketch but always tries to create
+    // a new sketch.
+    // See https://forum.freecad.org/viewtopic.php?f=3&t=44070
+
+    Gui::SelectionFilter FaceFilter("SELECT Part::Feature SUBELEMENT Face COUNT 1");
+    Gui::SelectionFilter PlaneFilter("SELECT App::Plane COUNT 1", activeBody);
+    Gui::SelectionFilter PlaneFilter2("SELECT PartDesign::Plane COUNT 1", activeBody);
+    Gui::SelectionFilter SketchFilter("SELECT Part::Part2DObject COUNT 1", activeBody);
+
+    if (PlaneFilter2.match()) {
+        PlaneFilter = PlaneFilter2;
+    }
+
+    return std::make_tuple(FaceFilter, PlaneFilter, SketchFilter);
+}
 
 class SupportFaceValidator
 {
@@ -260,11 +282,21 @@ public:
 
     void createSketchOnSupport(const std::string& supportString)
     {
+        PartDesignGui::setEdit(createSketchObject(supportString), activeBody);
+    }
+
+    /// Creates the sketch on the face or plane and returns it, leaving it to the caller
+    /// to open it. Joins a pending command, so that a body made for the sketch and the
+    /// sketch itself undo together.
+    App::DocumentObject* createSketchObject(const std::string& supportString)
+    {
         // create Sketch on Face or Plane
         App::Document* appdocument = guidocument->getDocument();
         std::string FeatName = appdocument->getUniqueObjectName("Sketch");
 
-        guidocument->openCommand(QT_TRANSLATE_NOOP("Command", "Sketch on Face"));
+        if (!guidocument->hasPendingCommand()) {
+            guidocument->openCommand(QT_TRANSLATE_NOOP("Command", "Sketch on Face"));
+        }
         FCMD_OBJ_CMD(activeBody, "newObject('Sketcher::SketchObject','" << FeatName << "')");
         auto Feat = activeBody->getDocument()->getObject(FeatName.c_str());
         FCMD_OBJ_CMD(Feat, "Label = 'Sketch'");
@@ -285,7 +317,7 @@ public:
         // After the recompute, so that the sketch is on its plane before its face is
         // projected onto it.
         SketcherGui::autoProjectSupportEdges(Feat);
-        PartDesignGui::setEdit(Feat, activeBody);
+        return Feat;
     }
 
 private:
@@ -522,9 +554,14 @@ private:
 class SketchRequestSelection
 {
 public:
-    SketchRequestSelection(Gui::Document* guidocument, PartDesign::Body* activeBody)
+    SketchRequestSelection(
+        Gui::Document* guidocument,
+        PartDesign::Body* activeBody,
+        bool useAttachmentDialog
+    )
         : guidocument(guidocument)
         , activeBody(activeBody)
+        , useAttachmentDialog(useAttachmentDialog)
     {}
 
     void findSupport()
@@ -549,7 +586,12 @@ private:
     {
         createBodyOrThrow();
 
-        createSketchAndShowAttachment();
+        if (useAttachmentDialog) {
+            createSketchAndShowAttachment();
+        }
+        else {
+            pickPlaneInView();
+        }
     }
 
     void createBodyOrThrow()
@@ -646,6 +688,68 @@ private:
             Gui::Application::Instance->getViewProvider(sketch)
         );
         vps->showAttachmentEditor(onAccept, onReject, true);
+    }
+
+    /// Fusion's way: no dialog, just click the face or plane to sketch on. The sketch is
+    /// only made once something planar has been picked, so a cancel leaves nothing but
+    /// the undo of a body that was created for it.
+    void pickPlaneInView()
+    {
+        checkForShownDialog();
+        setOriginTemporaryVisibility();
+        Gui::Selection().clearSelection();
+
+        Gui::Document* document = guidocument;
+        PartDesign::Body* body = activeBody;
+        std::string documentName = document->getDocument()->getName();
+        std::string bodyName = body->getNameInDocument();
+
+        auto onPick = [document, body]() -> App::DocumentObject* {
+            SketchPreselection picked {document, body, sketchFilters(body)};
+            if (!picked.isSingleFaceOrPlane()) {
+                return nullptr;
+            }
+            try {
+                picked.createSupport();
+                return picked.createSketchObject(picked.getSupport());
+            }
+            catch (const RejectException&) {
+                // The user turned down the copy/cross-reference question.
+            }
+            catch (const WrongSelectionException&) {
+            }
+            catch (const WrongSupportException&) {
+            }
+            catch (const SupportNotPlanarException&) {
+            }
+            return nullptr;
+        };
+
+        auto onDone = [documentName, bodyName](App::DocumentObject* sketch) {
+            Gui::Document* document
+                = Gui::Application::Instance->getDocument(documentName.c_str());
+            if (!document) {
+                return;  // the document went away, and took the picker with it
+            }
+            auto* body = dynamic_cast<PartDesign::Body*>(
+                document->getDocument()->getObject(bodyName.c_str())
+            );
+            if (body) {
+                resetOriginVisibility(body);
+            }
+            if (sketch) {
+                document->commitCommand();
+                PartDesignGui::setEdit(sketch, body);
+            }
+            else if (document->hasPendingCommand()) {
+                document->abortCommand();
+            }
+        };
+
+        Gui::Control().showDialog(
+            new TaskDlgSketchPlanePick(body, onPick, onDone),
+            document->getDocument()
+        );
     }
 
     static void resetOriginVisibility(PartDesign::Body* partDesignBody)
@@ -827,6 +931,7 @@ private:
 private:
     Gui::Document* guidocument;
     PartDesign::Body* activeBody;
+    bool useAttachmentDialog;
 };
 
 }  // namespace
@@ -896,9 +1001,10 @@ void SketchWorkflow::tryCreateSketch()
 
     // Fast path: single face or datum plane, preference off, Shift not held.
     // If the face turns out to be non-planar or otherwise invalid, fall through
-    // to the attachment dialog instead of showing an error.
-    // A selected sketch, multiple references, no selection, Shift, or preference on
-    // all go through the attachment dialog.
+    // instead of showing an error.
+    // A selected sketch, multiple references, Shift, or preference on all go through
+    // the attachment dialog; with nothing selected the user picks a face or plane in
+    // the 3D view instead.
     if (!useAttachment && !shiftHeld && sketchOnFace.isSingleFaceOrPlane()) {
         try {
             sketchOnFace.createSupport();
@@ -916,7 +1022,7 @@ void SketchWorkflow::tryCreateSketch()
         }
     }
 
-    SketchRequestSelection requestSelection {guidocument, activeBody};
+    SketchRequestSelection requestSelection {guidocument, activeBody, useAttachment || shiftHeld};
     requestSelection.findSupport();
 }
 
@@ -956,20 +1062,5 @@ bool SketchWorkflow::shouldAbort(bool shouldMakeBody) const
 
 std::tuple<Gui::SelectionFilter, Gui::SelectionFilter, Gui::SelectionFilter> SketchWorkflow::getFilters() const
 {
-    // Hint:
-    // The behaviour of this command has changed with respect to a selected sketch:
-    // It doesn't try any more to edit a selected sketch but always tries to create
-    // a new sketch.
-    // See https://forum.freecad.org/viewtopic.php?f=3&t=44070
-
-    Gui::SelectionFilter FaceFilter("SELECT Part::Feature SUBELEMENT Face COUNT 1");
-    Gui::SelectionFilter PlaneFilter("SELECT App::Plane COUNT 1", activeBody);
-    Gui::SelectionFilter PlaneFilter2("SELECT PartDesign::Plane COUNT 1", activeBody);
-    Gui::SelectionFilter SketchFilter("SELECT Part::Part2DObject COUNT 1", activeBody);
-
-    if (PlaneFilter2.match()) {
-        PlaneFilter = PlaneFilter2;
-    }
-
-    return std::make_tuple(FaceFilter, PlaneFilter, SketchFilter);
+    return sketchFilters(activeBody);
 }
