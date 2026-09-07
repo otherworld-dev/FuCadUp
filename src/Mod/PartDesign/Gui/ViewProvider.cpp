@@ -292,8 +292,10 @@ void ViewProvider::updatePreview()
     ViewProviderPreviewExtension::updatePreview();
 
     if (auto* addSubFeature = getObject<PartDesign::FeatureAddSub>()) {
-        // we only want to show the additional tool preview for subtractive features
+        // The tool preview is only for subtractive features; an operation turned back
+        // into an additive one takes its tool off the screen.
         if (addSubFeature->getAddSubType() != PartDesign::FeatureAddSub::Subtractive) {
+            updatePreviewShape({}, pcToolPreview);
             return;
         }
 

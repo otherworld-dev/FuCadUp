@@ -24,6 +24,8 @@
 
 #include <cmath>
 
+#include <Precision.hxx>
+
 #include <QAction>
 #include <QAbstractButton>
 #include <QIcon>
@@ -761,6 +763,13 @@ std::vector<std::string> PartDesignGui::TaskExtrudeParameters::getShapeFaces(
 void TaskExtrudeParameters::onLengthChanged(double len, Side side)
 {
     auto& controller = getSideController(side);
+
+    // Coarse snapping steps a drag straight onto zero on its way past the profile. A
+    // zero-length extrude cannot be built, and an arrow that is being dragged has no
+    // use for one: the last real length stands until the pointer is somewhere else.
+    if (controller.draggingLength && std::abs(len) < Precision::Confusion()) {
+        return;
+    }
 
     // A drag that has gone past the profile keeps reporting the same negative
     // distance for as long as the pointer stays there, so the extrude turns around
@@ -1748,7 +1757,13 @@ void TaskExtrudeParameters::setGizmoPositions()
     }
 
     auto extrude = getObject<PartDesign::FeatureExtrude>();
-    if (!extrude || extrude->isError()) {
+    // A broken extrude has no gizmos, except under an arrow that is being dragged: the
+    // dragger holds the mouse from inside the container's switch, and Coin measures its
+    // next motion along a path that a closed switch cuts short, in a frame that has
+    // collapsed onto the world origin. Such an arrow keeps its footing until the drag
+    // lets go, which re-places everything anyway, see setLengthDragActive.
+    const bool draggingLength = m_side1.draggingLength || m_side2.draggingLength;
+    if (!extrude || (extrude->isError() && !draggingLength)) {
         gizmoContainer->visible = false;
         return;
     }

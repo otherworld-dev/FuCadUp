@@ -208,7 +208,7 @@ void ViewProviderPreviewExtension::updatePreview()
 
 void ViewProviderPreviewExtension::updatePreviewShape(Part::TopoShape shape, SoPreviewShape* preview)
 {
-    if (shape.isNull() || preview == nullptr) {
+    if (preview == nullptr) {
         return;
     }
 
@@ -227,18 +227,25 @@ void ViewProviderPreviewExtension::updatePreviewShape(Part::TopoShape shape, SoP
         );
     };
 
-    try {
-        updatePreviewShape(preview, shape);
-        preview->transform.setValue(Base::convertTo<SbMatrix>(shape.getTransform()));
-    }
-    catch (Standard_Failure& e) {
-        Base::Console().userTranslatedNotification(
-            tr("Failure while rendering preview: %1. That usually indicates an error with model.")
-                .arg(QString::fromUtf8(e.GetMessageString()))
-                .toUtf8()
-        );
-
+    if (shape.isNull()) {
+        // An empty shape empties the preview rather than leaving the last one on screen:
+        // a cut with nothing to remove has no removed volume to show.
         updatePreviewShape(preview, {});
+    }
+    else {
+        try {
+            updatePreviewShape(preview, shape);
+            preview->transform.setValue(Base::convertTo<SbMatrix>(shape.getTransform()));
+        }
+        catch (Standard_Failure& e) {
+            Base::Console().userTranslatedNotification(
+                tr("Failure while rendering preview: %1. That usually indicates an error with model.")
+                    .arg(QString::fromUtf8(e.GetMessageString()))
+                    .toUtf8()
+            );
+
+            updatePreviewShape(preview, {});
+        }
     }
 
     // For some reason line patterns are not rendered correctly if material binding is set to
