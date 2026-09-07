@@ -45,11 +45,12 @@ RadioButtonBorderColor: "@GeneralBorderColor"
 # Panel and tab captions of the ribbon, see src/Gui/Stylesheets/FuCad.qss.
 # @TextDisabledColor reads at 4.4:1 on @PrimaryColor, just under the 4.5:1 WCAG
 # 2.1 asks of body text. darken() scales the HSV value and so cannot darken a
-# black @TextForegroundColor: the captions stay #000000, whose luminance 0.000
-# against the 0.871 of #f0f0f0 is 18.4:1. The token is still defined here, and
-# not left to fall back on @TextDisabledColor, so that a ribbon caption resolves
-# through the same name in every theme.
-RibbonCaptionColor: "darken(@TextForegroundColor, 30)"
+# black @TextForegroundColor at all, which would leave a caption at full body
+# strength and lose the hierarchy; blend() mixes towards the background
+# instead. blend(from, to, amount) is (1 - amount) * from + amount * to, so
+# 0.7 * #000000 + 0.3 * #f0f0f0 is #484848: relative luminance 0.065 against
+# the 0.871 of #f0f0f0, which is (0.871 + 0.05) / (0.065 + 0.05) = 8.0:1.
+RibbonCaptionColor: "blend(@TextForegroundColor, @PrimaryColor, 30)"
 ScrollbarBackgroundColor: "@GeneralDisabledBackgroundColor"
 SketcherConflictingConstraintsColor: "#9d0000"
 SketcherEmptySketchColor: "#000000"

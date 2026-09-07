@@ -115,14 +115,16 @@ private:
     int rowOfTile(int index) const;
     /// Runs the tile under the cursor, or the first one while it sits nowhere.
     void activateCurrentTile();
+    /// Takes the keyboard cursor out of the grid again.
+    void clearCurrentTile();
+    /// The first enabled tile at or after \a index walking by \a step, or -1.
+    int enabledTileNear(int index, int step) const;
 
     static CommandPalette* _instance;
 
     QLineEdit* searchField;
     QWidget* body;
     QVBoxLayout* bodyLayout;
-    /// The tile a plain Return runs while the keyboard cursor sits nowhere.
-    QToolButton* firstTile;
     /// Every tile of the body, in reading order across all of its sections.
     std::vector<QToolButton*> tiles;
     /// Index into tiles of the first tile of each visual row, ascending.

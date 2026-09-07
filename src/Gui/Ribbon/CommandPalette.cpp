@@ -159,7 +159,6 @@ CommandPalette::CommandPalette()
     , searchField(nullptr)
     , body(nullptr)
     , bodyLayout(nullptr)
-    , firstTile(nullptr)
 {
     setObjectName(QStringLiteral("CommandPalette"));
     setAttribute(Qt::WA_StyledBackground, true);
@@ -314,6 +313,12 @@ bool CommandPalette::navigate(const QKeyEvent* event)
             if (!inGrid) {
                 return false;
             }
+            if (rowOfTile(currentTile) == 0) {
+                // Stepping off the top of the grid hands the caret keys back to
+                // the search field, which is where the cursor came from.
+                clearCurrentTile();
+                return false;
+            }
             moveCurrentTile(-1, 0);
             return true;
         case Qt::Key_Right:
@@ -332,13 +337,13 @@ bool CommandPalette::navigate(const QKeyEvent* event)
             if (!inGrid) {
                 return false;
             }
-            setCurrentTile(0);
+            setCurrentTile(enabledTileNear(0, 1));
             return true;
         case Qt::Key_End:
             if (!inGrid) {
                 return false;
             }
-            setCurrentTile(static_cast<int>(tiles.size()) - 1);
+            setCurrentTile(enabledTileNear(static_cast<int>(tiles.size()) - 1, -1));
             return true;
         default:
             return false;
@@ -347,7 +352,6 @@ bool CommandPalette::navigate(const QKeyEvent* event)
 
 void CommandPalette::clearBody()
 {
-    firstTile = nullptr;
     tiles.clear();
     tileRows.clear();
     currentTile = -1;
@@ -407,9 +411,6 @@ void CommandPalette::addSection(const QString& caption, const QStringList& comma
         }
 
         layout->addWidget(tile, placed / gridColumns, placed % gridColumns);
-        if (!firstTile) {
-            firstTile = tile;
-        }
 
         // Every section starts a row of its own and its last row is usually
         // shorter than the grid, so where the rows begin is recorded rather
@@ -448,6 +449,9 @@ QToolButton* CommandPalette::createTile(const QString& command, QWidget* parent)
     auto* tile = new QToolButton(parent);
     tile->setObjectName(QStringLiteral("CommandPaletteTile"));
     tile->setProperty(currentTileProperty, false);
+    // The arrow keys carry a cursor of their own across the grid; real focus as
+    // well would give the palette two places to be at once.
+    tile->setFocusPolicy(Qt::NoFocus);
     tile->setAutoRaise(true);
     tile->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     tile->setIcon(action->icon());
@@ -594,6 +598,27 @@ void CommandPalette::setCurrentTile(int index)
     markCurrentTile(tiles[currentTile], true);
 }
 
+void CommandPalette::clearCurrentTile()
+{
+    if (currentTile >= 0 && currentTile < static_cast<int>(tiles.size())) {
+        markCurrentTile(tiles[currentTile], false);
+    }
+
+    currentTile = -1;
+}
+
+int CommandPalette::enabledTileNear(int index, int step) const
+{
+    // Walks one way only, because that is the way the user was heading.
+    for (int i = index; i >= 0 && i < static_cast<int>(tiles.size()); i += step) {
+        if (tiles[i]->isEnabled()) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 int CommandPalette::rowOfTile(int index) const
 {
     // The row a tile sits in is the last one that starts at or before it.
@@ -610,31 +635,48 @@ void CommandPalette::moveCurrentTile(int rows, int columns)
     if (currentTile < 0) {
         // The first step of the keyboard cursor is into the grid, wherever it
         // was aimed.
-        setCurrentTile(0);
+        setCurrentTile(enabledTileNear(0, 1));
+        return;
+    }
+
+    if (rows == 0) {
+        setCurrentTile(enabledTileNear(currentTile + columns, columns));
         return;
     }
 
     const int last = static_cast<int>(tiles.size()) - 1;
-
-    if (rows == 0) {
-        setCurrentTile(std::clamp(currentTile + columns, 0, last));
-        return;
-    }
-
+    const int rowCount = static_cast<int>(tileRows.size());
     const int row = rowOfTile(currentTile);
-    const int target = row + rows;
-    if (target < 0 || target >= static_cast<int>(tileRows.size())) {
-        return;
-    }
-
-    // Keeping the column rather than adding a fixed number of tiles is what
-    // makes a vertical step land under the tile it started on, even where a
-    // short last row sits between the two.
     const int column = currentTile - tileRows[row];
-    const int end =
-        target + 1 < static_cast<int>(tileRows.size()) ? tileRows[target + 1] - 1 : last;
 
-    setCurrentTile(std::min(tileRows[target] + column, end));
+    for (int target = row + rows; target >= 0 && target < rowCount; target += rows) {
+        const int start = tileRows[target];
+        const int end = target + 1 < rowCount ? tileRows[target + 1] - 1 : last;
+
+        // Keeping the column rather than adding a fixed number of tiles is what
+        // makes a vertical step land under the tile it started on, even where a
+        // short last row sits between the two.
+        const int aimed = std::min(start + column, end);
+
+        // Return cannot run a disabled tile, so the cursor never rests on one
+        // and a row of nothing but unavailable commands is stepped over.
+        int landed = -1;
+        for (int i = aimed; i >= start && landed < 0; --i) {
+            if (tiles[i]->isEnabled()) {
+                landed = i;
+            }
+        }
+        for (int i = aimed + 1; i <= end && landed < 0; ++i) {
+            if (tiles[i]->isEnabled()) {
+                landed = i;
+            }
+        }
+
+        if (landed >= 0) {
+            setCurrentTile(landed);
+            return;
+        }
+    }
 }
 
 void CommandPalette::activateCurrentTile()
@@ -647,12 +689,11 @@ void CommandPalette::activateCurrentTile()
         return;
     }
 
-    QToolButton* tile = currentTile >= 0 && currentTile < static_cast<int>(tiles.size())
-        ? tiles[currentTile]
-        : firstTile;
-
-    if (tile) {
-        tile->click();
+    // Return with the cursor still in the search field runs the first tile,
+    // which is what a search box is expected to do.
+    const int index = currentTile >= 0 ? currentTile : enabledTileNear(0, 1);
+    if (index >= 0) {
+        tiles[index]->click();
     }
 }
 

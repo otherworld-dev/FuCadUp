@@ -118,9 +118,9 @@ void RibbonPanel::setCaptionMenu(QMenu* menu)
     button->setToolButtonStyle(Qt::ToolButtonTextOnly);
     button->setPopupMode(QToolButton::InstantPopup);
     button->setAutoRaise(true);
-    // The caption drop-down holds the full command set of the panel, most of
-    // which is nowhere else, so it has to be in the tab chain.
-    button->setFocusPolicy(Qt::TabFocus);
+    // Reached with the arrow keys from the tab strip like every other button of
+    // a page, rather than as a tab stop of its own; see RibbonBar::eventFilter.
+    button->setFocusPolicy(Qt::NoFocus);
     button->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     applyCaptionFont(button);
     button->setMinimumWidth(captionButtonMinimumWidth);

@@ -65,9 +65,10 @@ RibbonButton::RibbonButton(QWidget* parent)
 {
     setObjectName(QStringLiteral("RibbonButton"));
     setAutoRaise(true);
-    // The ribbon replaces the toolbars, so it is the only way to most commands
-    // and has to be part of the tab chain rather than mouse-only decoration.
-    setFocusPolicy(Qt::TabFocus);
+    // A toolbar is one tab stop, not one per button, and the ribbon holds far
+    // too many buttons to sit in the tab chain. RibbonBar puts the keyboard on
+    // a button with setFocus(), which works whatever the policy says.
+    setFocusPolicy(Qt::NoFocus);
     setPopupMode(QToolButton::DelayedPopup);
 }
 

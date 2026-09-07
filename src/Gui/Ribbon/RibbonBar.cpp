@@ -21,21 +21,28 @@
 
 
 #include <QAbstractItemView>
+#include <QEvent>
 #include <QFont>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QKeyEvent>
+#include <QList>
+#include <QMenu>
 #include <QSignalBlocker>
 #include <QSize>
 #include <QSizePolicy>
 #include <QStackedWidget>
 #include <QStyle>
 #include <QTabBar>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 #include <Base/Console.h>
 #include <Gui/Action.h>
 #include <Gui/Application.h>
 #include <Gui/Command.h>
+#include <Gui/MDIView.h>
+#include <Gui/MainWindow.h>
 #include <Gui/WorkbenchSelector.h>
 
 #include "RibbonBar.h"
@@ -88,6 +95,9 @@ RibbonBar::RibbonBar(QWidget* parent)
     // own keyPressEvent() does the rest.
     tabBar->setFocusPolicy(Qt::TabFocus);
     tabBar->setProperty(contextTabProperty, false);
+    // The strip is the ribbon's one tab stop, and the arrow keys reach the rest
+    // of the ribbon from it; see eventFilter().
+    tabBar->installEventFilter(this);
 
     auto* pageRow = new QWidget(this);
     pageRow->setObjectName(QStringLiteral("RibbonPageRow"));
@@ -115,6 +125,127 @@ RibbonBar::RibbonBar(QWidget* parent)
         }
         Q_EMIT tabActivated(index);
     });
+}
+
+bool RibbonBar::eventFilter(QObject* watched, QEvent* event)
+{
+    if (event->type() != QEvent::KeyPress) {
+        return QWidget::eventFilter(watched, event);
+    }
+
+    const int key = static_cast<QKeyEvent*>(event)->key();
+
+    if (watched == tabBar) {
+        // Down steps from the strip onto the page it names, the way a menu bar
+        // opens onto its menu.
+        if (key == Qt::Key_Down && focusFirstPageButton()) {
+            return true;
+        }
+
+        if (key == Qt::Key_Escape && focusActiveView()) {
+            return true;
+        }
+
+        // Left and Right are QTabBar's own, and they are what moves between tabs.
+        return QWidget::eventFilter(watched, event);
+    }
+
+    auto* button = qobject_cast<QToolButton*>(watched);
+    if (!button) {
+        return QWidget::eventFilter(watched, event);
+    }
+
+    switch (key) {
+        case Qt::Key_Right:
+            return focusAdjacentPageButton(button, 1);
+        case Qt::Key_Left:
+            return focusAdjacentPageButton(button, -1);
+        case Qt::Key_Up:
+            tabBar->setFocus(Qt::OtherFocusReason);
+            return true;
+        case Qt::Key_Down:
+            // The drop-down of a split button is otherwise out of reach: a
+            // click on such a button runs its command instead of opening it.
+            if (button->menu()) {
+                button->showMenu();
+                return true;
+            }
+            return QWidget::eventFilter(watched, event);
+        case Qt::Key_Return:
+        case Qt::Key_Enter:
+            // QAbstractButton answers Space but ignores Return. A click also
+            // opens the menu of a button whose whole job is one, because
+            // QToolButton pops an InstantPopup menu from pressed().
+            button->click();
+            return true;
+        case Qt::Key_Escape:
+            return focusActiveView();
+        default:
+            return QWidget::eventFilter(watched, event);
+    }
+}
+
+QList<QToolButton*> RibbonBar::pageButtons() const
+{
+    QWidget* page = pageStack->currentWidget();
+    if (!page) {
+        return {};
+    }
+
+    // findChildren() walks the children depth first in the order they were
+    // created, which for a page is panel by panel and, inside a panel, its
+    // buttons before its caption: the order the eye reads them in.
+    QList<QToolButton*> buttons;
+    for (QToolButton* button : page->findChildren<QToolButton*>()) {
+        // A disabled button would swallow the keyboard on a command that
+        // Return could not run anyway.
+        if (button->isEnabled() && button->isVisibleTo(page)) {
+            buttons.append(button);
+        }
+    }
+
+    return buttons;
+}
+
+bool RibbonBar::focusFirstPageButton()
+{
+    const QList<QToolButton*> buttons = pageButtons();
+    if (buttons.isEmpty()) {
+        return false;
+    }
+
+    buttons.first()->setFocus(Qt::OtherFocusReason);
+    return true;
+}
+
+bool RibbonBar::focusAdjacentPageButton(QToolButton* from, int offset)
+{
+    const QList<QToolButton*> buttons = pageButtons();
+    const qsizetype index = buttons.indexOf(from);
+    if (index < 0) {
+        return false;
+    }
+
+    // Wrapping keeps the arrows from dead-ending at either edge of the page.
+    const qsizetype count = buttons.size();
+    const qsizetype next = ((index + offset) % count + count) % count;
+    buttons.at(next)->setFocus(Qt::OtherFocusReason);
+    return true;
+}
+
+bool RibbonBar::focusActiveView()
+{
+    // Escape hands the keyboard back to the model, which is where the next key
+    // belongs once the user is done with the ribbon. With no view open there is
+    // nowhere to hand it to, and Esc is left to whoever else wants it.
+    MainWindow* window = getMainWindow();
+    QWidget* view = window ? window->activeWindow() : nullptr;
+    if (!view) {
+        return false;
+    }
+
+    view->setFocus(Qt::OtherFocusReason);
+    return true;
 }
 
 QWidget* RibbonBar::createWorkspaceBlock(QWidget* parent)
@@ -263,6 +394,12 @@ void RibbonBar::setPage(int index, QWidget* page)
     if (index < 0 || index >= pageStack->count()) {
         delete page;
         return;
+    }
+
+    // None of the buttons is a tab stop of its own, so the bar has to answer
+    // the arrow keys on their behalf; see eventFilter().
+    for (QToolButton* button : page->findChildren<QToolButton*>()) {
+        button->installEventFilter(this);
     }
 
     QWidget* previous = pageStack->widget(index);

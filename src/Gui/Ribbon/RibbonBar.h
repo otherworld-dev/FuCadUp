@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include <QList>
 #include <QString>
 #include <QWidget>
 
@@ -29,6 +30,7 @@
 
 class QStackedWidget;
 class QTabBar;
+class QToolButton;
 
 namespace Gui
 {
@@ -80,10 +82,30 @@ public:
 Q_SIGNALS:
     void tabActivated(int index);
 
+protected:
+    /**
+     * Makes the whole ribbon a single tab stop that the arrow keys then walk,
+     * the way a toolbar behaves: Down steps from the tab strip into the page,
+     * Left and Right move between the buttons of that page, Up returns to the
+     * strip and Esc hands the keyboard back to the view underneath.
+     */
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
 private:
     /// Builds the block holding the workspace selector, or returns null when
     /// the Std_Workbench command has nothing to offer.
     QWidget* createWorkspaceBlock(QWidget* parent);
+
+    /// The buttons of the page on screen that the keyboard can reach, in
+    /// reading order.
+    QList<QToolButton*> pageButtons() const;
+    /// Focuses the first of them; false when the page has none.
+    bool focusFirstPageButton();
+    /// Focuses the one \a offset places from \a from, wrapping around the page.
+    bool focusAdjacentPageButton(QToolButton* from, int offset);
+    /// Hands the keyboard back to the view the ribbon sits above; false when
+    /// there is no view to hand it to.
+    static bool focusActiveView();
 
     QTabBar* tabBar;
     QStackedWidget* pageStack;

@@ -694,9 +694,10 @@ void MainWindow::setupWindowShortcuts()
     applyDefaultShortcutPriorities();
 
     // Qt only delivers a shortcut to its action while that action lives in a
-    // widget of the active window. The commands below appear in no menu and no
-    // toolbar because Fusion reaches them by key alone, so the window itself has
-    // to hold them for their key to arrive.
+    // widget of the active window. The commands below appear on a ribbon panel
+    // rather than in a menu or a toolbar, and a ribbon page is only built the
+    // first time its tab is shown, so until then no widget of the window holds
+    // them and the window itself has to.
     static const std::array<const char*, 1> keyOnlyCommands = {
         "Std_CommandPalette",
     };
