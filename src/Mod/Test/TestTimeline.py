@@ -266,6 +266,13 @@ class TestTimeline(unittest.TestCase):
 
         self._activate_body()
         self.assertTrue(self._wait_for_markers(FEATURE_COUNT))
+
+        # The strip has rebuilt itself around the reloaded body, and the rollback is still
+        # on: the playhead has to come back behind Sketch001 rather than snapping to the
+        # tip and showing it again.
+        self.assertFalse(self.sketch2.Visibility)
+        self.assertIn("Sketch001", self._hidden_by_rollback())
+
         self._invoke("stepForward")
 
         self.assertTrue(self.sketch2.Visibility)
@@ -287,9 +294,15 @@ class TestTimeline(unittest.TestCase):
 
         self._activate_body()
         self.assertTrue(self._wait_for_markers(FEATURE_COUNT))
+
+        # Coming back to the body has to come back to the rollback as well.
+        self.assertFalse(self.sketch2.Visibility)
+        self.assertIn("Sketch001", self._hidden_by_rollback())
+
         self._invoke("stepForward")
 
         self.assertTrue(self.sketch2.Visibility)
+        self.assertNotIn("Sketch001", self._hidden_by_rollback())
 
     def test_a_step_is_a_single_undo_entry(self):
         """Undo has to answer a step with a step, not with half of one."""

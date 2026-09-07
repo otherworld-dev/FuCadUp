@@ -53,7 +53,6 @@
 #include <App/Property.h>
 #include <App/PropertyLinks.h>
 #include <App/PropertyStandard.h>
-#include <Base/Console.h>
 #include <Base/Exception.h>
 #include <Base/Tools.h>
 #include <Base/Type.h>
@@ -956,14 +955,16 @@ void TimelineWidget::moveTo(int index)
         std::string(QT_TRANSLATE_NOOP("Command", "Roll history"))
     );
 
-    const bool rolled = !tipMoves || rollTo(index);
-    applyRollbackVisibility();
-
-    Gui::Command::commitCommand(transaction);
-
-    if (!rolled) {
-        scheduleRebuild();
+    if (!tipMoves || rollTo(index)) {
+        applyRollbackVisibility();
+        Gui::Command::commitCommand(transaction);
+        return;
     }
+
+    // The roll never happened, so neither should the half of it that may already have been
+    // written; the rebuild puts the strip back in step with the document as it really is.
+    Gui::Command::abortCommand(transaction);
+    scheduleRebuild();
 }
 
 bool TimelineWidget::rollTo(int index)
@@ -1008,9 +1009,19 @@ bool TimelineWidget::rollTo(int index)
 
             // A body with no tip builds nothing, so the solid that was on screen has to
             // be taken off it by hand: there is no feature left to show in its place.
+            // CmdPartDesignMoveTip walks the body's Group, which the base feature is not
+            // part of, so the base feature is left showing here too.
+            App::DocumentObject* baseFeature = nullptr;
+            auto* baseProp
+                = freecad_cast<App::PropertyLink*>(body->getPropertyByName("BaseFeature"));
+            if (baseProp) {
+                baseFeature = baseProp->getValue();
+            }
+
             for (int i : solidIndices) {
                 App::DocumentObject* obj = resolve(featureNames[static_cast<std::size_t>(i)]);
-                if (obj && obj->isAttachedToDocument() && obj->Visibility.getValue()) {
+                if (obj && obj != baseFeature && obj->isAttachedToDocument()
+                    && obj->Visibility.getValue()) {
                     FCMD_OBJ_HIDE(obj);
                 }
             }
@@ -1050,13 +1061,32 @@ int TimelineWidget::defaultPlayhead() const
 {
     // Everything up to the solid the tip does not yet include is part of the state the
     // model is in, so a sketch made after the tip does not read as rolled back.
+    int position = static_cast<int>(markers.size()) - 1;
     for (int solid : solidIndices) {
         if (solid > tipIndex) {
-            return solid - 1;
+            position = solid - 1;
+            break;
         }
     }
 
-    return static_cast<int>(markers.size()) - 1;
+    // A feature the roll took off the screen has to stay behind the playhead, or the very
+    // next rebuild would read it as reached, show it again and drop it from the list. That
+    // is what used to lose a rollback on a reload, on the way back from another body, or
+    // on any unrelated rebuild, since requestedPlayhead only survives a single one.
+    const App::PropertyStringList* hiddenProperty = rollbackHiddenProperty();
+    if (hiddenProperty) {
+        for (const std::string& name : hiddenProperty->getValues()) {
+            const int index = indexOfFeature(name);
+            if (index >= 0) {
+                position = std::min(position, index - 1);
+            }
+        }
+    }
+
+    // Only a solid carries the tip, so the leftmost position that still resolves to the
+    // current tip is the tip itself. A list left over from a roll the tip has since been
+    // moved past by hand must not drag the playhead behind it.
+    return std::max(position, tipIndex);
 }
 
 void TimelineWidget::onSelectionChanged(const Gui::SelectionChanges& msg)
