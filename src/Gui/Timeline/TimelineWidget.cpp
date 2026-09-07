@@ -136,6 +136,9 @@ void TimelineWidget::setupUi()
     stepBackButton->setIconSize(QSize(stepIconExtent, stepIconExtent));
     stepBackButton->setFixedSize(stepButtonExtent, stepButtonExtent);
     stepBackButton->setToolTip(tr("Step the history back one feature"));
+    // Tab can land here, and the strip has to claim its keys and answer them from a
+    // focused button exactly as it does from a focused marker.
+    stepBackButton->installEventFilter(this);
     connect(stepBackButton, &QToolButton::clicked, this, &TimelineWidget::stepBack);
 
     stepForwardButton = new QToolButton(controls);
@@ -146,6 +149,7 @@ void TimelineWidget::setupUi()
     stepForwardButton->setIconSize(QSize(stepIconExtent, stepIconExtent));
     stepForwardButton->setFixedSize(stepButtonExtent, stepButtonExtent);
     stepForwardButton->setToolTip(tr("Step the history forward one feature"));
+    stepForwardButton->installEventFilter(this);
     connect(stepForwardButton, &QToolButton::clicked, this, &TimelineWidget::stepForward);
 
     controlLayout->addWidget(stepBackButton);
@@ -154,6 +158,11 @@ void TimelineWidget::setupUi()
     auto* scrollArea = new QScrollArea(this);
     scrollArea->setObjectName(QStringLiteral("TimelineScroll"));
     scrollArea->setFrameShape(QFrame::NoFrame);
+    // A scroll area takes the focus on a click by default, and a click on a marker walks
+    // up to it. That would leave the focus inside the strip after an ordinary click and
+    // hand it keys the user meant for the rest of the window; it would also let the scroll
+    // area answer the arrows with a scroll of its own. Tab is the only way in.
+    scrollArea->setFocusPolicy(Qt::NoFocus);
     scrollArea->setWidgetResizable(true);
     scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -707,52 +716,44 @@ void TimelineWidget::applyRollbackVisibility()
     }
 }
 
-bool TimelineWidget::wantsKey(const QKeyEvent* event) const
+TimelineWidget::RollAction TimelineWidget::keyAction(const QKeyEvent* event) const
 {
     // Nothing to roll without a body, and swallowing the arrows would then only stop the
     // strip's neighbours from seeing them.
     if (bodyName.empty()) {
-        return false;
+        return nullptr;
     }
 
     // The number pad sends the same keys with a modifier of its own.
     if ((event->modifiers() & ~Qt::KeypadModifier) != Qt::NoModifier) {
-        return false;
+        return nullptr;
     }
 
+    // The one place the strip's keys are written down: the claim below and the press that
+    // follows it have to agree on the list, so they both read it from here.
     switch (event->key()) {
         case Qt::Key_Left:
+            return &TimelineWidget::stepBack;
         case Qt::Key_Right:
+            return &TimelineWidget::stepForward;
         case Qt::Key_Home:
+            return &TimelineWidget::rollToStart;
         case Qt::Key_End:
-            return true;
+            return &TimelineWidget::rollToEnd;
         default:
-            return false;
+            return nullptr;
     }
 }
 
 bool TimelineWidget::handleKey(QKeyEvent* event)
 {
-    if (!wantsKey(event)) {
+    const RollAction roll = keyAction(event);
+    if (!roll) {
         return false;
     }
 
-    switch (event->key()) {
-        case Qt::Key_Left:
-            stepBack();
-            return true;
-        case Qt::Key_Right:
-            stepForward();
-            return true;
-        case Qt::Key_Home:
-            rollToStart();
-            return true;
-        case Qt::Key_End:
-            rollToEnd();
-            return true;
-        default:
-            return false;
-    }
+    (this->*roll)();
+    return true;
 }
 
 void TimelineWidget::keyPressEvent(QKeyEvent* event)
@@ -773,7 +774,7 @@ bool TimelineWidget::event(QEvent* event)
     // to the strip instead of the camera, and only while the strip holds the focus, so the
     // command keeps Home everywhere else.
     if (event->type() == QEvent::ShortcutOverride
-        && wantsKey(static_cast<QKeyEvent*>(event))) {
+        && keyAction(static_cast<QKeyEvent*>(event))) {
         event->accept();
         return true;
     }
@@ -783,10 +784,10 @@ bool TimelineWidget::event(QEvent* event)
 
 bool TimelineWidget::eventFilter(QObject* watched, QEvent* event)
 {
-    // A focused marker is offered the key before the strip is, so the claim has to be
-    // made here as well as in event() above.
+    // A focused marker or step button is offered the key before the strip is, so the
+    // claim has to be made here as well as in event() above.
     if (event->type() == QEvent::ShortcutOverride
-        && wantsKey(static_cast<QKeyEvent*>(event))) {
+        && keyAction(static_cast<QKeyEvent*>(event))) {
         event->accept();
         return true;
     }

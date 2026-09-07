@@ -162,12 +162,15 @@ private:
     void positionPlayhead();
     void moveTo(int index);
     bool rollTo(int index);
-    /// Whether the key is one the strip rolls the history with. Asked twice: once to claim
-    /// the key from a command shortcut that would otherwise answer it first, and again
-    /// when the press itself arrives.
-    bool wantsKey(const QKeyEvent* event) const;
-    /// Answers the timeline's own keys wherever they arrive, either on the widget or on a
-    /// marker whose scroll area would otherwise eat the arrows. True when one was used.
+    /// One of the slots above, which is all a key of the strip's ever does.
+    using RollAction = void (TimelineWidget::*)();
+    /// What the key rolls, or nullptr when the key is not one of the strip's. Asked twice:
+    /// once to claim the key from a command shortcut that would otherwise answer it first,
+    /// and again when the press itself arrives.
+    RollAction keyAction(const QKeyEvent* event) const;
+    /// Answers the timeline's own keys wherever they arrive: on the widget itself, or on
+    /// the marker or step button Tab has landed on, both of which are filtered so that the
+    /// key never has to travel to be answered. True when one was used.
     bool handleKey(QKeyEvent* event);
 
     QWidget* strip {nullptr};

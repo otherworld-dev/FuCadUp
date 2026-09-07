@@ -189,27 +189,77 @@ class TestTimeline(unittest.TestCase):
         )
         self._settle()
 
-    def _press(self, key):
-        """Hand a key press to the strip the way the focused widget receives one.
+    def _focus(self, widget):
+        """Hand the keyboard to one of the strip's own widgets, as Tab would."""
 
-        Not through the application: Home is the shortcut of the Home view command, and
-        the shortcut map answers it inside QApplication::notify before any widget or event
-        filter sees it. The strip takes the key back by claiming the shortcut override Qt
-        sends ahead of a real press, which the claim test above covers on its own; what is
-        left for here is what the strip does with the press once it arrives.
+        if not self.window.isActiveWindow():
+            raise unittest.SkipTest("The main window does not take the keyboard here")
+
+        self.assertIsNotNone(widget, "Expected a widget to put the focus on")
+        widget.setFocus(QtCore.Qt.OtherFocusReason)
+        self._process_events()
+        self.assertIs(
+            QtWidgets.QApplication.focusWidget(),
+            widget,
+            "The widget has to hold the keyboard for a key press to mean anything",
+        )
+        return widget
+
+    def _focus_a_marker(self, label="Sketch"):
+        """Put the keyboard on a marker, which is one of the two ways into the strip.
+
+        Every step rebuilds the strip, so the marker that held the focus is gone by the
+        time the next key is sent and a fresh one has to be picked up each time.
         """
 
+        return self._focus(self._marker_for(label))
+
+    def _step_button(self, index=0):
+        """The back arrow, or the forward one at index 1."""
+
+        buttons = self.widget.findChildren(QtWidgets.QToolButton, "TimelineStepButton")
+        self.assertEqual(len(buttons), 2)
+        return buttons[index]
+
+    def _press(self, key):
+        """Send the key where a real one goes: through the application, to the focus.
+
+        Home is the shortcut of the Home view command and a shortcut is answered before
+        the focused widget sees the key, so this only reaches the strip because the strip
+        claims the key from the shortcut first.
+        """
+
+        marker = self._focus_a_marker()
         event = QtGui.QKeyEvent(QtCore.QEvent.KeyPress, key, QtCore.Qt.NoModifier)
-        self.widget.event(event)
+        QtWidgets.QApplication.instance().sendEvent(marker, event)
         self._settle()
 
-    def _claims(self, key):
+    def _claims(self, key, target):
         """Whether the strip takes the key off whatever command shortcut owns it."""
 
         override = QtGui.QKeyEvent(QtCore.QEvent.ShortcutOverride, key, QtCore.Qt.NoModifier)
         override.ignore()
-        QtWidgets.QApplication.instance().sendEvent(self.widget, override)
+        QtWidgets.QApplication.instance().sendEvent(target, override)
         return override.isAccepted()
+
+    def _click(self, widget):
+        """A plain left click, press and release, on the middle of a widget."""
+
+        centre = widget.rect().center()
+        globally = widget.mapToGlobal(centre)
+        for kind in (QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonRelease):
+            QtWidgets.QApplication.instance().sendEvent(
+                widget,
+                QtGui.QMouseEvent(
+                    kind,
+                    QtCore.QPointF(centre),
+                    QtCore.QPointF(globally),
+                    QtCore.Qt.LeftButton,
+                    QtCore.Qt.LeftButton,
+                    QtCore.Qt.NoModifier,
+                ),
+            )
+        self._process_events()
 
     def _marker_for(self, label):
         """Markers carry the feature's label as the first line of their tooltip."""
@@ -376,22 +426,90 @@ class TestTimeline(unittest.TestCase):
         self.assertIs(self.body.Tip, self.pad2)
 
     def test_the_strip_claims_home_from_the_home_view_shortcut(self):
-        """Home already belongs to Std_ViewHome, whose shortcut is answered inside
-        QApplication::notify before the focused widget or any event filter sees the key.
-        Qt offers the widget the first refusal through a shortcut override, and the strip
-        has to take it or its Home is dead however the keys are wired up behind it."""
+        """Home already belongs to Std_ViewHome, and a command shortcut is answered before
+        the focused widget ever sees the key. Qt offers that widget the first refusal
+        through a shortcut override, and the strip has to take it wherever inside itself
+        the focus happens to be, or its Home is dead."""
 
-        for key in (
-            QtCore.Qt.Key_Home,
-            QtCore.Qt.Key_End,
-            QtCore.Qt.Key_Left,
-            QtCore.Qt.Key_Right,
-        ):
-            self.assertTrue(self._claims(key), "The strip has to claim key {0}".format(key))
+        marker = self._focus_a_marker()
+        button = self._step_button()
 
-        # Everything the strip does not roll with is left to whoever else wants it.
-        self.assertFalse(self._claims(QtCore.Qt.Key_Up))
-        self.assertFalse(self._claims(QtCore.Qt.Key_F5))
+        for target in (marker, button):
+            for key in (
+                QtCore.Qt.Key_Home,
+                QtCore.Qt.Key_End,
+                QtCore.Qt.Key_Left,
+                QtCore.Qt.Key_Right,
+            ):
+                self.assertTrue(
+                    self._claims(key, target),
+                    "The strip has to claim key {0} at {1}".format(
+                        key, target.metaObject().className()
+                    ),
+                )
+
+            # Everything the strip does not roll with is left to whoever else wants it.
+            self.assertFalse(self._claims(QtCore.Qt.Key_Up, target))
+            self.assertFalse(self._claims(QtCore.Qt.Key_F5, target))
+
+    def test_pressing_home_on_a_focused_marker_rolls_the_history(self):
+        """The whole way a real Home arrives: Qt offers the override to the marker that
+        has the keyboard, the strip claims it, and the press then reaches the strip
+        through the event filter it keeps on its markers."""
+
+        marker = self._focus_a_marker()
+        self.assertIs(self.body.Tip, self.pad2)
+
+        event = QtGui.QKeyEvent(QtCore.QEvent.KeyPress, QtCore.Qt.Key_Home, QtCore.Qt.NoModifier)
+        QtWidgets.QApplication.instance().sendEvent(marker, event)
+        self._settle()
+
+        self.assertIsNone(self.body.Tip)
+
+    def test_pressing_home_on_a_focused_step_button_rolls_the_history(self):
+        """Tab lands on the arrows as readily as on a marker, so Home has to reach the
+        strip from a focused button too rather than going to the Home view command."""
+
+        button = self._focus(self._step_button())
+        self.assertIs(self.body.Tip, self.pad2)
+
+        event = QtGui.QKeyEvent(QtCore.QEvent.KeyPress, QtCore.Qt.Key_Home, QtCore.Qt.NoModifier)
+        QtWidgets.QApplication.instance().sendEvent(button, event)
+        self._settle()
+
+        self.assertIsNone(self.body.Tip)
+
+    def test_a_click_does_not_leave_the_keyboard_in_the_strip(self):
+        """Tab is the only way into the strip. Nothing around the markers may take the
+        focus on a click, or an ordinary click on a marker would leave the keyboard in
+        the timeline and it would go on answering keys, the claimed Home among them,
+        that the user meant for the rest of the window."""
+
+        scroll = self.widget.findChild(QtWidgets.QScrollArea, "TimelineScroll")
+        self.assertIsNotNone(scroll)
+        # A scroll area is Qt::WheelFocus by default, and the focus walk from a clicked
+        # marker climbs to it: this is the one that has to be turned off by hand.
+        self.assertEqual(scroll.focusPolicy(), QtCore.Qt.NoFocus)
+        self.assertEqual(scroll.viewport().focusPolicy(), QtCore.Qt.NoFocus)
+        strip = self.widget.findChild(QtWidgets.QWidget, "TimelineStrip")
+        self.assertEqual(strip.focusPolicy(), QtCore.Qt.NoFocus)
+        self.assertEqual(self.widget.focusPolicy(), QtCore.Qt.NoFocus)
+
+        before = self.body.Tip
+        self._click(self._marker_for("Sketch001"))
+
+        focus = QtWidgets.QApplication.focusWidget()
+        self.assertFalse(
+            focus is not None and self.widget.isAncestorOf(focus),
+            "A click must not leave the keyboard inside the timeline",
+        )
+
+        # And with the keyboard outside it, Home belongs to whoever else wants it.
+        event = QtGui.QKeyEvent(QtCore.QEvent.KeyPress, QtCore.Qt.Key_Home, QtCore.Qt.NoModifier)
+        QtWidgets.QApplication.instance().sendEvent(focus or self.window, event)
+        self._settle()
+
+        self.assertIs(self.body.Tip, before)
 
     def test_markers_and_step_buttons_can_be_reached_by_tab(self):
         marker = self._marker_for("Sketch001")
