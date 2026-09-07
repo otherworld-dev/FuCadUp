@@ -154,7 +154,29 @@ class ViewerTestCase(unittest.TestCase):
                     raise
                 self._process_events(20)
 
+    def _post(self, widget, event_type, pos, button, buttons, modifiers=NO_MODIFIER):
+        """Deliver a mouse event to ``widget`` without moving the real cursor.
+
+        Warping the cursor queues a move event of the system's own, which lands
+        later, after a synthetic press and with the button already down. It reads
+        as travel the test never asked for, and it re-picks whatever the pointer
+        ended up over, which is what a context menu says it is about.
+        """
+
+        app = QtGui.QApplication.instance()
+        event = QtGui.QMouseEvent(
+            event_type,
+            pos,
+            widget.mapToGlobal(pos),
+            button,
+            buttons,
+            modifiers,
+        )
+        app.sendEvent(widget, event)
+
     def _send_mouse_event(self, event_type, pos, button, buttons, modifiers):
+        """Deliver a mouse event and take the real cursor with it."""
+
         self._refresh_view_widgets()
         app = QtGui.QApplication.instance()
         global_pos = self.viewport.mapToGlobal(pos)
@@ -177,7 +199,7 @@ class ViewerTestCase(unittest.TestCase):
 
         self._send_mouse_event(MOUSE_MOVE, start, NO_BUTTON, NO_BUTTON, modifiers)
         self._process_events(10)
-        self._send_mouse_event(MOUSE_PRESS, start, button, button, modifiers)
+        self._post(self.viewport, MOUSE_PRESS, start, button, button, modifiers)
         self._process_events(10)
         for step in range(1, steps + 1):
             point = QtCore.QPoint(
@@ -186,16 +208,21 @@ class ViewerTestCase(unittest.TestCase):
             )
             self._send_mouse_event(MOUSE_MOVE, point, NO_BUTTON, button, modifiers)
             self._process_events(10)
-        self._send_mouse_event(MOUSE_RELEASE, end, button, NO_BUTTON, modifiers)
+        self._post(self.viewport, MOUSE_RELEASE, end, button, NO_BUTTON, modifiers)
         self._process_events()
 
     def _click(self, button, modifiers=NO_MODIFIER):
-        """Press and release ``button`` in the middle of the view without moving."""
+        """Press and release ``button`` in the middle of the view, moving nothing.
 
+        The real cursor is left where it is, so that nothing the test did not send
+        arrives between the press and the release.
+        """
+
+        self._refresh_view_widgets()
         where = self.viewport.rect().center()
-        self._send_mouse_event(MOUSE_PRESS, where, button, button, modifiers)
+        self._post(self.viewport, MOUSE_PRESS, where, button, button, modifiers)
         self._process_events(10)
-        self._send_mouse_event(MOUSE_RELEASE, where, button, NO_BUTTON, modifiers)
+        self._post(self.viewport, MOUSE_RELEASE, where, button, NO_BUTTON, modifiers)
         self._process_events()
 
     def _camera_state(self):

@@ -45,7 +45,6 @@ from TestNavigationStyles import (
     MOUSE_PRESS,
     MOUSE_RELEASE,
     NO_BUTTON,
-    NO_MODIFIER,
     RIGHT_BUTTON,
     ViewerTestCase,
 )
@@ -92,25 +91,6 @@ class MarkingMenuTestCase(ViewerTestCase):
         super().tearDown()
 
     # -- helpers ---------------------------------------------------------
-
-    def _post(self, widget, event_type, pos, button, buttons, modifiers=NO_MODIFIER):
-        """Deliver a mouse event without moving the real cursor.
-
-        Moving it would send a location event of its own, which is what picks the
-        object under it, so the tests below would no longer control what is
-        hovered when the menu opens.
-        """
-
-        app = QtGui.QApplication.instance()
-        event = QtGui.QMouseEvent(
-            event_type,
-            pos,
-            widget.mapToGlobal(pos),
-            button,
-            buttons,
-            modifiers,
-        )
-        app.sendEvent(widget, event)
 
     def _hover(self, pos):
         """Move the cursor to ``pos`` in the viewport and return what it picked.
@@ -265,7 +245,10 @@ class MarkingMenuTestCase(ViewerTestCase):
         header = menu.actions()[0]
 
         self.assertEqual(header.objectName(), "ContextMenuHeader")
-        self.assertNotEqual(header.text(), self.box.Label)
+        self.assertEqual(
+            header.text(),
+            QtCore.QCoreApplication.translate("QObject", "Nothing selected"),
+        )
 
 
 if __name__ == "__main__":

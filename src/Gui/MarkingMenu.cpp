@@ -96,14 +96,23 @@ QPoint slotOffset(int slot)
     );
 }
 
+/// An entry the ring can pin, with the top level action it was reached through.
+struct Entry
+{
+    QAction* action {nullptr};
+    /// The entry itself, unless it came out of a submenu, in which case it is
+    /// the action that opens that submenu.
+    QAction* carrier {nullptr};
+};
+
 /// The entry \a command names, among \a actions and one level into the menus
 /// they open, which is where the standard views sit.
-QAction* findEntry(const QList<QAction*>& actions, const char* command)
+Entry findEntry(const QList<QAction*>& actions, const char* command)
 {
     const QString name = QString::fromLatin1(command);
     for (QAction* action : actions) {
         if (action->objectName() == name) {
-            return action;
+            return {action, action};
         }
     }
 
@@ -111,13 +120,13 @@ QAction* findEntry(const QList<QAction*>& actions, const char* command)
         if (const QMenu* submenu = action->menu()) {
             for (QAction* nested : submenu->actions()) {
                 if (nested->objectName() == name) {
-                    return nested;
+                    return {nested, action};
                 }
             }
         }
     }
 
-    return nullptr;
+    return {};
 }
 }  // namespace
 
@@ -212,17 +221,21 @@ void MarkingMenu::collect()
     std::array<QAction*, cardinalSlots> pinned {};
     bool anyPinned = false;
     for (std::size_t slot = 0; slot < cardinalSlots; ++slot) {
-        QAction* found = findEntry(actions, cardinalCommands.at(slot));
-        if (!found && slot == southSlot) {
+        Entry found = findEntry(actions, cardinalCommands.at(slot));
+        if (!found.action && slot == southSlot) {
             found = findEntry(actions, southAlternative);
         }
-        if (!found || !found->isVisible() || found->text().isEmpty()) {
+        if (!found.action || !found.action->isVisible() || found.action->text().isEmpty()) {
             continue;
         }
 
-        pinned.at(slot) = found;
+        pinned.at(slot) = found.action;
         anyPinned = true;
-        usable.removeAll(found);
+        // The entry is spoken for, and so is the submenu it came out of: a
+        // direction spent on the list the isometric view was taken from would
+        // only lead back to views the ring already carries.
+        usable.removeAll(found.action);
+        usable.removeAll(found.carrier);
     }
 
     if (!anyPinned && usable.isEmpty()) {

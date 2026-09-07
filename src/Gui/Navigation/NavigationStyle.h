@@ -593,6 +593,11 @@ protected:
 
 private:
     SbBool lockButton1 {false};
+    /// Where the right button went down, so that the jitter of a click can be
+    /// told from the start of an orbit. Kept here rather than read back from
+    /// localPos, which saveCursorPosition() overwrites with the projected centre
+    /// of the bounding box when that is the rotation centre mode.
+    SbVec2s rightPressPosition {0, 0};
 };
 
 class GuiExport MayaGestureNavigationStyle: public UserNavigationStyle

@@ -30,6 +30,22 @@
 
 using namespace Gui;
 
+namespace
+{
+/// How far the pointer travels before the right button is navigating rather than
+/// clicking. Small enough that an orbit does not feel stuck at the start, and
+/// larger than the jitter of a right click on a trackpad, whose release the
+/// context menu and the Sketcher's tools are both waiting for.
+constexpr int clickTravel = 4;
+
+bool hasLeftTheClick(const SbVec2s& from, const SbVec2s& to)
+{
+    const int across = to[0] - from[0];
+    const int down = to[1] - from[1];
+    return across * across + down * down > clickTravel * clickTravel;
+}
+}  // namespace
+
 // ----------------------------------------------------------------------------------
 
 /* TRANSLATOR Gui::FusionNavigationStyle */
@@ -66,6 +82,8 @@ const char* FusionNavigationStyle::mouseButtons(ViewerMode mode)
                 "\nor press Ctrl and right mouse button"
             );
         default:
+            // The preferences dialog only ever asks for the four modes above, so
+            // this is the catch-all rather than a line anyone reads today.
             return QT_TR_NOOP(
                 "Select with the left mouse button, orbit with the right one or with Shift and "
                 "the middle one, pan with the middle one or with Shift and the right one, and "
@@ -165,6 +183,10 @@ SbBool FusionNavigationStyle::processSoEvent(const SoEvent* const ev)
                 // to pass the event to the base class.
                 this->lockrecenter = true;
 
+                if (press) {
+                    this->rightPressPosition = pos;
+                }
+
                 // Don't show the context menu after dragging, panning or zooming
                 if (!press && (hasDragged || hasPanned || hasZoomed)) {
                     processed = true;
@@ -217,15 +239,23 @@ SbBool FusionNavigationStyle::processSoEvent(const SoEvent* const ev)
     if (type.isDerivedFrom(SoLocation2Event::getClassTypeId())) {
         this->lockrecenter = true;
         const auto* const event = (const SoLocation2Event*)ev;
+
+        // A right press starts an orbit, a pan or a zoom, but a right click is
+        // also how the context menu and the Sketcher's tools are reached. Until
+        // the pointer has left the click behind nothing moves, and the release
+        // falls through to them untouched.
+        const bool rightIsNavigating = !this->button2down
+            || hasLeftTheClick(this->rightPressPosition, pos);
+
         if (this->currentmode == NavigationStyle::SELECTION && this->button1down) {
             triedSelectionDrag = true;
             processed = handleSelectionDragMotion(event, newmode, this->ctrldown);
         }
-        else if (this->currentmode == NavigationStyle::ZOOMING) {
+        else if (this->currentmode == NavigationStyle::ZOOMING && rightIsNavigating) {
             this->zoomByCursor(posn, prevnormalized);
             processed = true;
         }
-        else if (this->currentmode == NavigationStyle::PANNING) {
+        else if (this->currentmode == NavigationStyle::PANNING && rightIsNavigating) {
             float ratio = vp.getViewportAspectRatio();
             panCamera(
                 viewer->getSoRenderManager()->getCamera(),
@@ -236,13 +266,14 @@ SbBool FusionNavigationStyle::processSoEvent(const SoEvent* const ev)
             );
             processed = true;
         }
-        else if (this->currentmode == NavigationStyle::DRAGGING) {
+        else if (this->currentmode == NavigationStyle::DRAGGING && rightIsNavigating) {
             this->addToLog(event->getPosition(), event->getTime());
             this->spin(posn);
             moveCursorPosition();
             // spin() only counts as a drag once it has two positions to turn the
             // camera between, and the right button has a context menu waiting on
-            // the answer: the first move away is already a drag, not a click.
+            // the answer: past the threshold above, the first move is already a
+            // drag rather than a click.
             if (this->button2down) {
                 hasDragged = true;
             }

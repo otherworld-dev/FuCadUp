@@ -2584,29 +2584,25 @@ QString labelWithElement(const QString& label, const char* element)
     return QStringLiteral("%1 · %2").arg(label, QString::fromUtf8(element));
 }
 
-/// What the menu is about when nothing is selected: the object under the cursor
-/// is where the entries below came from and what a click would pick, so it names
-/// the menu rather than a row saying nothing is.
-QString preselectionHeading()
+/// What the menu is about when nothing is selected: \a hovered is the object the
+/// cursor is over, which is where the entries below came from and what a click
+/// would pick, so it names the menu rather than a row saying nothing is.
+QString preselectionHeading(const App::SubObjectT& hovered)
 {
-    const SelectionChanges& hovered = Selection().getPreselection();
-    const App::DocumentObject* object = hovered.Object.getObject();
+    const App::DocumentObject* object = hovered.getObject();
     if (!object) {
         return QObject::tr("Nothing selected");
     }
 
-    return labelWithElement(
-        QString::fromUtf8(object->Label.getValue()),
-        hovered.Object.getElementName()
-    );
+    return labelWithElement(QString::fromUtf8(object->Label.getValue()), hovered.getElementName());
 }
 
 /// What the context menu is about, for the row that heads it.
-QString selectionHeading()
+QString selectionHeading(const App::SubObjectT& hovered)
 {
     const std::vector<SelectionObject> selection = Selection().getSelectionEx();
     if (selection.empty()) {
-        return preselectionHeading();
+        return preselectionHeading(hovered);
     }
 
     if (selection.size() > 1) {
@@ -2647,7 +2643,10 @@ void NavigationStyle::openPopupMenu(const SbVec2s& position)
 
     QMenu* objectMenu = nullptr;
     QList<QAction*> objectActions;
-    App::DocumentObject* preselectedObject = Gui::Selection().getPreselection().Object.getObject();
+    // Taken once and kept: the entries below and the row that heads them have to
+    // agree on what the menu is about, and building it can move on.
+    const App::SubObjectT preselected = Gui::Selection().getPreselection().Object;
+    App::DocumentObject* preselectedObject = preselected.getObject();
 
     if (preselectedObject) {
         auto* preselectedViewProvider
@@ -2734,7 +2733,7 @@ void NavigationStyle::openPopupMenu(const SbVec2s& position)
     // of one body among several says which one it will act on. It comes from the
     // selection, which is what the commands act on, and falls back to the object
     // under the cursor, which is where the entries above came from.
-    auto* header = new QAction(selectionHeading(), contextMenu);
+    auto* header = new QAction(selectionHeading(preselected), contextMenu);
     header->setObjectName(QStringLiteral("ContextMenuHeader"));
     header->setEnabled(false);
     if (contextMenu->actions().empty()) {
