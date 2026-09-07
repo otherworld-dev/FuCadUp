@@ -43,14 +43,24 @@ namespace
  * one closed. The shortcut framework hands the key to whichever is live.
  *
  * A Fusion letter also has to win against every longer chord it happens to
- * prefix (S against "S, B"/"S, F"/"S, G"/"S, D", C against the old bare-C
- * constraint chords, and so on) instead of waiting ShortcutTimeout for one of
- * those chords to complete. `ShortcutManager::checkShortcut` resolves that by
- * priority: giving every entry here `fuCadPriority` below is what lets its
- * exact match fire immediately, ahead of any enabled longer sequence with a
- * lower priority. Modelling commands that must stay off while a sketch is
- * open (PartDesign's tools, `Std_Placement`, `Std_Measure`) are guarded in
- * their own `isActive()` instead of here.
+ * prefix (S against "S, B"/"S, F"/"S, G"/"S, D", and so on) instead of waiting
+ * ShortcutTimeout for one of those chords to complete. `ShortcutManager::
+ * checkShortcut` resolves that by priority: giving every entry here
+ * `fuCadPriority` below is what lets its exact match fire immediately, ahead
+ * of any enabled longer sequence with a lower priority. Modelling commands
+ * that must stay off while a sketch is open (PartDesign's tools,
+ * `Std_Placement`, `Std_Measure`) are guarded in their own `isActive()`
+ * instead of here.
+ *
+ * Circle's bare "C" also used to collide head-on with the Coincident
+ * constraint's default accelerator, which is a different problem: two
+ * commands claiming the exact same key rather than one waiting on a longer
+ * chord. That pair is not listed here - `CmdSketcherConstrainCoincidentUnified`
+ * and `CmdSketcherConstrainCoincident` (CommandConstraints.cpp) instead give
+ * each other mutually exclusive "K, K"/"K, Q" accelerators directly, swapping
+ * which one is which based on the UnifiedCoincident preference, so only one of
+ * them is ever bound to a given sequence and neither needs a priority boost
+ * from this table to resolve a chord it isn't in.
  */
 const std::unordered_map<std::string_view, const char*> shortcuts = {
     // Modelling, live while no sketch is open.
@@ -80,8 +90,6 @@ const std::unordered_map<std::string_view, const char*> shortcuts = {
     {"Sketcher_ConstrainTangent", "K, T"},
     {"Sketcher_ConstrainPointOnObject", "K, N"},
     {"Sketcher_ConstrainParallel", "K, P"},
-    {"Sketcher_ConstrainCoincidentUnified", "K, K"},
-    {"Sketcher_ConstrainCoincident", "K, K"},
     {"Sketcher_ConstrainSymmetric", "K, M"},
 };
 

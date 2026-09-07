@@ -12,6 +12,12 @@ from PySide import QtCore, QtGui, QtWidgets
 class TestFusionShortcuts(unittest.TestCase):
     def setUp(self):
         self.doc = FreeCAD.newDocument("FusionShortcuts")
+        # CommandBase::getAction() does not build an action on demand, so a
+        # Sketcher constraint command's action (and therefore its shortcut)
+        # may not exist until the Sketcher workbench has been activated at
+        # least once. Activate it before switching to PartDesignWorkbench,
+        # which the Body/sketch test below needs.
+        FreeCADGui.activateWorkbench("SketcherWorkbench")
         FreeCADGui.activateWorkbench("PartDesignWorkbench")
 
     def tearDown(self):
@@ -36,7 +42,17 @@ class TestFusionShortcuts(unittest.TestCase):
         self.assertGreater(prio, 0)
 
     def test_coincident_and_symmetric_left_bare_letters(self):
-        self.assertEqual(self._shortcut_of("Sketcher_ConstrainCoincidentUnified"), "K, K")
+        # Sketcher_ConstrainCoincidentUnified and Sketcher_ConstrainCoincident
+        # swap "K, K"/"K, Q" between them based on the UnifiedCoincident
+        # preference (CommandConstraints.cpp), rather than both being forced
+        # onto one value from DefaultShortcuts.cpp's table - so the expected
+        # value here has to follow that same preference.
+        hConstraints = FreeCAD.ParamGet(
+            "User parameter:BaseApp/Preferences/Mod/Sketcher/Constraints"
+        )
+        unified = hConstraints.GetBool("UnifiedCoincident", True)
+        expected = "K, K" if unified else "K, Q"
+        self.assertEqual(self._shortcut_of("Sketcher_ConstrainCoincidentUnified"), expected)
         self.assertEqual(self._shortcut_of("Sketcher_ConstrainSymmetric"), "K, M")
         self.assertEqual(self._shortcut_of("Sketcher_CreateCircle"), "C")
 

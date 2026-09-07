@@ -4683,11 +4683,15 @@ CmdSketcherConstrainCoincidentUnified::CmdSketcherConstrainCoincidentUnified(con
 
     ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Mod/Sketcher/Constraints");
-    // Superseded at runtime by the "Sketcher_ConstrainCoincidentUnified" entry
-    // in DefaultShortcuts.cpp's table (CommandManager::addCommand overrides
-    // sAccel via that table before this action ever exists), so the "K, Q"
-    // branch is unreachable in practice. Kept neither branch a bare "C" anyway,
-    // since Fusion's Circle tool now owns that letter.
+    // This command and CmdSketcherConstrainCoincident (below) are deliberately
+    // not in DefaultShortcuts.cpp's table, so this ternary is what actually
+    // sets the live accelerator - not a fallback. Fusion's Circle tool owns
+    // bare "C" now, so neither of these two commands may hold "C" either.
+    // Whichever is "primary" for the live UnifiedCoincident preference takes
+    // "K, K"; the other, demoted one takes "K, Q". Since the two commands
+    // always disagree on which value they use, they're never both bound to
+    // "K, K" at once, so pressing it never has to wait for the priority
+    // machinery in ShortcutManager::checkShortcut to arbitrate between them.
     sAccel = hGrp->GetBool("UnifiedCoincident", true) ? "K, K" : "K, Q";
 
     eType = ForEdit;
@@ -5202,9 +5206,11 @@ CmdSketcherConstrainCoincident::CmdSketcherConstrainCoincident()
     sPixmap = "Constraint_PointOnPoint";
     ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Mod/Sketcher/Constraints");
-    // Superseded at runtime by the "Sketcher_ConstrainCoincident" entry in
-    // DefaultShortcuts.cpp's table, same as the ternary above - kept off a
-    // bare "C" here too so no branch is left inconsistent with that table.
+    // Mirror of the ternary in CmdSketcherConstrainCoincidentUnified's ctor
+    // above: this command takes whichever of "K, K"/"K, Q" the other one
+    // isn't using for the live UnifiedCoincident preference, so the pair is
+    // always mutually exclusive and neither is a bare "C". Not in
+    // DefaultShortcuts.cpp's table either - this ternary is authoritative.
     sAccel = hGrp->GetBool("UnifiedCoincident", true) ? "K, Q" : "K, K";
     eType = ForEdit;
 
