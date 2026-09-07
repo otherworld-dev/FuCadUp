@@ -37,7 +37,7 @@ using namespace Gui;
 /* TRANSLATOR PartDesignGui::TaskPocketParameters */
 
 TaskPocketParameters::TaskPocketParameters(ViewProviderPocket* PocketView, QWidget* parent, bool newObj)
-    : TaskExtrudeParameters(PocketView, parent, "PartDesign_Pocket", tr("Pocket Parameters"))
+    : TaskExtrudeParameters(PocketView, parent, "PartDesign_Pocket", tr("Extrude"))
 {
     ui->offsetEdit->setToolTip(
         tr("Offset from the selected face at which the pocket will end on side 1")

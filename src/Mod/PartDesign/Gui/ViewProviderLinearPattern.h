@@ -38,7 +38,7 @@ class PartDesignGuiExport ViewProviderLinearPattern: public ViewProviderTransfor
 public:
     ViewProviderLinearPattern()
     {
-        menuName = tr("Linear Pattern Parameters");
+        menuName = tr("Rectangular Pattern");
         sPixmap = "PartDesign_LinearPattern.svg";
     }
 
