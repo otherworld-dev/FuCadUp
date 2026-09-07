@@ -64,13 +64,17 @@ class TestPartDesignLetters(unittest.TestCase):
 
         view = FreeCADGui.activeView()
         if view is None:
-            FreeCAD.closeDocument(self.doc.Name)
-            self.doc = None
+            self._discard_document()
             raise unittest.SkipTest("No 3D view in this test environment")
         view.setActiveObject("pdbody", self.body)
 
+        plane = self._origin_plane("XY_Plane")
+        if plane is None:
+            self._discard_document()
+            self.fail("The body's origin has no XY_Plane")
+
         self.sketch = self.body.newObject("Sketcher::SketchObject", "Sketch")
-        self.sketch.AttachmentSupport = [(self._origin_plane("XY_Plane"), "")]
+        self.sketch.AttachmentSupport = [(plane, "")]
         self.sketch.MapMode = "FlatFace"
         self.doc.recompute()
 
@@ -85,17 +89,26 @@ class TestPartDesignLetters(unittest.TestCase):
         self._process_events()
 
         FreeCADGui.Selection.clearSelection()
+        self._discard_document()
+
+    # -- helpers ---------------------------------------------------------
+
+    def _discard_document(self):
+        """Close the test document, if it is still open.
+
+        setUp has to call this itself on every path that gives up, since tearDown
+        never runs when setUp raises.
+        """
+
         if self.doc is not None:
             FreeCAD.closeDocument(self.doc.Name)
             self.doc = None
-
-    # -- helpers ---------------------------------------------------------
 
     def _origin_plane(self, name):
         for feature in self.body.Origin.OriginFeatures:
             if feature.Name.startswith(name):
                 return feature
-        self.fail(f"The body's origin has no {name}")
+        return None
 
     def _process_events(self, wait_ms=50):
         FreeCADGui.updateGui()

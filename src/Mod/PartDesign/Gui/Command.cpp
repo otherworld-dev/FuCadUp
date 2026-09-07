@@ -27,6 +27,7 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <GeomLib_IsPlanarSurface.hxx>
+#include <QCoreApplication>
 #include <QMessageBox>
 #include <TopExp_Explorer.hxx>
 #include <TopLoc_Location.hxx>
@@ -2568,10 +2569,13 @@ void makeFaceTool(Gui::Command* cmd, const std::string& which)
             }
 
             if (flatOnly && !shape.getSubTopoShape(name.c_str(), true).isPlanar()) {
+                // Name the tool the way its menu entry does, since Q is only one of the
+                // ways to get here.
                 QMessageBox::warning(
                     Gui::getMainWindow(),
-                    QObject::tr("Press/Pull"),
-                    QObject::tr("%1 works only on flat faces.").arg(QString::fromStdString(which))
+                    QObject::tr("Wrong selection"),
+                    QObject::tr("%1 works only on flat faces.")
+                        .arg(QCoreApplication::translate(cmd->className(), cmd->getMenuText()))
                 );
                 return;
             }
@@ -2581,12 +2585,13 @@ void makeFaceTool(Gui::Command* cmd, const std::string& which)
     }
 
     if (!base) {
-        // The body has no solid yet, so there is no face to push or pull and the feature
-        // would be built standing on nothing. Say so instead of quietly doing nothing.
+        // The body holds no solid yet, so there is no face to work on at all and the
+        // feature would be built standing on nothing. Ask for the solid rather than for
+        // a face that cannot exist.
         QMessageBox::warning(
             Gui::getMainWindow(),
-            QObject::tr("Press/Pull"),
-            QObject::tr("Select a face of the active body first.")
+            QObject::tr("Wrong selection"),
+            QObject::tr("Add a solid feature to the body first.")
         );
         return;
     }

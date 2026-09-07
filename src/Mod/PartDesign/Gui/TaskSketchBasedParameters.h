@@ -82,6 +82,8 @@ public Q_SLOTS:
 
 Q_SIGNALS:
     void profileChanged();
+    /// Picking has been switched off, so whoever owns the hint row can have it back.
+    void pickingFinished();
 
 private:
     void onSelectionChanged(const Gui::SelectionChanges& msg) override;

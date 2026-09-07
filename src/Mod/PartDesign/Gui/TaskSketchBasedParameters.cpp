@@ -104,6 +104,8 @@ ProfileSelectionWidget::~ProfileSelectionWidget()
 {
     if (isSelectionAttached()) {
         detachSelection();
+        // The row that put the hint up is going away, so nothing is left to explain.
+        Gui::getMainWindow()->hideHints();
     }
 }
 
@@ -190,6 +192,10 @@ void ProfileSelectionWidget::setPickingActive(bool active)
                     profileView->hide();
                 }
             }
+
+            // The hint row is a single shared slot, so clearing it would leave the
+            // dialog without its own hints for the rest of its life.
+            Q_EMIT pickingFinished();
         }
     }
 
@@ -330,6 +336,9 @@ TaskSketchBasedParameters::TaskSketchBasedParameters(
     groupLayout()->insertWidget(0, profileWidget);
     connect(profileWidget, &ProfileSelectionWidget::profileChanged, this, [this]() {
         recomputeFeature();
+    });
+    connect(profileWidget, &ProfileSelectionWidget::pickingFinished, this, [this]() {
+        showDraggerHints();
     });
 
     const int regions = ProfileSelectionWidget::countRegions(sketchBased->Profile.getValue());
