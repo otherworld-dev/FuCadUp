@@ -115,4 +115,5 @@ FreeCAD.__unit_test__ += [
     "TestMarkingMenu",
     "TestTimeline",
     "TestPartDesignDialogTitles",
+    "TestRibbonStrings",
 ]

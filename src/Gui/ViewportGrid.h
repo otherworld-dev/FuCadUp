@@ -22,9 +22,12 @@
 
 #pragma once
 
+#include <string>
+
 #include <Inventor/SbVec3f.h>
 #include <Inventor/sensors/SoNodeSensor.h>
 
+#include <Base/Parameter.h>
 #include <FCGlobal.h>
 
 class SoSeparator;
@@ -34,6 +37,23 @@ namespace Gui
 {
 
 class View3DInventorViewer;
+
+/**
+ * The spacing a grid starts from, in millimetres: 10 mm under a metric unit
+ * schema, 25.4 mm (one inch) under an imperial one, so that an imperial user
+ * gets whole inches rather than decimal millimetres.
+ *
+ * Both grids read it - the viewport grid here and the sketch grid's GridSize
+ * default (Mod/Sketcher/Gui/ViewProviderSketch.cpp) - so that the sketch grid
+ * does not change pitch under the user at the moment it takes over from this one.
+ */
+GuiExport double gridBaseSpacing();
+
+/**
+ * gridBaseSpacing() written the way Base::Quantity::parse() reads it, for use as
+ * the default of a parameter that stores a length as text.
+ */
+GuiExport std::string gridBaseSpacingText();
 
 /**
  * The lines of the viewport grid, worked out from numbers alone so that the
@@ -97,11 +117,11 @@ struct GuiExport ViewportGridLayout
  * its own.
  * @author FuCad contributors
  */
-class GuiExport ViewportGrid
+class GuiExport ViewportGrid: public ParameterGrp::ObserverType
 {
 public:
     explicit ViewportGrid(View3DInventorViewer* viewer);
-    ~ViewportGrid();
+    ~ViewportGrid() override;
 
     ViewportGrid(const ViewportGrid&) = delete;
     ViewportGrid& operator=(const ViewportGrid&) = delete;
@@ -137,6 +157,9 @@ public:
      */
     void rebuild(bool cameraDriven = false);
 
+    /// The unit schema changed, so the base spacing is due to be read again.
+    void OnChange(ParameterGrp::SubjectType& rCaller, ParameterGrp::MessageType reason) override;
+
 private:
     static void cameraChanged(void* data, SoSensor* sensor);
 
@@ -150,8 +173,12 @@ private:
     View3DInventorViewer* viewer;
     SoSeparator* root;
     SoNodeSensor cameraSensor;
-    /// 10 mm for a metric unit schema, 25.4 mm (1 in) for an imperial one; read once at setup.
+    /// Watched for "UserSchema", which is how the unit schema changes.
+    ParameterGrp::handle unitParameters;
+    /// 10 mm for a metric unit schema, 25.4 mm (1 in) for an imperial one.
     double baseSpacing;
+    /// Set by the observer, acted on by the next syncViewport(); see OnChange().
+    bool baseSpacingStale {false};
     bool enabled {true};
     bool suspended {false};
     SbVec3f lastFocalPoint {0.0F, 0.0F, 0.0F};

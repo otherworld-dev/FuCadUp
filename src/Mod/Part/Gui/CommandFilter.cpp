@@ -79,24 +79,41 @@ void PartCmdSelectFilter::activated(int iMsg)
     pcAction->setIcon(act[iMsg]->icon());
 }
 
+namespace
+{
+/// One entry of the selection-filter group, carrying the icon and the accelerator
+/// of the command it stands for.
+QAction* addFilterAction(Gui::ActionGroup* group, const char* command, const char* icon)
+{
+    QAction* action = group->addAction(QString());
+    action->setIcon(Gui::BitmapFactory().iconFromTheme(icon));
+
+    Gui::Command* cmd = Gui::Application::Instance->commandManager().getCommandByName(command);
+    const char* accel = cmd ? cmd->getAccel() : nullptr;
+    if (accel && *accel) {
+        action->setShortcut(QKeySequence(QString::fromLatin1(accel)));
+    }
+
+    return action;
+}
+}  // namespace
+
 Gui::Action* PartCmdSelectFilter::createAction()
 {
     auto pcAction = new Gui::ActionGroup(this, Gui::getMainWindow());
     pcAction->setDropDownMenu(true);
     applyCommandData(this->className(), pcAction);
 
-    QAction* cmd0 = pcAction->addAction(QString());
-    cmd0->setIcon(Gui::BitmapFactory().iconFromTheme("vertex-selection"));
-    cmd0->setShortcut(QKeySequence(QStringLiteral("X,S")));
-    QAction* cmd1 = pcAction->addAction(QString());
-    cmd1->setIcon(Gui::BitmapFactory().iconFromTheme("edge-selection"));
-    cmd1->setShortcut(QKeySequence(QStringLiteral("E,S")));
-    QAction* cmd2 = pcAction->addAction(QString());
-    cmd2->setIcon(Gui::BitmapFactory().iconFromTheme("face-selection"));
-    cmd2->setShortcut(QKeySequence(QStringLiteral("F,S")));
-    QAction* cmd3 = pcAction->addAction(QString());
-    cmd3->setIcon(Gui::BitmapFactory().iconFromTheme("clear-selection"));
-    cmd3->setShortcut(QKeySequence(QStringLiteral("C,S")));
+    // The four filters are only ever reached through this group - nothing else
+    // puts them in a menu or a toolbar, so their own commands never build an
+    // action - which means the accelerator that actually fires is the one set
+    // here. Take it from the command rather than repeating the literal, so that
+    // the two cannot drift apart the way they did while the chords still began
+    // with the letters the Fusion tools now hold.
+    addFilterAction(pcAction, "Part_VertexSelection", "vertex-selection");
+    addFilterAction(pcAction, "Part_EdgeSelection", "edge-selection");
+    addFilterAction(pcAction, "Part_FaceSelection", "face-selection");
+    addFilterAction(pcAction, "Part_RemoveSelectionGate", "clear-selection");
 
     _pcAction = pcAction;
     languageChange();
@@ -195,7 +212,11 @@ PartCmdVertexSelection::PartCmdVertexSelection()
     sWhatsThis = "Part_VertexSelection";
     sStatusTip = sToolTipText;
     sPixmap = "vertex-selection";
-    sAccel = "X, S";
+    // The selection filters sit behind U rather than behind the shape letter they
+    // name: X, E, F and C are Fusion tool letters now, and a Fusion letter fires its
+    // own command at once instead of waiting for a chord that starts with it (see
+    // Gui/DefaultShortcuts.cpp), so "X, S" and friends could never complete.
+    sAccel = "U, V";
     eType = Alter3DView;
 }
 
@@ -220,7 +241,7 @@ PartCmdEdgeSelection::PartCmdEdgeSelection()
     sWhatsThis = "Part_EdgeSelection";
     sStatusTip = sToolTipText;
     sPixmap = "edge-selection";
-    sAccel = "E, S";
+    sAccel = "U, E";
     eType = Alter3DView;
 }
 
@@ -245,7 +266,7 @@ PartCmdFaceSelection::PartCmdFaceSelection()
     sWhatsThis = "Part_FaceSelection";
     sStatusTip = sToolTipText;
     sPixmap = "face-selection";
-    sAccel = "F, S";
+    sAccel = "U, F";
     eType = Alter3DView;
 }
 
@@ -275,7 +296,7 @@ PartCmdRemoveSelectionGate::PartCmdRemoveSelectionGate()
     sWhatsThis = "Part_RemoveSelectionGate";
     sStatusTip = sToolTipText;
     sPixmap = "clear-selection";
-    sAccel = "C, S";
+    sAccel = "U, C";
     eType = Alter3DView;
 }
 

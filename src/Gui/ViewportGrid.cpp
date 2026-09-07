@@ -22,6 +22,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <locale>
+#include <sstream>
+#include <string>
 #include <vector>
 
 #include <Inventor/SbColor.h>
@@ -36,6 +40,7 @@
 #include <Inventor/nodes/SoTransparencyType.h>
 #include <Inventor/nodes/SoVertexProperty.h>
 
+#include <App/Application.h>
 #include <Base/Console.h>
 #include <Base/UnitsApi.h>
 
@@ -48,26 +53,19 @@ using namespace Gui;
 
 namespace
 {
-// Matches the sketch grid's own default (10 mm), which does not vary by unit
-// schema, so the two grids only agree in a metric schema; in an imperial one
-// this grid switches to inch-based spacing below while the sketch grid stays
-// at 10.
+// The spacing a metric user expects, and the one the sketch grid has always
+// defaulted to.
 constexpr double metricBaseSpacing = 10.0;
 // 1 inch, so that the grid steps in whole inches rather than decimal
 // millimetres while the user works in an imperial unit schema.
 constexpr double imperialBaseSpacing = 25.4;
 constexpr int subdivision = 10;
-
-/// 10 mm for a metric unit schema, 25.4 mm (1 in) for an imperial one.
-double baseSpacingForUnitSchema()
-{
-    const std::string basicLengthUnit = Base::UnitsApi::getBasicLengthUnit();
-    if (basicLengthUnit == "in" || basicLengthUnit == "ft") {
-        return imperialBaseSpacing;
-    }
-    return metricBaseSpacing;
-}
 constexpr int pixelThreshold = 15;
+
+// Where the unit schema is kept; "UserSchema" is the key App::Application and
+// MainWindow's unit chooser both write.
+const char* const unitPreferences = "User parameter:BaseApp/Preferences/Units";
+const char* const unitSchemaKey = "UserSchema";
 // How far beyond the visible area the lines reach, so that a pan of less than
 // a tenth of the view needs no rebuild.
 constexpr double extentFactor = 1.5;
@@ -92,6 +90,26 @@ SoMaterial* makeMaterial(float grey, float transparency)
     return material;
 }
 }  // namespace
+
+
+double Gui::gridBaseSpacing()
+{
+    const std::string basicLengthUnit = Base::UnitsApi::getBasicLengthUnit();
+    if (basicLengthUnit == "in" || basicLengthUnit == "ft") {
+        return imperialBaseSpacing;
+    }
+    return metricBaseSpacing;
+}
+
+std::string Gui::gridBaseSpacingText()
+{
+    // Base::Quantity::parse() reads a C decimal point, so keep the stream out of
+    // whatever locale the user is running under.
+    std::ostringstream out;
+    out.imbue(std::locale::classic());
+    out << gridBaseSpacing() << " mm";
+    return out.str();
+}
 
 
 double ViewportGridLayout::spacingFor(
@@ -165,20 +183,37 @@ int ViewportGridLayout::lineCount() const
 ViewportGrid::ViewportGrid(View3DInventorViewer* viewer)
     : viewer(viewer)
     , root(new SoSeparator)
-    , baseSpacing(baseSpacingForUnitSchema())
+    , unitParameters(App::GetApplication().GetParameterGroupByPath(unitPreferences))
+    , baseSpacing(gridBaseSpacing())
 {
     root->ref();
     root->setName("ViewportGrid");
 
     cameraSensor.setFunction(&ViewportGrid::cameraChanged);
     cameraSensor.setData(this);
+
+    unitParameters->Attach(this);
 }
 
 ViewportGrid::~ViewportGrid()
 {
+    unitParameters->Detach(this);
     cameraSensor.detach();
     root->removeAllChildren();
     root->unref();
+}
+
+void ViewportGrid::OnChange(ParameterGrp::SubjectType&, ParameterGrp::MessageType reason)
+{
+    // A null reason means the whole group changed, so it counts too.
+    if (reason && std::strcmp(reason, unitSchemaKey) != 0) {
+        return;
+    }
+
+    // Base::UnitsApi::setSchema() runs after the parameter has been written (see
+    // MainWindow's unit chooser and DlgSettingsUnits), so reading the new spacing
+    // here would still see the old schema. Leave it to the next frame instead.
+    baseSpacingStale = true;
 }
 
 SoSeparator* ViewportGrid::getNode() const
@@ -229,6 +264,16 @@ void ViewportGrid::syncViewport()
 {
     if (!viewer) {
         return;
+    }
+
+    if (baseSpacingStale) {
+        baseSpacingStale = false;
+        const double spacing = gridBaseSpacing();
+        if (spacing != baseSpacing) {
+            baseSpacing = spacing;
+            rebuild();
+            return;
+        }
     }
 
     // Switching between orthographic and perspective replaces the camera; the

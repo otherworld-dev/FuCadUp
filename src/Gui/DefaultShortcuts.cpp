@@ -52,6 +52,41 @@ namespace
  * `Std_Placement`, `Std_Measure`) are guarded in their own `isActive()`
  * instead of here.
  *
+ * That win has a price, and this is the whole of it: a chord that begins with
+ * a Fusion letter stops completing while that letter's own command is enabled.
+ * The letter fires, the chord never gets its second keystroke. Which chords are
+ * shadowed therefore follows the letter's `isActive()`:
+ *
+ *   - always, because `Std_CommandPalette` is never disabled -
+ *     S: S,A S,B S,C S,D S,E S,F S,G S,H S,I S,P S,R S,S
+ *   - whenever something is selected, which is when `Std_SetAppearance` is on -
+ *     A: A,R A,T A,X
+ *   - while no sketch is open, when the modelling letters are on -
+ *     Q: Q,P Q,S / E: E,L E,Q E,X / F: F,R / H: H,A H,S /
+ *     M: M,A M,I M,T M,V / I: I,C I,D I,E I,P I,S
+ *   - inside a sketch, when the sketching letters are on -
+ *     L: L,E L,K L,V / R: R,B R,E R,F R,O / C: C,C C,I C,L C,M C,V C,W /
+ *     D: D,E D,H D,I D,L D,N D,V / T: T,E T,P T,R T,T T,U / O: O,S /
+ *     P: P,A P,C P,F P,G P,I P,J P,L P,M P,N P,O P,P P,S P,T P,V P,X /
+ *     X: X,S
+ *
+ * (The list is the state of the tree when the letters were bound; it is
+ * `grep -rhoE 'sAccel *= *"[^"]+"|"Accel" *: *"[^"]+"' src/` filtered to the
+ * letters above. It goes stale as workbenches gain commands, and nothing
+ * enforces it.)
+ *
+ * Most of those chords belong to workbenches a Fusion user never loads, and all
+ * of them stay reachable from their menu, their toolbar and the command palette.
+ * The four that were worth moving are Part's selection filters, which used to be
+ * "X, S"/"E, S"/"F, S"/"C, S" - two of them dead in any document, all four dead
+ * inside a sketch - and now sit behind the free U prefix as "U, V"/"U, E"/
+ * "U, F"/"U, C" (Mod/Part/Gui/CommandFilter.cpp).
+ *
+ * A user who wants a shadowed chord back does not have to give up the letter:
+ * raising that chord's command above `fuCadPriority` (100) in
+ * Preferences -> Keyboard restores the wait, because `checkShortcut` only
+ * flushes the letter when its priority beats every other candidate's.
+ *
  * Circle's bare "C" also used to collide head-on with the Coincident
  * constraint's default accelerator, which is a different problem: two
  * commands claiming the exact same key rather than one waiting on a longer

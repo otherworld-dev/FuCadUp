@@ -43,6 +43,7 @@ SET(Test_SRCS
     TestMarkingMenu.py
     TestTimeline.py
     TestPartDesignDialogTitles.py
+    TestRibbonStrings.py
 )
 
 SET(TestData_SRCS

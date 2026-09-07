@@ -105,7 +105,11 @@ ProfileSelectionWidget::~ProfileSelectionWidget()
     if (isSelectionAttached()) {
         detachSelection();
         // The row that put the hint up is going away, so nothing is left to explain.
-        Gui::getMainWindow()->hideHints();
+        // The main window is already gone when the panel outlives it at shutdown, so
+        // the hint row is asked to clear only while there is one to ask.
+        if (Gui::getMainWindow()) {
+            Gui::getMainWindow()->hideHints();
+        }
     }
 }
 

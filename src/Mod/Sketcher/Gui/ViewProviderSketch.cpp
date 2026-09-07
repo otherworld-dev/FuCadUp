@@ -76,6 +76,7 @@
 #include <Gui/Utilities.h>
 #include <Gui/View3DInventor.h>
 #include <Gui/View3DInventorViewer.h>
+#include <Gui/ViewportGrid.h>
 #include <Mod/Part/App/Geometry.h>
 #include <Mod/Sketcher/App/GeoList.h>
 #include <Mod/Sketcher/App/GeometryFacade.h>
@@ -237,8 +238,14 @@ void ViewProviderSketch::ParameterObserver::updateGridSize(const std::string& st
     ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Mod/Sketcher/General");
 
+    // The default follows the unit schema, the same rule the 3D view's own grid
+    // uses (Gui/ViewportGrid.cpp): 10 mm metric, 1 inch imperial. Without that the
+    // sketch grid would step in decimal millimetres for a user working in inches,
+    // and would change pitch under them the moment a sketch opened over the view
+    // grid it replaces.
     Client.GridSize.setValue(
-        Base::Quantity::parse(hGrp->GetGroup("GridSize")->GetASCII("GridSize", "10.0"))
+        Base::Quantity::parse(
+            hGrp->GetGroup("GridSize")->GetASCII("GridSize", Gui::gridBaseSpacingText().c_str()))
             .getValue());
 }
 
