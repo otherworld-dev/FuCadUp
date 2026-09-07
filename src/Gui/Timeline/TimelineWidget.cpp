@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <sstream>
 #include <unordered_set>
 
 #include <QAction>
@@ -31,6 +32,7 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QInputDialog>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLayoutItem>
 #include <QLineEdit>
@@ -50,6 +52,7 @@
 #include <App/DocumentObject.h>
 #include <App/Property.h>
 #include <App/PropertyLinks.h>
+#include <App/PropertyStandard.h>
 #include <Base/Console.h>
 #include <Base/Exception.h>
 #include <Base/Tools.h>
@@ -128,7 +131,9 @@ void TimelineWidget::setupUi()
     stepBackButton->setObjectName(QStringLiteral("TimelineStepButton"));
     stepBackButton->setIcon(style()->standardIcon(QStyle::SP_MediaSeekBackward));
     stepBackButton->setAutoRaise(true);
-    stepBackButton->setFocusPolicy(Qt::NoFocus);
+    // Tab reaches the strip's own controls, which is what makes the arrow keys below
+    // usable without the mouse; a click still leaves the focus where the user put it.
+    stepBackButton->setFocusPolicy(Qt::TabFocus);
     stepBackButton->setIconSize(QSize(stepIconExtent, stepIconExtent));
     stepBackButton->setFixedSize(stepButtonExtent, stepButtonExtent);
     stepBackButton->setToolTip(tr("Step the history back one feature"));
@@ -138,7 +143,7 @@ void TimelineWidget::setupUi()
     stepForwardButton->setObjectName(QStringLiteral("TimelineStepButton"));
     stepForwardButton->setIcon(style()->standardIcon(QStyle::SP_MediaSeekForward));
     stepForwardButton->setAutoRaise(true);
-    stepForwardButton->setFocusPolicy(Qt::NoFocus);
+    stepForwardButton->setFocusPolicy(Qt::TabFocus);
     stepForwardButton->setIconSize(QSize(stepIconExtent, stepIconExtent));
     stepForwardButton->setFixedSize(stepButtonExtent, stepButtonExtent);
     stepForwardButton->setToolTip(tr("Step the history forward one feature"));
@@ -296,7 +301,6 @@ void TimelineWidget::rebuild()
     markers.clear();
     featureNames.clear();
     solidIndices.clear();
-    const std::string previousDocument = documentName;
     documentName.clear();
     bodyName.clear();
     tipIndex = -1;
@@ -312,12 +316,6 @@ void TimelineWidget::rebuild()
     if (appDoc) {
         documentName = appDoc->getName();
         body = activeBody(guiDoc);
-    }
-
-    // Internal names are only unique within a document, so what the strip hid in the
-    // one it is leaving cannot be tracked any further.
-    if (documentName != previousDocument) {
-        rollbackHidden.clear();
     }
 
     if (appDoc) {
@@ -359,6 +357,9 @@ void TimelineWidget::rebuild()
             &TimelineWidget::onMarkerMenu,
             Qt::QueuedConnection
         );
+        // A focused marker sits inside a scroll area, which answers the arrow keys with
+        // a scroll of its own before they ever reach the strip, so they are taken here.
+        marker->installEventFilter(this);
 
         markers.append(marker);
         featureNames.emplace_back(obj->getNameInDocument());
@@ -624,10 +625,46 @@ bool TimelineWidget::isSolidIndex(int index) const
     return std::find(solidIndices.begin(), solidIndices.end(), index) != solidIndices.end();
 }
 
+App::PropertyStringList* TimelineWidget::rollbackHiddenProperty() const
+{
+    App::DocumentObject* body = currentBody();
+    Gui::Application* app = Gui::Application::Instance;
+    if (!body || !app) {
+        return nullptr;
+    }
+
+    Gui::ViewProvider* provider = app->getViewProvider(body);
+    if (!provider) {
+        return nullptr;
+    }
+
+    // Read by name so that Gui does not have to know the PartDesign view provider that
+    // declares it; a body without the property simply remembers nothing.
+    return freecad_cast<App::PropertyStringList*>(provider->getPropertyByName("RollbackHidden"));
+}
+
 void TimelineWidget::applyRollbackVisibility()
 {
-    // Outside a body nothing is behind the playhead, so anything held back is let go.
-    const bool rolling = !bodyName.empty();
+    // Outside a body there is no tip to roll to and nowhere to write down what was held
+    // back, so the strip leaves visibility alone rather than letting go of a rollback the
+    // user can still see. Coming back to the body finds the list where it left it.
+    App::PropertyStringList* hiddenProperty = rollbackHiddenProperty();
+    if (!hiddenProperty) {
+        return;
+    }
+
+    const std::vector<std::string> remembered = hiddenProperty->getValues();
+    const auto wasHidden = [&remembered](const std::string& name) {
+        return std::find(remembered.begin(), remembered.end(), name) != remembered.end();
+    };
+
+    // Worked out in full before anything is written: the list is a plain property and the
+    // visibilities are not, so writing the list first is what opens the transaction that
+    // the visibility changes then land in. A name that has gone from the strip is dropped
+    // on the way, since the strip can no longer put that feature back.
+    std::vector<std::string> hidden;
+    std::vector<App::DocumentObject*> toHide;
+    std::vector<App::DocumentObject*> toShow;
 
     const int count = static_cast<int>(featureNames.size());
     for (int i = 0; i < count; ++i) {
@@ -643,25 +680,81 @@ void TimelineWidget::applyRollbackVisibility()
             continue;
         }
 
-        if (rolling && i > playheadIndex) {
+        if (i > playheadIndex) {
+            // Only what the strip itself took off the screen is put back later, so a
+            // sketch the user hid by hand is left out of the list.
             if (obj->Visibility.getValue()) {
-                rollbackHidden.insert(name);
-                obj->Visibility.setValue(false);
+                toHide.push_back(obj);
+                hidden.push_back(name);
+            }
+            else if (wasHidden(name)) {
+                hidden.push_back(name);
             }
         }
-        else if (rollbackHidden.erase(name) > 0) {
-            obj->Visibility.setValue(true);
+        else if (wasHidden(name)) {
+            toShow.push_back(obj);
         }
     }
 
-    // A feature that has gone from the strip can no longer be put back by it.
-    for (auto it = rollbackHidden.begin(); it != rollbackHidden.end();) {
-        it = indexOfFeature(*it) < 0 ? rollbackHidden.erase(it) : std::next(it);
+    if (hidden != remembered) {
+        hiddenProperty->setValues(hidden);
     }
+
+    for (App::DocumentObject* obj : toHide) {
+        obj->Visibility.setValue(false);
+    }
+    for (App::DocumentObject* obj : toShow) {
+        obj->Visibility.setValue(true);
+    }
+}
+
+bool TimelineWidget::handleKey(QKeyEvent* event)
+{
+    // Nothing to roll without a body, and swallowing the arrows would then only stop the
+    // strip's neighbours from seeing them.
+    if (bodyName.empty()) {
+        return false;
+    }
+
+    // The number pad sends the same keys with a modifier of its own.
+    if ((event->modifiers() & ~Qt::KeypadModifier) != Qt::NoModifier) {
+        return false;
+    }
+
+    switch (event->key()) {
+        case Qt::Key_Left:
+            stepBack();
+            return true;
+        case Qt::Key_Right:
+            stepForward();
+            return true;
+        case Qt::Key_Home:
+            rollToStart();
+            return true;
+        case Qt::Key_End:
+            rollToEnd();
+            return true;
+        default:
+            return false;
+    }
+}
+
+void TimelineWidget::keyPressEvent(QKeyEvent* event)
+{
+    if (handleKey(event)) {
+        event->accept();
+        return;
+    }
+
+    QWidget::keyPressEvent(event);
 }
 
 bool TimelineWidget::eventFilter(QObject* watched, QEvent* event)
 {
+    if (event->type() == QEvent::KeyPress && handleKey(static_cast<QKeyEvent*>(event))) {
+        return true;
+    }
+
     if (watched != playhead) {
         return QWidget::eventFilter(watched, event);
     }
@@ -854,10 +947,21 @@ void TimelineWidget::moveTo(int index)
     playheadIndex = index;
     requestedPlayhead = index;
     positionPlayhead();
-    applyRollbackVisibility();
     applyStates();
 
-    if (tipMoves && !rollTo(index)) {
+    // One step is one undo entry. The tip goes first on purpose: Visibility is a NoModify
+    // property, which never opens a transaction of its own and is only recorded once one
+    // is already running, so the writes that do open one have to come before it.
+    const int transaction = Gui::Command::openActiveDocumentCommand(
+        std::string(QT_TRANSLATE_NOOP("Command", "Roll history"))
+    );
+
+    const bool rolled = !tipMoves || rollTo(index);
+    applyRollbackVisibility();
+
+    Gui::Command::commitCommand(transaction);
+
+    if (!rolled) {
         scheduleRebuild();
     }
 }
@@ -869,54 +973,54 @@ bool TimelineWidget::rollTo(int index)
         return false;
     }
 
-    // Only a solid feature can carry the tip, so a sketch or a datum rolls to
-    // the solid feature it sits behind. Nothing before the first solid feature
-    // means an empty body, which is the body itself as the target.
-    App::DocumentObject* target = body;
+    auto* tipProp = freecad_cast<App::PropertyLink*>(body->getPropertyByName("Tip"));
+    if (!tipProp) {
+        return false;
+    }
+
+    // Only a solid feature can carry the tip, so a sketch or a datum rolls to the solid
+    // feature it sits behind. Nothing before the first solid feature means the history has
+    // been rolled off its start, which leaves the body without a tip at all.
+    App::DocumentObject* target = nullptr;
     const int solid = solidAtOrBefore(index);
     if (solid >= 0 && solid < static_cast<int>(featureNames.size())) {
-        App::DocumentObject* feature = resolve(featureNames[static_cast<std::size_t>(solid)]);
-        if (feature) {
-            target = feature;
+        target = resolve(featureNames[static_cast<std::size_t>(solid)]);
+        if (!target || !target->isAttachedToDocument()) {
+            return false;
         }
     }
 
-    if (!target->isAttachedToDocument()) {
+    if (tipProp->getValue() == target) {
         return false;
     }
 
-    Gui::Application* app = Gui::Application::Instance;
-    if (!app || !app->commandManager().getCommandByName("PartDesign_MoveTip")) {
-        Base::Console().warning("Timeline: PartDesign_MoveTip is not available\n");
+    // What PartDesign_MoveTip does, without its own transaction: this step owns the one
+    // that is already open, and running the command by name would commit it halfway
+    // through and leave the visibility changes below in an entry of their own.
+    try {
+        if (target) {
+            FCMD_OBJ_CMD(body, "Tip = " << Gui::Command::getObjectCmd(target));
+            // Showing the new tip is what takes the solids after it off the screen.
+            FCMD_OBJ_SHOW(target);
+        }
+        else {
+            FCMD_OBJ_CMD(body, "Tip = None");
+
+            // A body with no tip builds nothing, so the solid that was on screen has to
+            // be taken off it by hand: there is no feature left to show in its place.
+            for (int i : solidIndices) {
+                App::DocumentObject* obj = resolve(featureNames[static_cast<std::size_t>(i)]);
+                if (obj && obj->isAttachedToDocument() && obj->Visibility.getValue()) {
+                    FCMD_OBJ_HIDE(obj);
+                }
+            }
+        }
+
+        FCMD_DOC_CMD(body->getDocument(), "recompute()");
+    }
+    catch (const Base::Exception& e) {
+        e.reportException();
         return false;
-    }
-
-    // The command works off the selection, which belongs to the user. Stepping through the
-    // history is not a selection change, so what was selected is put back afterwards.
-    struct Selected
-    {
-        std::string document;
-        std::string object;
-        std::string sub;
-    };
-    std::vector<Selected> restore;
-    for (const auto& sel : Gui::Selection().getCompleteSelection(Gui::ResolveMode::NoResolve)) {
-        restore.push_back({sel.DocName ? sel.DocName : "",
-                           sel.FeatName ? sel.FeatName : "",
-                           sel.SubName ? sel.SubName : ""});
-    }
-
-    const char* docName = target->getDocument()->getName();
-    Gui::Selection().clearSelection();
-    if (!Gui::Selection().addSelection(docName, target->getNameInDocument())) {
-        return false;
-    }
-
-    app->commandManager().runCommandByName("PartDesign_MoveTip");
-
-    Gui::Selection().clearSelection();
-    for (const Selected& sel : restore) {
-        Gui::Selection().addSelection(sel.document.c_str(), sel.object.c_str(), sel.sub.c_str());
     }
 
     return true;
@@ -930,6 +1034,16 @@ void TimelineWidget::stepBack()
 void TimelineWidget::stepForward()
 {
     moveTo(playheadIndex + 1);
+}
+
+void TimelineWidget::rollToStart()
+{
+    moveTo(-1);
+}
+
+void TimelineWidget::rollToEnd()
+{
+    moveTo(static_cast<int>(markers.size()) - 1);
 }
 
 int TimelineWidget::defaultPlayhead() const

@@ -80,6 +80,17 @@ ViewProviderBody::ViewProviderBody()
     ADD_PROPERTY(DisplayModeBody, ((long)0));
     DisplayModeBody.setEnums(BodyModeEnum);
 
+    ADD_PROPERTY_TYPE(
+        RollbackHidden,
+        (),
+        "Timeline",
+        App::Prop_Hidden,
+        QT_TRANSLATE_NOOP(
+            "App::Property",
+            "Sketches and datums hidden by rolling the timeline back"
+        )
+    );
+
     sPixmap = "PartDesign_Body.svg";
 
     Gui::ViewProviderOriginGroupExtension::initExtension(this);
@@ -414,7 +425,8 @@ void ViewProviderBody::unifyVisualProperty(const App::Property* prop)
     }
 
     if (prop == &Visibility || prop == &Selectable || prop == &DisplayModeBody
-        || prop == &PointColorArray || prop == &ShowPlacement || prop == &LineColorArray) {
+        || prop == &PointColorArray || prop == &ShowPlacement || prop == &LineColorArray
+        || prop == &RollbackHidden) {
         return;
     }
 

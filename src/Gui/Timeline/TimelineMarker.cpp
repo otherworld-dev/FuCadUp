@@ -87,7 +87,9 @@ TimelineMarker::TimelineMarker(App::DocumentObject* obj, QWidget* parent)
     setObjectName(QStringLiteral("TimelineMarker"));
     setAttribute(Qt::WA_StyledBackground, true);
     setFixedSize(tileSize());
-    setFocusPolicy(Qt::NoFocus);
+    // Tab walks the strip so that the history can be rolled without the mouse, while a
+    // click still leaves the focus wherever the user had put it.
+    setFocusPolicy(Qt::TabFocus);
 
     if (obj && obj->isAttachedToDocument()) {
         documentName = obj->getDocument()->getName();
@@ -212,9 +214,10 @@ void TimelineMarker::contextMenuEvent(QContextMenuEvent* event)
 {
     event->accept();
 
-    const QString feature = QString::fromUtf8(internalName.c_str());
-    Q_EMIT selectRequested(feature);
-    Q_EMIT menuRequested(feature, event->globalPos());
+    // The menu is about the marker under the cursor, which is what it is handed. Taking
+    // the selection over as well would throw away whatever the user had picked, and
+    // every entry of the menu works off the feature name rather than the selection.
+    Q_EMIT menuRequested(QString::fromUtf8(internalName.c_str()), event->globalPos());
 }
 
 #include "moc_TimelineMarker.cpp"

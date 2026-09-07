@@ -23,7 +23,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include <QList>
@@ -38,6 +37,7 @@
 
 class QEvent;
 class QHBoxLayout;
+class QKeyEvent;
 class QLabel;
 class QTimer;
 class QToolButton;
@@ -46,6 +46,7 @@ namespace App
 {
 class Document;
 class DocumentObject;
+class PropertyStringList;
 }  // namespace App
 
 namespace Gui
@@ -64,11 +65,16 @@ class TimelineMarker;
  *
  * The strip is filled from the active PartDesign body of the active document.
  * PartDesign is not linked from Gui, so the body is recognised by type name and
- * read through its Group, Tip and BaseFeature properties, and its tip is moved
- * by running the PartDesign_MoveTip command by name; that keeps the timeline
- * out of the module dependency graph and keeps undo working. Outside a body the
+ * read and written through its Group, Tip and BaseFeature properties, which
+ * keeps the timeline out of the module dependency graph. Outside a body the
  * strip falls back to the Part features of the document in dependency order,
  * which has no tip and therefore no playhead.
+ *
+ * One step of the playhead is one undo entry: the tip and the visibility of the
+ * sketches and datums the step rolls past are written inside a single
+ * transaction. Which features the strip hid is remembered in the RollbackHidden
+ * property of the body's view provider rather than in the widget, so it is saved
+ * with the document and survives both a reload and a switch to another body.
  *
  * Nothing here holds a document object across event loop turns: features are
  * remembered by internal name and resolved again on use, and every rebuild is
@@ -83,8 +89,19 @@ public:
     explicit TimelineWidget(QWidget* parent = nullptr);
     ~TimelineWidget() override;
 
+public Q_SLOTS:
+    /// Move the playhead one marker back, towards the start of the history.
+    void stepBack();
+    /// Move the playhead one marker forward, towards the end of the history.
+    void stepForward();
+    /// Roll the whole history back, leaving the body without a tip.
+    void rollToStart();
+    /// Roll the history forward again, up to and including the last feature.
+    void rollToEnd();
+
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
     /// Observer message from the Selection
     void onSelectionChanged(const Gui::SelectionChanges& msg) override;
 
@@ -126,6 +143,9 @@ private:
     /// Hide the sketches and datums the playhead has not reached yet, and put back the
     /// ones it has. Solids are left to the tip, which already hides what comes after it.
     void applyRollbackVisibility();
+    /// Where the names of the features the rollback hid are kept: a hidden string list on
+    /// the view provider of the active body, or nullptr when there is no body to ask.
+    App::PropertyStringList* rollbackHiddenProperty() const;
     /// The rightmost playhead position that still resolves to the current tip, which is
     /// where the playhead belongs whenever it has not been put somewhere by hand.
     int defaultPlayhead() const;
@@ -141,8 +161,9 @@ private:
     void positionPlayhead();
     void moveTo(int index);
     bool rollTo(int index);
-    void stepBack();
-    void stepForward();
+    /// Answers the timeline's own keys wherever they arrive, either on the widget or on a
+    /// marker whose scroll area would otherwise eat the arrows. True when one was used.
+    bool handleKey(QKeyEvent* event);
 
     QWidget* strip {nullptr};
     QHBoxLayout* stripLayout {nullptr};
@@ -167,9 +188,6 @@ private:
     /// Survives the rebuild that moving the tip triggers, so a step is not snapped back
     /// onto the tip. noPlayheadRequest when the playhead has not been put anywhere by hand.
     int requestedPlayhead {noPlayheadRequest};
-    /// Features the rollback hid, by internal name. Stepping forward puts back only what
-    /// is in here, so a sketch the user hid themselves stays hidden.
-    std::unordered_set<std::string> rollbackHidden;
 
     Gui::Document* trackedDocument {nullptr};
     bool pendingRebuild {false};

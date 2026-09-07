@@ -59,6 +59,10 @@ public:
     ~ViewProviderBody() override;
 
     App::PropertyEnumeration DisplayModeBody;
+    /// Sketches and datums the timeline hid by rolling the history back, by internal
+    /// name. Kept on the body so that it is saved with the document and survives both
+    /// a switch to another body and a reload.
+    App::PropertyStringList RollbackHidden;
 
     void attach(App::DocumentObject*) override;
 
