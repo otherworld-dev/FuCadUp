@@ -944,7 +944,11 @@ def getCurrentNavigationStyle():
         if view and hasattr(view, "getNavigationType"):
             return view.getNavigationType()
 
-    return pView.GetString("NavigationStyle")
+    # Must match View3DSettings.cpp's own default: without it, a missing key
+    # reads back as "", setCurrent() below treats that as "no valid style"
+    # and immediately writes the CAD style back into the parameter, which
+    # defeats the C++ default before any 3D view ever reads it.
+    return pView.GetString("NavigationStyle", "Gui::FusionNavigationStyle")
 
 
 def onMenu(action):
@@ -982,7 +986,10 @@ def setCurrent():
                 pass
     else:
         s = True
-        pView.SetString("NavigationStyle", a2.data())
+        # current is genuinely unrecognised (e.g. "Undefined" or a corrupted
+        # value) rather than merely absent, so recover with the same default
+        # View3DSettings.cpp falls back to.
+        pView.SetString("NavigationStyle", a13.data())
 
     if s:
         a0.setVisible(False)
