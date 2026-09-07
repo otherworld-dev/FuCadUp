@@ -4683,10 +4683,11 @@ CmdSketcherConstrainCoincidentUnified::CmdSketcherConstrainCoincidentUnified(con
 
     ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Mod/Sketcher/Constraints");
-    // Fusion's C is the bare-letter shortcut for the circle tool now, so neither
-    // role this command can take (the unified primary, or the demoted one when
-    // the user turns UnifiedCoincident off) may keep a bare "C" or a "C, ..."
-    // chord: "K, O" is already Diameter's, so the demoted role takes "K, Q".
+    // Superseded at runtime by the "Sketcher_ConstrainCoincidentUnified" entry
+    // in DefaultShortcuts.cpp's table (CommandManager::addCommand overrides
+    // sAccel via that table before this action ever exists), so the "K, Q"
+    // branch is unreachable in practice. Kept neither branch a bare "C" anyway,
+    // since Fusion's Circle tool now owns that letter.
     sAccel = hGrp->GetBool("UnifiedCoincident", true) ? "K, K" : "K, Q";
 
     eType = ForEdit;
@@ -5201,8 +5202,9 @@ CmdSketcherConstrainCoincident::CmdSketcherConstrainCoincident()
     sPixmap = "Constraint_PointOnPoint";
     ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Mod/Sketcher/Constraints");
-    // Mirror of the ternary above: whichever role this command takes, it must
-    // not be a bare "C" now that Fusion's Circle tool owns that letter.
+    // Superseded at runtime by the "Sketcher_ConstrainCoincident" entry in
+    // DefaultShortcuts.cpp's table, same as the ternary above - kept off a
+    // bare "C" here too so no branch is left inconsistent with that table.
     sAccel = hGrp->GetBool("UnifiedCoincident", true) ? "K, Q" : "K, K";
     eType = ForEdit;
 

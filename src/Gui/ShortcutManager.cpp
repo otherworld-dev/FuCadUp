@@ -20,6 +20,7 @@
  *                                                                          *
  ****************************************************************************/
 
+#include <algorithm>
 #include <limits>
 #include <QShortcutEvent>
 #include <QApplication>
@@ -231,7 +232,8 @@ bool ShortcutManager::checkShortcut(QObject* o, const QKeySequence& key)
     // check for potential partial match, i.e. longer key sequences
     bool found = false;
     bool longerEnabled = false;
-    int longerPriority = std::numeric_limits<int>::min();
+    bool sameLengthEnabled = false;
+    int otherPriority = std::numeric_limits<int>::min();
     for (auto it = iter; it != index.end(); ++it) {
         if (key.matches(it->key.shortcut) == QKeySequence::NoMatch) {
             break;
@@ -248,23 +250,25 @@ bool ShortcutManager::checkShortcut(QObject* o, const QKeySequence& key)
             pendingActions.back().priority = getPriority(it->key.name);
             found = true;
         }
-        else if (it->action && it->action->isEnabled()
-                 && it->key.shortcut.count() > key.count()) {
-            // Only a strictly longer, enabled sequence can make us wait: it might
-            // still be completed by the next keystroke. Keep scanning past the
-            // first one instead of breaking, so every candidate's priority is
-            // considered below.
-            longerEnabled = true;
-            longerPriority = std::max(longerPriority, getPriority(it->key.name));
+        else if (it->action && it->action->isEnabled()) {
+            // Track every other enabled candidate - a strictly longer chord
+            // this sequence prefixes, or another action bound to this exact
+            // same sequence - and keep scanning past the first one instead of
+            // breaking, so every candidate's priority is considered below.
+            const bool longer = it->key.shortcut.count() > key.count();
+            (longer ? longerEnabled : sameLengthEnabled) = true;
+            otherPriority = std::max(otherPriority, getPriority(it->key.name));
         }
     }
 
-    // A command that was given an explicit priority above every chord it prefixes
-    // fires at once: the Fusion letters must not wait ShortcutTimeout for "S, B"
-    // and friends.
-    const bool outranksChords =
-        found && longerEnabled && pendingActions.back().priority > longerPriority;
-    const bool flush = !longerEnabled || outranksChords;
+    // A command given an explicit priority above every other candidate - a
+    // longer chord it prefixes ("S, B" and friends), or another action on the
+    // exact same sequence (the Keyboard preferences' priority list; see
+    // DlgKeyboardImp.cpp) - fires at once instead of waiting ShortcutTimeout
+    // for the replay-and-arbitrate path below. Candidates of equal priority
+    // still fall back to that path, exactly as before.
+    const bool anyOther = longerEnabled || sameLengthEnabled;
+    const bool flush = !anyOther || (found && pendingActions.back().priority > otherPriority);
 
     if (flush) {
         // We'll flush now because there is no potential match with further

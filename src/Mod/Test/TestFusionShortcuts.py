@@ -18,8 +18,11 @@ class TestFusionShortcuts(unittest.TestCase):
         FreeCAD.closeDocument(self.doc.Name)
 
     def _shortcut_of(self, command):
-        action = FreeCADGui.Command.get(command).getAction()[0]
-        return action.shortcut().toString()
+        # Command.getShortcut() (CommandPyImp.cpp) reads the QAction's shortcut
+        # and is null-safe: it returns "" rather than raising if the command
+        # has no action yet, so a missing action fails the exact-value assert
+        # below cleanly instead of raising IndexError out of getAction()[0].
+        return FreeCADGui.Command.get(command).getShortcut()
 
     def test_palette_has_priority_over_chords(self):
         # FreeCADGui.ShortcutManager is not exposed to Python, so read the
@@ -33,8 +36,8 @@ class TestFusionShortcuts(unittest.TestCase):
         self.assertGreater(prio, 0)
 
     def test_coincident_and_symmetric_left_bare_letters(self):
-        self.assertNotEqual(self._shortcut_of("Sketcher_ConstrainCoincidentUnified"), "C")
-        self.assertNotEqual(self._shortcut_of("Sketcher_ConstrainSymmetric"), "S")
+        self.assertEqual(self._shortcut_of("Sketcher_ConstrainCoincidentUnified"), "K, K")
+        self.assertEqual(self._shortcut_of("Sketcher_ConstrainSymmetric"), "K, M")
         self.assertEqual(self._shortcut_of("Sketcher_CreateCircle"), "C")
 
     def test_placement_and_measure_inactive_inside_sketch(self):
