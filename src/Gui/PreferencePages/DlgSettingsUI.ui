@@ -534,7 +534,7 @@
       <item row="1" column="0">
        <widget class="Gui::PrefCheckBox" name="useMarkingMenuCheckBox">
         <property name="toolTip">
-         <string>Open a marking menu on right-click in the 3D view</string>
+         <string>When this is off, right-click in the 3D view opens the ordinary context menu instead</string>
         </property>
         <property name="text">
          <string>Open a marking menu on right-click in the 3D view</string>
@@ -553,10 +553,10 @@
       <item row="2" column="0">
        <widget class="Gui::PrefCheckBox" name="useNavigationBarCheckBox">
         <property name="toolTip">
-         <string>Show the navigation bar over the 3D view</string>
+         <string>Already-open 3D views keep their current navigation bar; only views opened after this changes pick it up</string>
         </property>
         <property name="text">
-         <string>Show the navigation bar over the 3D view</string>
+         <string>Show the navigation bar over the 3D view (applies to new 3D views)</string>
         </property>
         <property name="checked">
          <bool>true</bool>
@@ -572,7 +572,7 @@
       <item row="3" column="0">
        <widget class="Gui::PrefCheckBox" name="framelessWindowCheckBox">
         <property name="toolTip">
-         <string>Draw the window frame and title bar as the app bar (restart required)</string>
+         <string>Without this, the window keeps its native title bar and the app bar sits below it; restart the application after changing this</string>
         </property>
         <property name="text">
          <string>Draw the window frame and title bar as the app bar (restart required)</string>
@@ -591,10 +591,10 @@
       <item row="4" column="0">
        <widget class="Gui::PrefCheckBox" name="showTimelineCheckBox">
         <property name="toolTip">
-         <string>Show the timeline</string>
+         <string>The timeline dock is only created at startup, so toggling this has no effect until the application restarts</string>
         </property>
         <property name="text">
-         <string>Show the timeline</string>
+         <string>Show the timeline (restart required)</string>
         </property>
         <property name="checked">
          <bool>true</bool>

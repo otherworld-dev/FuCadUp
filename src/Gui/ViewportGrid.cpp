@@ -48,8 +48,10 @@ using namespace Gui;
 
 namespace
 {
-// The sketch grid's defaults, so that the two grids agree where one takes over
-// from the other.
+// Matches the sketch grid's own default (10 mm), which does not vary by unit
+// schema, so the two grids only agree in a metric schema; in an imperial one
+// this grid switches to inch-based spacing below while the sketch grid stays
+// at 10.
 constexpr double metricBaseSpacing = 10.0;
 // 1 inch, so that the grid steps in whole inches rather than decimal
 // millimetres while the user works in an imperial unit schema.

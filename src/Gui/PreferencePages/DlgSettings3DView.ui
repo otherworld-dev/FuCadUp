@@ -350,6 +350,19 @@ will be shown at the lower left corner in opened files</string>
           </property>
          </widget>
         </item>
+        <item>
+         <spacer name="horizontalSpacerNaviCubeDragSensitivity">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
        </layout>
       </item>
      </layout>

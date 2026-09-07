@@ -75,7 +75,6 @@ class TestNavigationStyleDefault(unittest.TestCase):
 
     def test_navigation_style_defaults_to_fusion_when_absent(self):
         self.doc = FreeCAD.newDocument("TestFuCadDefaultsNavigation")
-        FreeCADGui.ActiveDocument = FreeCADGui.getDocument(self.doc.Name)
 
         view = self._active_view()
 

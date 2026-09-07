@@ -26,6 +26,7 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QLayout>
+#include <QSignalBlocker>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -238,24 +239,33 @@ void GeneralSettingsWidget::retranslateUi()
     _unitSystemComboBox->setCurrentIndex(userSchema);
 
     _navigationStyleLabel->setText(createLabelText(tr("Navigation Style")));
-    _navigationStyleComboBox->clear();
-    ParameterGrp::handle hGrpNav = App::GetApplication().GetParameterGroupByPath(
-        "User parameter:BaseApp/Preferences/View"
-    );
-    auto navStyleName = hGrpNav->GetASCII(
-        "NavigationStyle",
-        std::string {Gui::CADNavigationStyle::getClassTypeId().getName()}.c_str()
-    );
-    std::map<Base::Type, std::string> styles = Gui::UserNavigationStyle::getUserFriendlyNames();
-    for (const auto& style : styles) {
-        QByteArray data(style.first.getName());
-        QString name = QApplication::translate(
-            std::string {style.first.getName()}.c_str(),
-            style.second.c_str()
+    {
+        // Populating the combo must never persist a value the user did not
+        // choose: adding the first item forces a currentIndexChanged(0), and
+        // without this blocker that reaches onNavigationStyleChanged() and
+        // writes whatever style happens to be first to the real preference,
+        // before the loop below has even found the entry that actually
+        // matches the user's (or the default's) navigation style.
+        const QSignalBlocker blocker(_navigationStyleComboBox);
+        _navigationStyleComboBox->clear();
+        ParameterGrp::handle hGrpNav = App::GetApplication().GetParameterGroupByPath(
+            "User parameter:BaseApp/Preferences/View"
         );
-        _navigationStyleComboBox->addItem(name, data);
-        if (navStyleName == style.first.getName()) {
-            _navigationStyleComboBox->setCurrentIndex(_navigationStyleComboBox->count() - 1);
+        auto navStyleName = hGrpNav->GetASCII(
+            "NavigationStyle",
+            std::string {Gui::FusionNavigationStyle::getClassTypeId().getName()}.c_str()
+        );
+        std::map<Base::Type, std::string> styles = Gui::UserNavigationStyle::getUserFriendlyNames();
+        for (const auto& style : styles) {
+            QByteArray data(style.first.getName());
+            QString name = QApplication::translate(
+                std::string {style.first.getName()}.c_str(),
+                style.second.c_str()
+            );
+            _navigationStyleComboBox->addItem(name, data);
+            if (navStyleName == style.first.getName()) {
+                _navigationStyleComboBox->setCurrentIndex(_navigationStyleComboBox->count() - 1);
+            }
         }
     }
 }

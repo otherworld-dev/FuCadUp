@@ -106,7 +106,7 @@ public:
         if (strcmp(Reason, "NavigationStyle") == 0) {
             std::string model = rGrp.GetASCII(
                 "NavigationStyle",
-                std::string {CADNavigationStyle::getClassTypeId().getName()}.c_str()
+                std::string {FusionNavigationStyle::getClassTypeId().getName()}.c_str()
             );
             page->setNavigationStyle(model);
         }
@@ -618,7 +618,7 @@ std::string QGVPage::getNavStyleParameter()
         App::GetApplication().GetParameterGroupByPath("User parameter:BaseApp/Preferences/View");
     std::string model = hGrp->GetASCII(
         "NavigationStyle",
-        std::string {NavigationStyle::getClassTypeId().getName()}.c_str()
+        std::string {FusionNavigationStyle::getClassTypeId().getName()}.c_str()
     );
     return model;
 }
