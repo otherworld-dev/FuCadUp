@@ -1349,7 +1349,10 @@ void CmdPartDesignExtrude::activated(int iMsg)
 
 bool CmdPartDesignExtrude::isActive()
 {
-    return hasActiveDocument();
+    // This command owns a bare letter, which a sketch in edit needs for its own
+    // constraint shortcuts. Standing down while a task dialog owns the panel hands
+    // the letter back to whoever is being edited.
+    return hasActiveDocument() && Gui::Control().activeDialog() == nullptr;
 }
 
 //===========================================================================
@@ -1452,7 +1455,10 @@ void CmdPartDesignHole::activated(int iMsg)
 
 bool CmdPartDesignHole::isActive()
 {
-    return hasActiveDocument();
+    // This command owns a bare letter, which a sketch in edit needs for its own
+    // constraint shortcuts. Standing down while a task dialog owns the panel hands
+    // the letter back to whoever is being edited.
+    return hasActiveDocument() && Gui::Control().activeDialog() == nullptr;
 }
 
 //===========================================================================
@@ -2355,7 +2361,10 @@ void CmdPartDesignFillet::activated(int iMsg)
 
 bool CmdPartDesignFillet::isActive()
 {
-    return hasActiveDocument();
+    // This command owns a bare letter, which a sketch in edit needs for its own
+    // constraint shortcuts. Standing down while a task dialog owns the panel hands
+    // the letter back to whoever is being edited.
+    return hasActiveDocument() && Gui::Control().activeDialog() == nullptr;
 }
 
 //===========================================================================
@@ -2522,10 +2531,11 @@ bool CmdPartDesignThickness::isActive()
 namespace
 {
 /**
- * Starts the direct edit feature \a which on whichever faces are selected. Faces
- * are the only thing these tools can act on, so anything else in the selection is
- * dropped rather than refused: picking a body and reaching for Offset Face should
- * open the dialog ready to pick, not complain.
+ * Starts the direct edit feature \a which on whichever faces are selected. Faces are
+ * the only thing these tools can act on, so anything else in the selection is dropped
+ * rather than refused: picking a body and reaching for Offset Face should open the
+ * dialog ready to pick, not complain. Having nothing to stand on at all is different,
+ * and is said out loud rather than leaving the key looking broken.
  */
 void makeFaceTool(Gui::Command* cmd, const std::string& which)
 {
@@ -2540,15 +2550,45 @@ void makeFaceTool(Gui::Command* cmd, const std::string& which)
     std::vector<std::string> faces;
 
     if (noSelection) {
-        base = static_cast<Part::Feature*>(PartDesignGui::getBody(true)->Tip.getValue());
+        PartDesign::Body* body = PartDesignGui::getBody(true);
+        base = body ? static_cast<Part::Feature*>(body->Tip.getValue()) : nullptr;
     }
     else {
         base = static_cast<Part::Feature*>(selected.getObject());
+
+        // Offsetting or moving a face sweeps it along one direction, which only says what
+        // the user asked for while the face is flat. A curved face would be swept along
+        // the normal of its middle and quietly come out wrong everywhere else.
+        const bool flatOnly = which == "OffsetFace" || which == "MoveFace";
+        const Part::TopoShape& shape = base->Shape.getShape();
+
         for (const std::string& name : selected.getSubNames()) {
-            if (name.compare(0, 4, "Face") == 0) {
-                faces.push_back(name);
+            if (name.compare(0, 4, "Face") != 0) {
+                continue;
             }
+
+            if (flatOnly && !shape.getSubTopoShape(name.c_str(), true).isPlanar()) {
+                QMessageBox::warning(
+                    Gui::getMainWindow(),
+                    QObject::tr("Press/Pull"),
+                    QObject::tr("%1 works only on flat faces.").arg(QString::fromStdString(which))
+                );
+                return;
+            }
+
+            faces.push_back(name);
         }
+    }
+
+    if (!base) {
+        // The body has no solid yet, so there is no face to push or pull and the feature
+        // would be built standing on nothing. Say so instead of quietly doing nothing.
+        QMessageBox::warning(
+            Gui::getMainWindow(),
+            QObject::tr("Press/Pull"),
+            QObject::tr("Select a face of the active body first.")
+        );
+        return;
     }
 
     finishDressupFeature(cmd, which, base, faces, false);
@@ -2686,7 +2726,10 @@ void CmdPartDesignPressPull::activated(int iMsg)
 
 bool CmdPartDesignPressPull::isActive()
 {
-    return hasActiveDocument();
+    // This command owns a bare letter, which a sketch in edit needs for its own
+    // constraint shortcuts. Standing down while a task dialog owns the panel hands
+    // the letter back to whoever is being edited.
+    return hasActiveDocument() && Gui::Control().activeDialog() == nullptr;
 }
 
 //===========================================================================

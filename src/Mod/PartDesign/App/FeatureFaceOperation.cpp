@@ -132,6 +132,15 @@ App::DocumentObjectExecReturn* SweptFace::execute()
     Part::TopoShape result = base;
     try {
         for (const TopoDS_Face& face : faces) {
+            // The face travels along a single direction, which only describes what was
+            // asked for while the face is flat. A curved one would move along the normal
+            // of its middle and come out wrong everywhere else, so refuse it outright.
+            if (!Part::TopoShape(face).isPlanar()) {
+                return new App::DocumentObjectExecReturn(
+                    QT_TRANSLATE_NOOP("Exception", "This tool works only on flat faces")
+                );
+            }
+
             const gp_Vec travel = displacement(face);
             if (travel.Magnitude() < Precision::Confusion()) {
                 continue;

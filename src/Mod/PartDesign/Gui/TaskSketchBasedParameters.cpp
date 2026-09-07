@@ -45,6 +45,8 @@
 #include <Gui/Application.h>
 #include <Gui/CommandT.h>
 #include <Gui/Document.h>
+#include <Gui/InputHint.h>
+#include <Gui/MainWindow.h>
 #include <Gui/Selection/Selection.h>
 #include <Gui/ViewProvider.h>
 #include <Mod/Part/App/DatumFeature.h>
@@ -162,9 +164,26 @@ void ProfileSelectionWidget::setPickingActive(bool active)
 
             Gui::Selection().clearSelection();
             attachSelection();
+
+            // The dialog puts up its own hints while it is being built, and picking
+            // is switched on from the middle of that. Posting the hint rather than
+            // showing it straight away lets it land once the dialog has settled.
+            QTimer::singleShot(0, this, [this]() {
+                if (!isPickingActive()) {
+                    return;
+                }
+
+                Gui::getMainWindow()->showHints({{
+                    .message = tr(
+                        "Click a region to extrude only that region; click it again to "
+                        "release it"
+                    ),
+                }});
+            });
         }
         else {
             detachSelection();
+            Gui::getMainWindow()->hideHints();
 
             if (Gui::ViewProvider* profileView = getProfileViewProvider()) {
                 if (!profileWasVisible) {
@@ -191,14 +210,14 @@ void ProfileSelectionWidget::updateSummary()
         return !sub.empty();
     });
 
-    if (selected > 0) {
-        summaryLabel->setText(tr("%1 selected").arg(static_cast<int>(selected)));
-        return;
-    }
-
     const int regions = countRegions(profileBased->Profile.getValue());
-    if (regions > 0) {
-        summaryLabel->setText(tr("%1 available").arg(regions));
+
+    if (selected > 0) {
+        summaryLabel->setText(tr("%1 of %2 regions").arg(static_cast<int>(selected)).arg(regions));
+    }
+    else if (regions > 0) {
+        // No region picked is not nothing picked: the feature is built from all of them.
+        summaryLabel->setText(tr("All %n regions", nullptr, regions));
     }
     else {
         summaryLabel->setText(tr("Nothing selected"));
@@ -275,13 +294,9 @@ void ProfileSelectionWidget::toggleRegion(const std::string& subName)
         subs = {subName};
     }
     else if (auto it = std::find(subs.begin(), subs.end(), subName); it != subs.end()) {
-        if (subs.size() == 1) {
-            // Dropping the last one leaves no sub-elements at all, which means the whole
-            // sketch. That cannot be faced when the curves cross, so the feature would go
-            // invalid and keep showing whatever it last built. Swapping regions is done by
-            // picking the new one first.
-            return;
-        }
+        // Dropping the last one leaves no sub-elements at all, which is how the feature
+        // says the whole sketch. Releasing every region therefore puts the preview back
+        // where it started, rather than leaving Cancel as the only way out of picking.
         subs.erase(it);
     }
     else {
