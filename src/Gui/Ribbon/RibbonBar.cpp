@@ -46,6 +46,7 @@
 #include <Gui/WorkbenchSelector.h>
 
 #include "RibbonBar.h"
+#include "RibbonPage.h"
 
 
 using namespace Gui;
@@ -187,24 +188,10 @@ bool RibbonBar::eventFilter(QObject* watched, QEvent* event)
 
 QList<QToolButton*> RibbonBar::pageButtons() const
 {
-    QWidget* page = pageStack->currentWidget();
-    if (!page) {
-        return {};
-    }
-
-    // findChildren() walks the children depth first in the order they were
-    // created, which for a page is panel by panel and, inside a panel, its
-    // buttons before its caption: the order the eye reads them in.
-    QList<QToolButton*> buttons;
-    for (QToolButton* button : page->findChildren<QToolButton*>()) {
-        // A disabled button would swallow the keyboard on a command that
-        // Return could not run anyway.
-        if (button->isEnabled() && button->isVisibleTo(page)) {
-            buttons.append(button);
-        }
-    }
-
-    return buttons;
+    // The page knows its panels, which of their buttons are on show, and
+    // where its overflow button sits among them.
+    auto* page = qobject_cast<RibbonPage*>(pageStack->currentWidget());
+    return page ? page->keyboardButtons() : QList<QToolButton*> {};
 }
 
 bool RibbonBar::focusFirstPageButton()

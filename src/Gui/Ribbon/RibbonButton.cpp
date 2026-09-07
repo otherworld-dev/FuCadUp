@@ -39,6 +39,7 @@
 #include <Gui/Command.h>
 
 #include "RibbonButton.h"
+#include "RibbonPanelMenu.h"
 
 
 using namespace Gui;
@@ -87,6 +88,16 @@ void RibbonButton::actionEvent(QActionEvent* event)
             setToolTip(ribbonToolTip);
         }
     }
+}
+
+QString RibbonButton::command() const
+{
+    return commandName;
+}
+
+bool RibbonButton::splitsExplicitCommands() const
+{
+    return explicitSubCommands;
 }
 
 void RibbonButton::setPrimary(bool primary)
@@ -168,6 +179,7 @@ bool RibbonButton::setCommand(
     }
 
     setDefaultAction(guiAction->action());
+    commandName = command;
     applySize(size);
 
     if (size == ButtonSize::Large) {
@@ -202,6 +214,9 @@ bool RibbonButton::setCommand(
     QList<QAction*> children;
     for (const QString& subCommand : subCommands) {
         if (QAction* action = resolveAction(subCommand)) {
+            // Named so that the entry can be dragged onto the row once the
+            // button has folded into the caption drop-down.
+            RibbonPanelMenu::tagCommand(action, subCommand);
             children.append(action);
         }
         else if (quiet) {
@@ -219,6 +234,8 @@ bool RibbonButton::setCommand(
             );
         }
     }
+
+    explicitSubCommands = !children.isEmpty();
 
     ActionGroup* group = nullptr;
     if (children.isEmpty()) {

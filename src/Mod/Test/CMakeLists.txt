@@ -38,6 +38,7 @@ SET(Test_SRCS
     TestExtrudeFlip.py
     TestPartDesignLetters.py
     TestRibbon.py
+    TestRibbonLayout.py
     TestFuCadDefaults.py
     TestSketcherSnapFeedback.py
     TestMarkingMenu.py

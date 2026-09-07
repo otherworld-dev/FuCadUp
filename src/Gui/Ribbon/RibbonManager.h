@@ -36,7 +36,6 @@
 #include "RibbonBar.h"
 
 class QJsonObject;
-class QMenu;
 class QWidget;
 
 namespace Gui
@@ -46,6 +45,8 @@ class ToolBarItem;
 
 namespace Ribbon
 {
+
+class RibbonPanelMenu;
 
 /**
  * Owns the ribbon content: it reads the workspace definition, resolves the
@@ -98,6 +99,12 @@ public:
      */
     void popContextTab(const QString& id);
 
+    /**
+     * Forgets every row the user arranged and builds the pages again from the
+     * workspace definition; what "Reset every panel" and the preferences do.
+     */
+    void resetPanelArrangements();
+
 public Q_SLOTS:
     /**
      * Rebuilds the tab strip so that every caption the workspace definition
@@ -121,7 +128,12 @@ private:
 
     struct PanelDefinition
     {
+        /// The untranslated caption, which also names the panel in the user's
+        /// stored layout; see rowOverride().
         QString caption;
+        /// A caption already in the user's language, for a generated panel whose
+        /// name comes from a toolbar rather than from the workspace definition.
+        QString displayCaption;
         /// Workbench whose Initialize() has to run before the panel's commands exist.
         /// A Python workbench registers its commands on first activation, so without
         /// this the panel would stay empty until the user visited that workbench.
@@ -143,7 +155,17 @@ private:
         /// Only on the strip while a mode pushed it, and never auto-activates
         /// its workbench: the mode that owns it decides which one is active.
         bool context {false};
+        /// Built from the toolbars of a workbench the definition does not
+        /// describe, whose id is the workbench's menu text.
+        bool generated {false};
         std::vector<PanelDefinition> panels;
+
+        /// Names the tab in the user's stored layout: the id, or the workbench
+        /// for a generated tab, whose id changes with the language.
+        QString key() const
+        {
+            return generated ? workbench : id;
+        }
     };
 
     struct ContextTabState
@@ -162,9 +184,31 @@ private:
     void loadWorkspace();
     void rebuildTabs(const QString& workbench);
     void buildPage(int index);
-    QWidget* createPage(const TabDefinition& tab) const;
-    /// The caption drop-down of \a panel, or nullptr when nothing resolved.
-    static QMenu* createPanelMenu(const PanelDefinition& panel, QWidget* parent);
+    QWidget* createPage(const TabDefinition& tab);
+    /// Builds the page of \a tab again once the current event has been dealt
+    /// with, so that a panel may ask for it from one of its own handlers.
+    void schedulePageRebuild(const TabDefinition* tab);
+    /// Marks every page stale and rebuilds the one on screen.
+    void scheduleAllPagesRebuild();
+
+    /**
+     * The row the user stored for the panel \a caption of the tab \a tabKey.
+     * False when there is none and the definition's row applies.
+     */
+    static bool rowOverride(const QString& tabKey, const QString& caption, QStringList& row);
+    static void storeRowOverride(const QString& tabKey, const QString& caption, const QStringList& row);
+    static void clearRowOverride(const QString& tabKey, const QString& caption);
+    static void clearAllRowOverrides();
+
+    /// The definitions behind the \a commands of a stored row, in that order.
+    static std::vector<ItemDefinition> resolveRow(
+        const PanelDefinition& panel,
+        const QStringList& commands
+    );
+    /// Whether the curated drop-down of \a panel lists \a command somewhere.
+    static bool menuCovers(const PanelDefinition& panel, const QString& command);
+    /// Appends \a items to the drop-down \a menu, naming every entry it can.
+    static void fillPanelMenu(RibbonPanelMenu* menu, const std::vector<ItemDefinition>& items);
 
     const TabDefinition* findContextTab(const QString& id) const;
     int indexOfTab(const TabDefinition* tab) const;

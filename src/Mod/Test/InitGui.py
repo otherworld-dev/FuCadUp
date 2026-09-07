@@ -110,6 +110,7 @@ FreeCAD.__unit_test__ += [
     "TestExtrudeFlip",
     "TestPartDesignLetters",
     "TestRibbon",
+    "TestRibbonLayout",
     "TestFuCadDefaults",
     "TestSketcherSnapFeedback",
     "TestMarkingMenu",

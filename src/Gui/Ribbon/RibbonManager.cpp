@@ -20,6 +20,7 @@
  ***************************************************************************/
 
 
+#include <algorithm>
 #include <cstddef>
 #include <utility>
 
@@ -27,7 +28,6 @@
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QFile>
-#include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -35,6 +35,7 @@
 #include <QJsonValue>
 #include <QList>
 #include <QMenu>
+#include <QTimer>
 #include <QWidget>
 
 #include <App/Application.h>
@@ -52,7 +53,9 @@
 #include "RibbonBar.h"
 #include "RibbonButton.h"
 #include "RibbonManager.h"
+#include "RibbonPage.h"
 #include "RibbonPanel.h"
+#include "RibbonPanelMenu.h"
 
 
 using namespace Gui;
@@ -62,6 +65,41 @@ namespace
 {
 const char* const workspaceResource = ":/ribbon/Workspaces/Design.json";
 const char* const mainWindowPreferences = "User parameter:BaseApp/Preferences/MainWindow";
+// One group per tab, one per panel under it, holding the row the user arranged.
+const char* const preferencesPath = "User parameter:BaseApp/Preferences";
+const char* const ribbonGroupName = "Ribbon";
+const char* const panelsGroupName = "Panels";
+const char* const panelLayoutPreferences = "User parameter:BaseApp/Preferences/Ribbon/Panels";
+const char* const rowKey = "Row";
+const QLatin1Char rowSeparator(';');
+const QLatin1Char keySeparator('/');
+
+/**
+ * The parameter group name for \a key. ParameterGrp reads a slash as a path
+ * separator, so a toolbar named with one has to be stored under a name without.
+ */
+QByteArray parameterName(const QString& key)
+{
+    QString safe = key;
+    safe.replace(keySeparator, QLatin1Char('|'));
+    return safe.toUtf8();
+}
+
+// The toolbars StdWorkbench::setupToolBars() gives every workbench. They stay
+// off a generated tab: the app bar's menus carry their commands, the workspace
+// selector at the head of every page is the Workbench toolbar, and the tabs
+// the workspace definition describes do not repeat them either.
+const QStringList standardToolBars = {
+    QStringLiteral("File"),
+    QStringLiteral("Edit"),
+    QStringLiteral("Clipboard"),
+    QStringLiteral("Workbench"),
+    QStringLiteral("Macro"),
+    QStringLiteral("View"),
+    QStringLiteral("Individual Views"),
+    QStringLiteral("Structure"),
+    QStringLiteral("Help"),
+};
 
 /// The command framework action of \a command, or nullptr when not registered.
 Gui::Action* resolveGuiAction(const QString& command)
@@ -113,33 +151,6 @@ void reportMissing(const QString& command, bool quiet)
     );
 }
 
-/**
- * A menu entry that carries \a label but triggers \a source, so that the ribbon
- * can name a command the way Fusion does without renaming the action the rest
- * of the application shares. The proxy follows the state of the original, which
- * the command framework keeps up to date.
- */
-QAction* createLabelledAction(QAction* source, const QString& label, QMenu* parent)
-{
-    auto* proxy = new QAction(source->icon(), label, parent);
-    proxy->setToolTip(source->toolTip());
-    proxy->setStatusTip(source->statusTip());
-    proxy->setWhatsThis(source->whatsThis());
-    proxy->setCheckable(source->isCheckable());
-    proxy->setChecked(source->isChecked());
-    proxy->setEnabled(source->isEnabled());
-
-    QObject::connect(proxy, &QAction::triggered, source, [source]() {
-        source->trigger();
-    });
-    QObject::connect(source, &QAction::changed, proxy, [proxy, source]() {
-        proxy->setIcon(source->icon());
-        proxy->setEnabled(source->isEnabled());
-        proxy->setChecked(source->isChecked());
-    });
-
-    return proxy;
-}
 }  // namespace
 
 
@@ -208,8 +219,16 @@ void RibbonManager::rememberToolBars(const QString& workbench, const ToolBarItem
             continue;
         }
 
+        const QString name = QString::fromStdString(bar->command());
+        if (standardToolBars.contains(name)) {
+            continue;
+        }
+
         PanelDefinition panel;
-        panel.caption = QCoreApplication::translate("Workbench", bar->command().c_str());
+        // The name is the key the user's layout is stored under; what the
+        // caption shows is the translation the toolbar itself would carry.
+        panel.caption = name;
+        panel.displayCaption = QCoreApplication::translate("Workbench", bar->command().c_str());
 
         const QList<ToolBarItem*> entries = bar->getItems();
         for (const ToolBarItem* entry : entries) {
@@ -233,6 +252,12 @@ void RibbonManager::rememberToolBars(const QString& workbench, const ToolBarItem
     }
 
     rememberedToolBars[workbench] = std::move(panels);
+}
+
+void RibbonManager::resetPanelArrangements()
+{
+    clearAllRowOverrides();
+    scheduleAllPagesRebuild();
 }
 
 void RibbonManager::pushContextTab(const QString& id)
@@ -621,6 +646,7 @@ void RibbonManager::rebuildTabs(const QString& workbench)
             }
             generatedTab.workbench = workbench;
             generatedTab.optional = false;
+            generatedTab.generated = true;
 
             const auto remembered = rememberedToolBars.find(workbench);
             generatedTab.panels = remembered != rememberedToolBars.end()
@@ -706,24 +732,25 @@ void RibbonManager::buildPage(int index)
     }
 }
 
-QWidget* RibbonManager::createPage(const TabDefinition& tab) const
+QWidget* RibbonManager::createPage(const TabDefinition& tab)
 {
-    auto* page = new QWidget();
-    page->setObjectName(QStringLiteral("RibbonPage"));
-    // A plain QWidget only honours a stylesheet background with this attribute.
-    page->setAttribute(Qt::WA_StyledBackground, true);
-
-    auto* layout = new QHBoxLayout(page);
-    layout->setContentsMargins(2, 1, 2, 0);
-    layout->setSpacing(0);
-
-    std::vector<RibbonPanel*> leading;
-    std::vector<RibbonPanel*> trailing;
+    auto* page = new RibbonPage();
+    const QString tabKey = tab.key();
 
     for (const PanelDefinition& panelDefinition : tab.panels) {
-        auto* panel = new RibbonPanel(translateRibbon(panelDefinition.caption), page);
+        const QString panelKey = tabKey + keySeparator + panelDefinition.caption;
+        const QString caption = panelDefinition.displayCaption.isEmpty()
+            ? translateRibbon(panelDefinition.caption)
+            : panelDefinition.displayCaption;
+        auto* panel = new RibbonPanel(panelKey, caption, page);
 
-        for (const ItemDefinition& item : panelDefinition.items) {
+        // The row is the definition's unless the user has arranged one.
+        QStringList storedRow;
+        const bool customised = rowOverride(tabKey, panelDefinition.caption, storedRow);
+        const std::vector<ItemDefinition> rowItems =
+            customised ? resolveRow(panelDefinition, storedRow) : panelDefinition.items;
+
+        for (const ItemDefinition& item : rowItems) {
             auto* button = new RibbonButton(panel);
             const bool bound = button->setCommand(
                 item.command,
@@ -740,53 +767,205 @@ QWidget* RibbonManager::createPage(const TabDefinition& tab) const
             button->setPrimary(item.primary);
             panel->addButton(button);
         }
+        panel->setCustomised(customised);
 
-        panel->setCaptionMenu(createPanelMenu(panelDefinition, panel));
+        // A definition entry the user took out of the row stays reachable
+        // through the drop-down, ahead of the curated list when that does not
+        // already carry it.
+        std::vector<ItemDefinition> parked;
+        if (customised) {
+            for (const ItemDefinition& item : panelDefinition.items) {
+                if (!storedRow.contains(item.command) && !menuCovers(panelDefinition, item.command)) {
+                    parked.push_back(item);
+                }
+            }
+        }
+
+        RibbonPanelMenu* menu = panel->dropDown();
+        fillPanelMenu(menu, parked);
+        if (!menu->isEmpty() && !panelDefinition.menuItems.empty()) {
+            menu->addSeparator();
+        }
+        fillPanelMenu(menu, panelDefinition.menuItems);
 
         if (panel->isEmpty()) {
             delete panel;
             continue;
         }
 
-        if (panelDefinition.alignRight) {
-            trailing.push_back(panel);
+        // The definitions outlive the page: the tab lives in workspaceTabs,
+        // contextTabs or generatedTab, none of which is reshaped once loaded.
+        const TabDefinition* tabDefinition = &tab;
+        const QString captionKey = panelDefinition.caption;
+        QStringList definedRow;
+        for (const ItemDefinition& item : panelDefinition.items) {
+            definedRow.append(item.command);
         }
-        else {
-            leading.push_back(panel);
-        }
-    }
+        connect(
+            panel,
+            &RibbonPanel::rowChanged,
+            this,
+            [this, tabDefinition, captionKey, definedRow](const QStringList& commands) {
+                // A row put back the way the definition has it is not an
+                // arrangement to keep, and the panel is no longer customised.
+                if (commands == definedRow) {
+                    clearRowOverride(tabDefinition->key(), captionKey);
+                }
+                else {
+                    storeRowOverride(tabDefinition->key(), captionKey, commands);
+                }
+                schedulePageRebuild(tabDefinition);
+            }
+        );
+        connect(panel, &RibbonPanel::resetRequested, this, [this, tabDefinition, captionKey]() {
+            clearRowOverride(tabDefinition->key(), captionKey);
+            schedulePageRebuild(tabDefinition);
+        });
+        connect(panel, &RibbonPanel::resetAllRequested, this, &RibbonManager::resetPanelArrangements);
 
-    for (RibbonPanel* panel : leading) {
-        layout->addWidget(panel);
-    }
-
-    if (!leading.empty()) {
-        leading.back()->setSeparatorVisible(false);
-    }
-
-    layout->addStretch(1);
-
-    for (RibbonPanel* panel : trailing) {
-        layout->addWidget(panel);
-    }
-
-    if (!trailing.empty()) {
-        trailing.back()->setSeparatorVisible(false);
+        page->addPanel(panel, panelDefinition.alignRight);
     }
 
     return page;
 }
 
-QMenu* RibbonManager::createPanelMenu(const PanelDefinition& panel, QWidget* parent)
+void RibbonManager::schedulePageRebuild(const TabDefinition* tab)
 {
-    if (panel.menuItems.empty()) {
-        return nullptr;
+    // Queued: the panel that asked is still inside the event that made it ask,
+    // and setPage() deletes the page it belongs to.
+    QTimer::singleShot(0, this, [this, tab]() {
+        const int index = indexOfTab(tab);
+        if (index < 0) {
+            return;
+        }
+        if (index < static_cast<int>(pageBuilt.size())) {
+            pageBuilt[index] = false;
+        }
+        buildPage(index);
+    });
+}
+
+void RibbonManager::scheduleAllPagesRebuild()
+{
+    QTimer::singleShot(0, this, [this]() {
+        if (ribbonBar.isNull()) {
+            return;
+        }
+        // The others are rebuilt when their tab is next selected.
+        pageBuilt.assign(pageBuilt.size(), false);
+        buildPage(ribbonBar->currentIndex());
+    });
+}
+
+bool RibbonManager::rowOverride(const QString& tabKey, const QString& caption, QStringList& row)
+{
+    // Looked up rather than fetched by path, so that a user who never arranged
+    // a panel does not get the groups written into user.cfg on every page.
+    ParameterGrp::handle preferences = App::GetApplication().GetParameterGroupByPath(preferencesPath);
+    if (!preferences->HasGroup(ribbonGroupName)) {
+        return false;
+    }
+    ParameterGrp::handle ribbon = preferences->GetGroup(ribbonGroupName);
+    if (!ribbon->HasGroup(panelsGroupName)) {
+        return false;
     }
 
-    auto* menu = new QMenu(parent);
-    menu->setObjectName(QStringLiteral("RibbonPanelMenu"));
+    ParameterGrp::handle panels = ribbon->GetGroup(panelsGroupName);
+    const QByteArray tabName = parameterName(tabKey);
+    if (!panels->HasGroup(tabName.constData())) {
+        return false;
+    }
 
+    ParameterGrp::handle tabGroup = panels->GetGroup(tabName.constData());
+    const QByteArray panelName = parameterName(caption);
+    if (!tabGroup->HasGroup(panelName.constData())) {
+        return false;
+    }
+
+    const std::string stored = tabGroup->GetGroup(panelName.constData())->GetASCII(rowKey);
+    row = QString::fromStdString(stored).split(rowSeparator, Qt::SkipEmptyParts);
+    return true;
+}
+
+void RibbonManager::storeRowOverride(const QString& tabKey, const QString& caption, const QStringList& row)
+{
+    App::GetApplication()
+        .GetParameterGroupByPath(panelLayoutPreferences)
+        ->GetGroup(parameterName(tabKey).constData())
+        ->GetGroup(parameterName(caption).constData())
+        ->SetASCII(rowKey, row.join(rowSeparator).toUtf8().constData());
+}
+
+void RibbonManager::clearRowOverride(const QString& tabKey, const QString& caption)
+{
+    ParameterGrp::handle panels = App::GetApplication().GetParameterGroupByPath(panelLayoutPreferences);
+    const QByteArray tabName = parameterName(tabKey);
+    if (!panels->HasGroup(tabName.constData())) {
+        return;
+    }
+
+    bool tabEmpty = false;
+    {
+        // A group still referenced from here would only be cleared, not
+        // removed, by the parent's RemoveGrp() below.
+        ParameterGrp::handle tabGroup = panels->GetGroup(tabName.constData());
+        tabGroup->RemoveGrp(parameterName(caption).constData());
+        tabEmpty = tabGroup->GetGroups().empty();
+    }
+    if (tabEmpty) {
+        panels->RemoveGrp(tabName.constData());
+    }
+}
+
+void RibbonManager::clearAllRowOverrides()
+{
+    App::GetApplication().GetParameterGroupByPath(panelLayoutPreferences)->Clear();
+}
+
+std::vector<RibbonManager::ItemDefinition> RibbonManager::resolveRow(
+    const PanelDefinition& panel,
+    const QStringList& commands
+)
+{
+    std::vector<ItemDefinition> items;
+    for (const QString& command : commands) {
+        // The definition knows how the command is labelled and what it splits
+        // into; a command it only lists inside a submenu becomes a plain button.
+        auto matches = [&command](const ItemDefinition& item) {
+            return item.command == command;
+        };
+        auto found = std::find_if(panel.items.begin(), panel.items.end(), matches);
+        if (found == panel.items.end()) {
+            found = std::find_if(panel.menuItems.begin(), panel.menuItems.end(), matches);
+            if (found == panel.menuItems.end()) {
+                ItemDefinition plain;
+                plain.command = command;
+                // A stored command that has since gone (an add-on removed, a
+                // command renamed) is not a mistake in the definition, so it
+                // is dropped from the row without a warning on every page.
+                plain.optional = true;
+                items.push_back(std::move(plain));
+                continue;
+            }
+        }
+        items.push_back(*found);
+    }
+    return items;
+}
+
+bool RibbonManager::menuCovers(const PanelDefinition& panel, const QString& command)
+{
     for (const ItemDefinition& item : panel.menuItems) {
+        if (item.command == command || item.subCommands.contains(command)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void RibbonManager::fillPanelMenu(RibbonPanelMenu* menu, const std::vector<ItemDefinition>& items)
+{
+    for (const ItemDefinition& item : items) {
         Gui::Action* guiAction = resolveGuiAction(item.command);
         QAction* action = guiAction ? guiAction->action() : nullptr;
 
@@ -798,6 +977,7 @@ QMenu* RibbonManager::createPanelMenu(const PanelDefinition& panel, QWidget* par
         QList<QAction*> children;
         for (const QString& subCommand : item.subCommands) {
             if (QAction* child = RibbonButton::resolveAction(subCommand)) {
+                RibbonPanelMenu::tagCommand(child, subCommand);
                 children.append(child);
             }
             else {
@@ -806,7 +986,8 @@ QMenu* RibbonManager::createPanelMenu(const PanelDefinition& panel, QWidget* par
         }
 
         // A group command already carries its variants, which is how a single
-        // FreeCAD command stands in for a row of Fusion entries.
+        // FreeCAD command stands in for a row of Fusion entries. Those variants
+        // are not commands of their own, so they are not named for dragging.
         Gui::ActionGroup* group = nullptr;
         if (children.isEmpty()) {
             group = qobject_cast<Gui::ActionGroup*>(guiAction);
@@ -822,9 +1003,10 @@ QMenu* RibbonManager::createPanelMenu(const PanelDefinition& panel, QWidget* par
                 continue;
             }
 
-            QMenu* submenu = menu->addMenu(title);
+            RibbonPanelMenu* submenu = menu->addSubmenu(title);
             if (action) {
                 submenu->setIcon(action->icon());
+                RibbonPanelMenu::tagCommand(submenu->menuAction(), item.command);
             }
             submenu->addActions(children);
             RibbonButton::followGroupMenu(group, submenu);
@@ -835,19 +1017,12 @@ QMenu* RibbonManager::createPanelMenu(const PanelDefinition& panel, QWidget* par
             continue;
         }
 
-        menu->addAction(
-            item.label.isEmpty()
-                ? action
-                : createLabelledAction(action, translateRibbon(item.label), menu)
-        );
+        QAction* entry = item.label.isEmpty()
+            ? action
+            : RibbonPanelMenu::createProxyAction(action, translateRibbon(item.label), menu);
+        RibbonPanelMenu::tagCommand(entry, item.command);
+        menu->addAction(entry);
     }
-
-    if (menu->isEmpty()) {
-        delete menu;
-        return nullptr;
-    }
-
-    return menu;
 }
 
 #include "moc_RibbonManager.cpp"

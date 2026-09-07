@@ -607,6 +607,33 @@
         </property>
        </widget>
       </item>
+      <item row="5" column="0">
+       <layout class="QHBoxLayout" name="ribbonResetLayout">
+        <item>
+         <widget class="QPushButton" name="resetRibbonPanelsButton">
+          <property name="toolTip">
+           <string>Put every ribbon panel back to the buttons its workspace defines, undoing what was dragged into or out of the drop-downs.</string>
+          </property>
+          <property name="text">
+           <string>Reset ribbon panel arrangements</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="ribbonResetSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>0</width>
+            <height>0</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
      </layout>
     </widget>
    </item>

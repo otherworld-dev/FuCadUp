@@ -58,6 +58,8 @@ enum class ButtonSize
 class GuiExport RibbonButton: public QToolButton
 {
     Q_OBJECT
+    /// The command the button runs; what a drag of the button carries.
+    Q_PROPERTY(QString command READ command CONSTANT)
 
 public:
     explicit RibbonButton(QWidget* parent = nullptr);
@@ -82,6 +84,16 @@ public:
         ButtonSize size,
         bool quiet
     );
+
+    /// The command setCommand() bound, or an empty string before that.
+    QString command() const;
+
+    /**
+     * Whether the drop-down lists sub-commands the definition named, rather
+     * than the variants of a group command; the former do not include the
+     * command a plain click runs, the latter do.
+     */
+    bool splitsExplicitCommands() const;
 
     /**
      * Marks the button as the call to action of its page, which the stylesheet
@@ -124,6 +136,8 @@ private:
     QString ribbonText;
     /// The tooltip built around that name, empty while there is none.
     QString ribbonToolTip;
+    QString commandName;
+    bool explicitSubCommands {false};
 
     Q_DISABLE_COPY(RibbonButton)
 };

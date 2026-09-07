@@ -30,6 +30,7 @@
 #include "ui_DlgSettingsUI.h"
 
 #include "Dialogs/DlgThemeEditor.h"
+#include "Ribbon/RibbonManager.h"
 
 #include <Base/ServiceProvider.h>
 
@@ -49,6 +50,13 @@ DlgSettingsUI::DlgSettingsUI(QWidget* parent)
     ui->setupUi(this);
 
     connect(ui->themeEditorButton, &QPushButton::clicked, [this]() { openThemeEditor(); });
+
+    // The arrangements belong to the ribbon shell, so there is nothing to reset
+    // while the classic toolbars are in use.
+    ui->resetRibbonPanelsButton->setEnabled(Gui::Ribbon::RibbonManager::isEnabled());
+    connect(ui->resetRibbonPanelsButton, &QPushButton::clicked, this, []() {
+        Gui::Ribbon::RibbonManager::instance()->resetPanelArrangements();
+    });
 }
 
 /**

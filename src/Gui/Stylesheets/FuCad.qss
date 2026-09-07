@@ -2879,6 +2879,15 @@ QToolButton#RibbonPanelCaptionButton:open {
   color: @TextForegroundColor;
 }
 
+/* A drag hovering the caption band: dropping there moves the dragged button
+   out of the row and into the drop-down. */
+QLabel#RibbonPanelCaption[dropTarget="true"],
+QToolButton#RibbonPanelCaptionButton[dropTarget="true"] {
+  background-color: @AccentHoverColor;
+  border: 1px solid @AccentColor;
+  color: @TextForegroundColor;
+}
+
 QToolButton#RibbonPanelCaptionButton::menu-indicator {
   image: url(qss:@IconsLocationFolderName/arrow-down-lightgray.svg);
   height: 11px;
@@ -2890,6 +2899,30 @@ QToolButton#RibbonPanelCaptionButton::menu-indicator {
 QToolButton#RibbonPanelCaptionButton::menu-indicator:hover,
 QToolButton#RibbonPanelCaptionButton::menu-indicator:open {
   image: url(qss:@IconsLocationFolderName/arrow-down-@StylesheetIconsColor.svg);
+}
+
+/* The overflow button at the end of the leading panels, for the panels a page
+   narrower than their captions cannot show. Flat like a caption drop-down. */
+QToolButton#RibbonPageOverflowButton {
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: @InputFieldBorderRadius;
+  color: @RibbonCaptionColor;
+  padding: 0px;
+}
+
+QToolButton#RibbonPageOverflowButton:hover,
+QToolButton#RibbonPageOverflowButton:focus,
+QToolButton#RibbonPageOverflowButton:pressed,
+QToolButton#RibbonPageOverflowButton:open {
+  background-color: @AccentHoverColor;
+  border: 1px solid @AccentColor;
+  color: @TextForegroundColor;
+}
+
+QToolButton#RibbonPageOverflowButton::menu-indicator {
+  image: none;
+  width: 0px;
 }
 
 /* Tab strip: flat labels that the active tab underlines in the accent colour. */
