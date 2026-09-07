@@ -229,8 +229,9 @@ bool ShortcutManager::checkShortcut(QObject* o, const QKeySequence& key)
     pendingActions.emplace_back(action, key.count(), 0);
 
     // check for potential partial match, i.e. longer key sequences
-    bool flush = true;
     bool found = false;
+    bool longerEnabled = false;
+    int longerPriority = std::numeric_limits<int>::min();
     for (auto it = iter; it != index.end(); ++it) {
         if (key.matches(it->key.shortcut) == QKeySequence::NoMatch) {
             break;
@@ -247,13 +248,23 @@ bool ShortcutManager::checkShortcut(QObject* o, const QKeySequence& key)
             pendingActions.back().priority = getPriority(it->key.name);
             found = true;
         }
-        else if (it->action && it->action->isEnabled()) {
-            flush = false;
-            if (found) {
-                break;
-            }
+        else if (it->action && it->action->isEnabled()
+                 && it->key.shortcut.count() > key.count()) {
+            // Only a strictly longer, enabled sequence can make us wait: it might
+            // still be completed by the next keystroke. Keep scanning past the
+            // first one instead of breaking, so every candidate's priority is
+            // considered below.
+            longerEnabled = true;
+            longerPriority = std::max(longerPriority, getPriority(it->key.name));
         }
     }
+
+    // A command that was given an explicit priority above every chord it prefixes
+    // fires at once: the Fusion letters must not wait ShortcutTimeout for "S, B"
+    // and friends.
+    const bool outranksChords =
+        found && longerEnabled && pendingActions.back().priority > longerPriority;
+    const bool flush = !longerEnabled || outranksChords;
 
     if (flush) {
         // We'll flush now because there is no potential match with further

@@ -66,6 +66,12 @@ void StdCmdMeasure::activated(int iMsg)
 
 bool StdCmdMeasure::isActive()
 {
+    // A task dialog owns the 3D view's keys while it is open (a sketch edit,
+    // for instance), so Fusion's bare "I" must not also reach for this here.
+    if (Gui::Control().activeDialog() != nullptr) {
+        return false;
+    }
+
     App::Document* doc = App::GetApplication().getActiveDocument();
     if (!doc || doc->countObjectsOfType<App::GeoFeature>() == 0) {
         return false;

@@ -41,6 +41,16 @@ namespace
  * Modelling and sketching can share a letter because only one of the two is ever
  * enabled: a sketch constraint needs a sketch open, and a modelling command needs
  * one closed. The shortcut framework hands the key to whichever is live.
+ *
+ * A Fusion letter also has to win against every longer chord it happens to
+ * prefix (S against "S, B"/"S, F"/"S, G"/"S, D", C against the old bare-C
+ * constraint chords, and so on) instead of waiting ShortcutTimeout for one of
+ * those chords to complete. `ShortcutManager::checkShortcut` resolves that by
+ * priority: giving every entry here `fuCadPriority` below is what lets its
+ * exact match fire immediately, ahead of any enabled longer sequence with a
+ * lower priority. Modelling commands that must stay off while a sketch is
+ * open (PartDesign's tools, `Std_Placement`, `Std_Measure`) are guarded in
+ * their own `isActive()` instead of here.
  */
 const std::unordered_map<std::string_view, const char*> shortcuts = {
     // Modelling, live while no sketch is open.
@@ -51,6 +61,7 @@ const std::unordered_map<std::string_view, const char*> shortcuts = {
     {"Std_Placement", "M"},
     {"Std_Measure", "I"},
     {"Std_SetAppearance", "A"},
+    {"Std_CommandPalette", "S"},
 
     // Sketching, live only inside a sketch.
     {"Sketcher_CreateLine", "L"},
@@ -69,6 +80,9 @@ const std::unordered_map<std::string_view, const char*> shortcuts = {
     {"Sketcher_ConstrainTangent", "K, T"},
     {"Sketcher_ConstrainPointOnObject", "K, N"},
     {"Sketcher_ConstrainParallel", "K, P"},
+    {"Sketcher_ConstrainCoincidentUnified", "K, K"},
+    {"Sketcher_ConstrainCoincident", "K, K"},
+    {"Sketcher_ConstrainSymmetric", "K, M"},
 };
 
 /// High enough to beat the commands that never asked for an order of their own,

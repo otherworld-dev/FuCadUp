@@ -4683,7 +4683,11 @@ CmdSketcherConstrainCoincidentUnified::CmdSketcherConstrainCoincidentUnified(con
 
     ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Mod/Sketcher/Constraints");
-    sAccel = hGrp->GetBool("UnifiedCoincident", true) ? "C" :"C,O";
+    // Fusion's C is the bare-letter shortcut for the circle tool now, so neither
+    // role this command can take (the unified primary, or the demoted one when
+    // the user turns UnifiedCoincident off) may keep a bare "C" or a "C, ..."
+    // chord: "K, O" is already Diameter's, so the demoted role takes "K, Q".
+    sAccel = hGrp->GetBool("UnifiedCoincident", true) ? "K, K" : "K, Q";
 
     eType = ForEdit;
 
@@ -5197,7 +5201,9 @@ CmdSketcherConstrainCoincident::CmdSketcherConstrainCoincident()
     sPixmap = "Constraint_PointOnPoint";
     ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Mod/Sketcher/Constraints");
-    sAccel = hGrp->GetBool("UnifiedCoincident", true) ? "C,C" : "C";
+    // Mirror of the ternary above: whichever role this command takes, it must
+    // not be a bare "C" now that Fusion's Circle tool owns that letter.
+    sAccel = hGrp->GetBool("UnifiedCoincident", true) ? "K, Q" : "K, K";
     eType = ForEdit;
 
     allowedSelSequences = {{SelVertexOrRoot, SelVertexOrRoot},
@@ -10361,7 +10367,8 @@ CmdSketcherConstrainSymmetric::CmdSketcherConstrainSymmetric()
     sWhatsThis = "Sketcher_ConstrainSymmetric";
     sStatusTip = sToolTipText;
     sPixmap = "Constraint_Symmetric";
-    sAccel = "S";
+    // Fusion's S is the bare-letter shortcut for the command palette now.
+    sAccel = "K, M";
     eType = ForEdit;
 
     allowedSelSequences = {{SelEdge, SelVertexOrRoot},
