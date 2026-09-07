@@ -56,17 +56,22 @@ MOUSE_MOVE = QtCore.QEvent.MouseMove
 MOUSE_PRESS = QtCore.QEvent.MouseButtonPress
 MOUSE_RELEASE = QtCore.QEvent.MouseButtonRelease
 
-# Sketch units between grid lines, and the zoom the tests work at: a pitch of 40
-# device pixels leaves a snap band of a third of the pitch on each side of a line,
-# comfortably wider than the pixel a projected point rounds to.
+# Sketch units between grid lines, and the zoom the tests work at. The grid reaches for
+# the pointer over min(GridSnapTolerance, pitch / 3) pixels, so a pitch of 60 puts the
+# cap on the preference rather than on the pitch and gives every test the same 15-pixel
+# band to work inside, whatever the display scaling is.
 GRID_SIZE = 10.0
-TARGET_PITCH_PX = 40.0
+TARGET_PITCH_PX = 60.0
 GRID_SNAP_TOLERANCE = 15.0
 SNAP_RADIUS = 8.0
 
-# Pointer travel of the drag tests, in device pixels. Short enough that the grid
-# would pull the dragged point back onto the line it started on.
-DRAG_TRAVEL_PX = 6.0
+# Pointer travel of the drag test, in device pixels: inside the grid band above, so a
+# drag that snapped would be pulled straight back onto the line it started on, and long
+# enough that the sketcher takes it for a drag at all. Measured on this build, a press
+# that travels 6 device pixels is swallowed and one that travels 9 is not, so the margin
+# above the shorter of those matters.
+DRAG_TRAVEL_PX = 12.0
+MIN_DRAG_TRAVEL_WIDGET_PX = 5
 
 
 class TestSketcherSnapFeedback(unittest.TestCase):
@@ -177,8 +182,9 @@ class TestSketcherSnapFeedback(unittest.TestCase):
     def _refresh_view_widgets(self, timeout_ms=1000):
         """Grab the live 3D view of the test document and its viewport widget.
 
-        Right after a document switch the active view can still be the previous
-        document window on its way out, so the view is re-fetched on each try.
+        Right after a document switch the active view can still be the previous document
+        window on its way out - its C++ side already deleted, or laid out to nothing - so
+        the view is re-fetched on each try and only a window with a real size is accepted.
         """
 
         deadline = time.monotonic() + (timeout_ms / 1000.0)
@@ -188,14 +194,16 @@ class TestSketcherSnapFeedback(unittest.TestCase):
                 self.viewer = self.view.getViewer()
                 graphics_view = self.view.graphicsView()
                 viewport = graphics_view.viewport()
-                viewport.rect()
-                self.graphics_view = graphics_view
-                self.viewport = viewport
-                return
+                if viewport.width() > 0 and viewport.height() > 0:
+                    self.graphics_view = graphics_view
+                    self.viewport = viewport
+                    return
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("the 3D view of the test document never got a size")
             except RuntimeError:
                 if time.monotonic() >= deadline:
                     raise
-                self._process_events(20)
+            self._process_events(20)
 
     def _camera_state(self):
         camera = self.view.getCameraNode()
@@ -244,7 +252,7 @@ class TestSketcherSnapFeedback(unittest.TestCase):
 
         camera = self.view.getCameraNode()
         pitch = GRID_SIZE / self._units_per_pixel()
-        camera.height = max(1e-6, camera.height.getValue() * pitch / TARGET_PITCH_PX)
+        camera.height.setValue(max(1e-6, camera.height.getValue() * pitch / TARGET_PITCH_PX))
         position = camera.position.getValue().getValue()
         camera.position.setValue(coin.SbVec3f(0.0, 0.0, position[2]))
         self._process_events(100)
@@ -324,6 +332,19 @@ class TestSketcherSnapFeedback(unittest.TestCase):
         self._send_mouse_event(MOUSE_MOVE, self._widget_point(u, v), NO_BUTTON, NO_BUTTON)
         self._process_events(wait_ms)
 
+    def _hover_until_preselected(self, pos, message):
+        """Park the pointer on a widget position until the sketch preselects a vertex there."""
+
+        for _ in range(5):
+            self._send_mouse_event(MOUSE_MOVE, pos, NO_BUTTON, NO_BUTTON)
+            self._process_events(80)
+            preselection = FreeCADGui.Selection.getPreselection()
+            names = getattr(preselection, "SubElementNames", ())
+            if preselection.ObjectName and names and names[0].startswith("Vertex"):
+                return names[0]
+        self.fail(message)
+        return None
+
     def _start_line_tool(self):
         FreeCADGui.runCommand("Sketcher_CreateLine", 0)
         self._process_events(100)
@@ -331,13 +352,21 @@ class TestSketcherSnapFeedback(unittest.TestCase):
     # -- reading the snap glyph ------------------------------------------
 
     def _find_edit_node(self, name):
+        """A node of the sketch's edit-mode scene graph, by name.
+
+        Searched from the view, not from ``ViewObject.RootNode``: the edit-mode nodes are
+        hung off the viewer's scene graph while the sketch is open, and the view provider's
+        own root comes back empty.
+        """
+
         from pivy import coin
 
+        self._refresh_view_widgets()
         search = coin.SoSearchAction()
         search.setName(coin.SbName(name))
         search.setInterest(coin.SoSearchAction.FIRST)
         search.setSearchingAll(True)
-        search.apply(self.sketch.ViewObject.RootNode)
+        search.apply(self.view.getSceneGraph())
         path = search.getPath()
         return path.getTail() if path else None
 
@@ -413,15 +442,16 @@ class TestSketcherSnapFeedback(unittest.TestCase):
         """Press on the sketch point at grab, pull it travel_px along +X, release."""
 
         press = self._widget_point(*grab)
-        target = QtCore.QPoint(
-            press.x() + int(round(travel_px / self._device_pixel_ratio())), press.y()
-        )
+        widget_travel = int(round(travel_px / self._device_pixel_ratio()))
+        if widget_travel < MIN_DRAG_TRAVEL_WIDGET_PX:
+            raise unittest.SkipTest(
+                "the display scaling leaves no travel that is both a drag and inside the grid"
+            )
+        target = QtCore.QPoint(press.x() + widget_travel, press.y())
 
-        # Preselect the point first: a press only starts a drag on what is under it.
-        self._send_mouse_event(MOUSE_MOVE, press, NO_BUTTON, NO_BUTTON)
-        self._process_events(50)
-        self._send_mouse_event(MOUSE_MOVE, press, NO_BUTTON, NO_BUTTON)
-        self._process_events(50)
+        # A press only starts a drag on what is preselected under it, and the first move
+        # after a view is built can land before its first frame, so wait for the vertex.
+        self._hover_until_preselected(press, "The pointer never picked up the point to drag")
 
         self._send_mouse_event(MOUSE_PRESS, press, LEFT_BUTTON, LEFT_BUTTON)
         self._process_events(50)
