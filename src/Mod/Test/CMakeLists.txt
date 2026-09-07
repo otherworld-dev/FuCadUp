@@ -33,6 +33,7 @@ SET(Test_SRCS
     TestSelectionVisual.py
     TestCornerAxisCrossVisual.py
     TestViewProviderLink.py
+    TestOriginPlaneHover.py
 )
 
 SET(TestData_SRCS

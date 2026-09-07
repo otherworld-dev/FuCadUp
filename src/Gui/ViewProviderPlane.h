@@ -64,7 +64,10 @@ private:
 
     CoinPtr<SoSwitch> labelSwitch;
     CoinPtr<SoAsciiText> pLabel;
+    /// Extent that is drawn: the quarter, or the full square while hovered or selected
     CoinPtr<SoCoordinate3> pCoords;
+    /// Extent that is picked: always the quarter, so hovering never changes what is under the cursor
+    CoinPtr<SoCoordinate3> pPickCoords;
     CoinPtr<SoTranslation> pTextTranslation;
 
     ParamHandlers handlers;

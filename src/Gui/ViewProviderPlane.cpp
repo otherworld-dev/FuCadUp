@@ -23,6 +23,7 @@
 
 #include <Inventor/nodes/SoAsciiText.h>
 #include <Inventor/nodes/SoCoordinate3.h>
+#include <Inventor/nodes/SoDrawStyle.h>
 #include <Inventor/nodes/SoFaceSet.h>
 #include <Inventor/nodes/SoIndexedLineSet.h>
 #include <Inventor/nodes/SoMaterial.h>
@@ -95,9 +96,19 @@ void ViewProviderPlane::attach(App::DocumentObject* obj)
     sep->addChild(material);
     sep->addChild(ps);
 
-    auto lineSeparator = new SoSeparator();
-    auto pLines = new SoIndexedLineSet();
+    // The outline and face grow to the full square while the plane is hovered or selected.
+    // That growth is feedback only and must not take part in picking: every origin plane
+    // picks "on top", so Coin reports them all at the same depth and a grown plane that
+    // overlaps its neighbour on screen would keep winning the pick by scene graph order,
+    // leaving the highlight stuck on it. Picking is done by an invisible quarter instead.
+    auto feedbackOnly = new SoPickStyle();
+    feedbackOnly->style.setValue(SoPickStyle::UNPICKABLE);
+
     static const int32_t lines[6] = {0, 1, 2, 3, 0, -1};
+
+    auto lineSeparator = new SoSeparator();
+    lineSeparator->addChild(feedbackOnly);
+    auto pLines = new SoIndexedLineSet();
     pLines->coordIndex.setNum(6);
     pLines->coordIndex.setValues(0, 6, lines);
 
@@ -106,6 +117,7 @@ void ViewProviderPlane::attach(App::DocumentObject* obj)
 
     // add semi transparent face
     auto faceSeparator = new SoSeparator();
+    faceSeparator->addChild(feedbackOnly);
     sep->addChild(faceSeparator);
 
     // disable backface culling and render with two-sided lighting
@@ -119,6 +131,21 @@ void ViewProviderPlane::attach(App::DocumentObject* obj)
     vertexProperty->vertex.connectFrom(&pCoords->point);
     faceSet->vertexProperty.setValue(vertexProperty);
     faceSeparator->addChild(faceSet);
+
+    // The pickable extent: an invisible copy of the quarter (face and outline) that keeps
+    // its size whatever the plane currently draws.
+    auto pickSeparator = new SoSeparator();
+    auto invisible = new SoDrawStyle();
+    invisible->style.setValue(SoDrawStyle::INVISIBLE);
+    pickSeparator->addChild(invisible);
+    pPickCoords = new SoCoordinate3();
+    pickSeparator->addChild(pPickCoords);
+    auto pickOutline = new SoIndexedLineSet();
+    pickOutline->coordIndex.setNum(6);
+    pickOutline->coordIndex.setValues(0, 6, lines);
+    pickSeparator->addChild(pickOutline);
+    pickSeparator->addChild(new SoFaceSet());
+    sep->addChild(pickSeparator);
 
     pTextTranslation = new SoTranslation();
     sep->addChild(pTextTranslation);
@@ -202,26 +229,32 @@ void ViewProviderPlane::updatePlaneSize()
     const float size = params->getDatumPlaneSize() * Base::fromPercent(params->getDatumScale());
     const float offset = 8.0F;
 
-    SbVec3f verts[4];
+    const SbVec3f quarter[4] = {
+        SbVec3f(size, size, 0),
+        SbVec3f(size, offset, 0),
+        SbVec3f(offset, offset, 0),
+        SbVec3f(offset, size, 0),
+    };
+    const SbVec3f full[4] = {
+        SbVec3f(size, size, 0),
+        SbVec3f(size, -size, 0),
+        SbVec3f(-size, -size, 0),
+        SbVec3f(-size, size, 0),
+    };
 
-    bool isSelectedOrHovered = isSelected || isHovered;
+    // An origin plane (one with a role) shows its quarter and grows to the full square while
+    // hovered or selected; any other plane always shows the full square. Only the quarter is
+    // ever pickable, so the growth cannot change which plane is under the cursor.
+    const bool hasRole = !getRole().empty();
+    const bool isSelectedOrHovered = isSelected || isHovered;
+    const SbVec3f* drawn = (hasRole && !isSelectedOrHovered) ? quarter : full;
+    const SbVec3f* pickable = hasRole ? quarter : full;
 
-    if (!getRole().empty() && !isSelectedOrHovered) {
-        verts[0] = SbVec3f(size, size, 0);
-        verts[1] = SbVec3f(size, offset, 0);
-        verts[2] = SbVec3f(offset, offset, 0);
-        verts[3] = SbVec3f(offset, size, 0);
-    }
-    else {
-        verts[0] = SbVec3f(size, size, 0);
-        verts[1] = SbVec3f(size, -size, 0);
-        verts[2] = SbVec3f(-size, -size, 0);
-        verts[3] = SbVec3f(-size, size, 0);
-    }
-
-    pTextTranslation->translation.setValue(verts[0] / 2 - SbVec3f(2, 6, 0));  // NOLINT
+    pTextTranslation->translation.setValue(drawn[0] / 2 - SbVec3f(2, 6, 0));  // NOLINT
     pCoords->point.setNum(4);
-    pCoords->point.setValues(0, 4, verts);
+    pCoords->point.setValues(0, 4, drawn);
+    pPickCoords->point.setNum(4);
+    pPickCoords->point.setValues(0, 4, pickable);
 }
 
 unsigned long ViewProviderPlane::getColor(const std::string& role) const

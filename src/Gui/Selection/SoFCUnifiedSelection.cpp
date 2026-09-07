@@ -49,6 +49,7 @@
 #include <Inventor/elements/SoShapeStyleElement.h>
 #include <Inventor/elements/SoSwitchElement.h>
 #include <Inventor/elements/SoTextureEnabledElement.h>
+#include <Inventor/elements/SoViewVolumeElement.h>
 #include <Inventor/events/SoLocation2Event.h>
 #include <Inventor/events/SoMouseButtonEvent.h>
 #include <Inventor/misc/SoChildList.h>
@@ -92,6 +93,7 @@
 #include "SoFCSelectionAction.h"
 #include "ViewParams.h"
 #include "ViewProvider.h"
+#include "ViewProviderDatum.h"
 #include "ViewProviderDocumentObject.h"
 
 
@@ -309,6 +311,60 @@ static bool isAnnotationPick(const SoPickedPoint* pp, const Document* doc)
     return false;
 }
 
+static bool isDatumPick(const SoPickedPoint* pp, const Document* doc)
+{
+    auto path = Gui::toFullPath(pp->getPath());
+    if (!path) {
+        return false;
+    }
+    for (auto& [vp, idx] : doc->getViewProvidersByPath(path)) {
+        if (vp->isDerivedFrom<ViewProviderDatum>()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Datum planes and axes pick "on top" so that they stay selectable behind solids. Coin then
+// reports every one of them at distance zero, so when several datums overlap under the cursor
+// their order in the picked point list is the scene graph order, not their depth: the XY
+// plane would win over an XZ plane that is drawn in front of it. Datum picks lead the list
+// because of that zero distance; put that leading run back into depth order so the datum
+// nearest to the camera wins.
+static std::vector<const SoPickedPoint*> orderDatumPicksByDepth(
+    SoHandleEventAction* action,
+    const Document* doc
+)
+{
+    const SoPickedPointList& points = action->getPickedPointList();
+    std::vector<const SoPickedPoint*> ordered;
+    ordered.reserve(points.getLength());
+    for (int i = 0, count = points.getLength(); i < count; ++i) {
+        ordered.push_back(points[i]);
+    }
+    if (!doc) {
+        return ordered;
+    }
+
+    auto datumsEnd = std::find_if_not(ordered.begin(), ordered.end(), [doc](const SoPickedPoint* pp) {
+        return isDatumPick(pp, doc);
+    });
+    if (std::distance(ordered.begin(), datumsEnd) < 2) {
+        return ordered;
+    }
+
+    const SbViewVolume& volume = SoViewVolumeElement::get(action->getState());
+    const SbVec3f eye = volume.getProjectionPoint();
+    const SbVec3f direction = volume.getProjectionDirection();
+    auto depth = [&](const SoPickedPoint* pp) {
+        return (pp->getPoint() - eye).dot(direction);
+    };
+    std::stable_sort(ordered.begin(), datumsEnd, [&](const SoPickedPoint* a, const SoPickedPoint* b) {
+        return depth(a) < depth(b);
+    });
+    return ordered;
+}
+
 int SoFCUnifiedSelection::getPriority(const SoPickedPoint* p)
 {
     const SoDetail* detail = p->getDetail();
@@ -402,10 +458,9 @@ std::vector<SoFCUnifiedSelection::PickedInfo> SoFCUnifiedSelection::getPickedLis
 {
     ViewProvider* last_vp = nullptr;
     std::vector<PickedInfo> ret;
-    const SoPickedPointList& points = action->getPickedPointList();
-    for (int i = 0, count = points.getLength(); i < count; ++i) {
+    for (const SoPickedPoint* pp : orderDatumPicksByDepth(action, this->pcDocument)) {
         PickedInfo info;
-        info.pp = points[i];
+        info.pp = pp;
         info.vpd = nullptr;
         ViewProvider* vp = nullptr;
         auto path = Gui::toFullPath(info.pp->getPath());
