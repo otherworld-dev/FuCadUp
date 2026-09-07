@@ -497,6 +497,13 @@ void Workbench::retranslate() const
     // ToolBoxManager::getInstance()->retranslate();
     DockWindowManager::instance()->retranslate();
     MenuManager::getInstance()->retranslate();
+
+    if (Ribbon::RibbonManager::isEnabled()) {
+        // The ribbon names its tabs, panels and buttons from the workspace
+        // definition rather than from the menu and toolbar trees above, so
+        // nothing else reaches its captions.
+        Ribbon::RibbonManager::instance()->retranslate();
+    }
 }
 
 PyObject* Workbench::getPyObject()

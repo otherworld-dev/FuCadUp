@@ -2762,7 +2762,7 @@ QToolButton#RibbonQuickAccessButton:disabled {
    src/Gui/Ribbon/FramelessWindow.cpp */
 QLabel#RibbonWindowTitle {
   background-color: transparent;
-  color: @TextDisabledColor;
+  color: @RibbonCaptionColor;
 }
 
 QToolButton#RibbonMinimizeButton,
@@ -2844,7 +2844,7 @@ QWidget#RibbonPanelSeparator {
 
 QLabel#RibbonPanelCaption {
   background-color: transparent;
-  color: @TextDisabledColor;
+  color: @RibbonCaptionColor;
   padding: 0px 2px 0px 2px;
 }
 
@@ -2854,12 +2854,20 @@ QToolButton#RibbonPanelCaptionButton {
   background-color: transparent;
   border: 1px solid transparent;
   border-radius: @InputFieldBorderRadius;
-  color: @TextDisabledColor;
+  color: @RibbonCaptionColor;
   padding: 0px 14px 0px 4px;
 }
 
 QToolButton#RibbonPanelCaptionButton:hover {
   background-color: @AccentHoverColor;
+  border: 1px solid @AccentColor;
+  color: @TextForegroundColor;
+}
+
+/* The reset at the top of this file drops every focus ring, so the ribbon has
+   to say for itself where the keyboard is. The border is already 1px and only
+   transparent, so recolouring it never moves the label. */
+QToolButton#RibbonPanelCaptionButton:focus {
   border: 1px solid @AccentColor;
   color: @TextForegroundColor;
 }
@@ -2894,7 +2902,7 @@ QTabBar#RibbonTabBar::tab {
   background-color: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: @TextDisabledColor;
+  color: @RibbonCaptionColor;
   margin: 0px;
   min-width: 5px;
   padding: 4px 14px 2px 14px;
@@ -2909,6 +2917,13 @@ QTabBar#RibbonTabBar::tab:selected {
   background-color: @PrimaryColor;
   border-bottom: 2px solid @AccentColor;
   color: @TextForegroundColor;
+}
+
+/* QTabBar marks only the selected tab as focused, which is exactly the one the
+   Left and Right keys move away from. Tinting rather than bordering it keeps
+   the label from shifting as focus arrives. */
+QTabBar#RibbonTabBar::tab:selected:focus {
+  background-color: @AccentHoverColor;
 }
 
 QTabBar#RibbonTabBar QToolButton {
@@ -2930,6 +2945,12 @@ QToolButton#RibbonButton {
 
 QToolButton#RibbonButton:hover {
   background-color: @AccentHoverColor;
+  border: 1px solid @AccentColor;
+}
+
+/* Same story as the panel caption: nothing else marks the keyboard position
+   now that the reset has taken the focus ring away. */
+QToolButton#RibbonButton:focus {
   border: 1px solid @AccentColor;
 }
 
@@ -3007,6 +3028,13 @@ QToolButton#RibbonPrimaryButton {
 }
 
 QToolButton#RibbonPrimaryButton:hover {
+  background-color: @AccentHoverColor;
+  border: 1px solid @AccentColor;
+}
+
+/* The primary button is bordered in the accent colour already, so focus has to
+   show in the fill instead. */
+QToolButton#RibbonPrimaryButton:focus {
   background-color: @AccentHoverColor;
   border: 1px solid @AccentColor;
 }
@@ -3130,13 +3158,13 @@ QWidget#CommandPaletteGrid {
 
 QLabel#CommandPaletteSectionCaption {
   background-color: transparent;
-  color: @TextDisabledColor;
+  color: @RibbonCaptionColor;
   padding: 2px 2px 0px 2px;
 }
 
 QLabel#CommandPaletteEmptyLabel {
   background-color: transparent;
-  color: @TextDisabledColor;
+  color: @RibbonCaptionColor;
   padding: 8px 2px 8px 2px;
 }
 
@@ -3147,8 +3175,11 @@ QToolButton#CommandPaletteTile {
   padding: 4px 2px 2px 2px;
 }
 
+/* [current="true"] is the keyboard cursor of the tile grid, which the arrow
+   keys move; see CommandPalette::setCurrentTile(). */
 QToolButton#CommandPaletteTile:hover,
-QToolButton#CommandPaletteTile:focus {
+QToolButton#CommandPaletteTile:focus,
+QToolButton#CommandPaletteTile[current="true"] {
   background-color: @AccentHoverColor;
   border: 1px solid @AccentColor;
 }

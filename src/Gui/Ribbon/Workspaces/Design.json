@@ -214,7 +214,8 @@
                     "caption": "SELECT",
                     "items": [
                         { "command": "Std_SelectionFilter", "label": "Selection Filters" },
-                        { "command": "Std_BoxSelection", "label": "Window Selection" }
+                        { "command": "Std_BoxSelection", "label": "Window Selection" },
+                        { "command": "Std_CommandPalette", "label": "Search Commands" }
                     ],
                     "menu": [
                         { "command": "Std_SelectionFilter", "label": "Selection Filters" },
@@ -224,7 +225,8 @@
                             "command": "Std_BoxElementSelection",
                             "label": "Window Selection (Elements)"
                         },
-                        { "command": "Std_SelectAll", "label": "Select All" }
+                        { "command": "Std_SelectAll", "label": "Select All" },
+                        { "command": "Std_CommandPalette", "label": "Search Commands" }
                     ]
                 }
             ]
@@ -921,7 +923,8 @@
                     "caption": "SELECT",
                     "items": [
                         { "command": "Std_SelectionFilter", "label": "Selection Filters" },
-                        { "command": "Std_BoxSelection", "label": "Window Selection" }
+                        { "command": "Std_BoxSelection", "label": "Window Selection" },
+                        { "command": "Std_CommandPalette", "label": "Search Commands" }
                     ],
                     "menu": [
                         { "command": "Std_SelectionFilter", "label": "Selection Filters" },

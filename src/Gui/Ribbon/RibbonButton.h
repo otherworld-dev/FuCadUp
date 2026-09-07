@@ -30,6 +30,7 @@
 #include <FCGlobal.h>
 
 class QAction;
+class QActionEvent;
 class QMenu;
 
 namespace Gui
@@ -102,6 +103,14 @@ public:
      */
     static void followGroupMenu(ActionGroup* group, QMenu* menu);
 
+protected:
+    /**
+     * Puts the ribbon's own caption and tooltip back after QToolButton has
+     * copied them from the default action, which it does on every change of
+     * that action, the enabled state included.
+     */
+    void actionEvent(QActionEvent* event) override;
+
 private:
     void applySize(ButtonSize size);
 
@@ -110,6 +119,11 @@ private:
      * commands, which decides if a plain click runs the command or opens the menu.
      */
     static bool isSettingsMenu(const QList<QAction*>& children);
+
+    /// The Fusion name the ribbon gave this entry, empty while it has none.
+    QString ribbonText;
+    /// The tooltip built around that name, empty while there is none.
+    QString ribbonToolTip;
 
     Q_DISABLE_COPY(RibbonButton)
 };

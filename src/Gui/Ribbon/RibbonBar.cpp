@@ -84,7 +84,9 @@ RibbonBar::RibbonBar(QWidget* parent)
     tabBar->setDrawBase(false);
     tabBar->setUsesScrollButtons(true);
     tabBar->setElideMode(Qt::ElideNone);
-    tabBar->setFocusPolicy(Qt::NoFocus);
+    // Focus is all QTabBar needs to move between tabs with Left and Right; its
+    // own keyPressEvent() does the rest.
+    tabBar->setFocusPolicy(Qt::TabFocus);
     tabBar->setProperty(contextTabProperty, false);
 
     auto* pageRow = new QWidget(this);

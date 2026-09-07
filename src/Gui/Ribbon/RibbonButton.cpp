@@ -23,6 +23,8 @@
 #include <algorithm>
 
 #include <QAction>
+#include <QActionEvent>
+#include <QEvent>
 #include <QList>
 #include <QMenu>
 #include <QSize>
@@ -63,8 +65,27 @@ RibbonButton::RibbonButton(QWidget* parent)
 {
     setObjectName(QStringLiteral("RibbonButton"));
     setAutoRaise(true);
-    setFocusPolicy(Qt::NoFocus);
+    // The ribbon replaces the toolbars, so it is the only way to most commands
+    // and has to be part of the tab chain rather than mouse-only decoration.
+    setFocusPolicy(Qt::TabFocus);
     setPopupMode(QToolButton::DelayedPopup);
+}
+
+void RibbonButton::actionEvent(QActionEvent* event)
+{
+    QToolButton::actionEvent(event);
+
+    // Qt copies text and tooltip back from the action every time the action
+    // changes, the enabled state included, and Command::testActive toggles that
+    // after every selection change. The ribbon's own naming has to survive it.
+    if (event->type() == QEvent::ActionChanged && event->action() == defaultAction()) {
+        if (!ribbonText.isEmpty()) {
+            setText(ribbonText);
+        }
+        if (!ribbonToolTip.isEmpty()) {
+            setToolTip(ribbonToolTip);
+        }
+    }
 }
 
 void RibbonButton::setPrimary(bool primary)
@@ -150,26 +171,31 @@ bool RibbonButton::setCommand(
 
     if (size == ButtonSize::Large) {
         // The name is not drawn, so it has to lead the tooltip: hovering is the only
-        // way to find out what an icon does.
+        // way to find out what an icon does. The label arrives translated from the
+        // workspace definition and commandMenuText() is translated by the command
+        // framework, so the comparison below is between two strings of the running
+        // language.
         const QString caption = label.isEmpty() ? Action::commandMenuText(cmd) : label;
+        ribbonText = caption;
         setText(caption);
 
         const QString description = guiAction->action()->toolTip();
         if (description.isEmpty()) {
-            setToolTip(caption);
+            ribbonToolTip = caption;
         }
         else if (description.contains(caption)) {
             // FreeCAD's tooltip already opens with the command's own name.
-            setToolTip(description);
+            ribbonToolTip = description;
         }
         else {
             // Only differs when the ribbon renames the command, and the separator
             // has to match the format Qt infers for the rest of the tooltip.
             const bool rich = description.trimmed().startsWith(QLatin1Char('<'));
-            setToolTip(
-                caption + (rich ? QLatin1String("<br/>") : QLatin1String("\n")) + description
-            );
+            ribbonToolTip =
+                caption + (rich ? QLatin1String("<br/>") : QLatin1String("\n")) + description;
         }
+
+        setToolTip(ribbonToolTip);
     }
 
     QList<QAction*> children;

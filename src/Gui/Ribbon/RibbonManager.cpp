@@ -80,6 +80,23 @@ Gui::Action* resolveGuiAction(const QString& command)
     return cmd->getAction();
 }
 
+/**
+ * The Fusion wording of \a text in the running language.
+ *
+ * The workspace definition is data rather than source, so lupdate cannot find
+ * its captions; they are looked up under the "Ribbon" context, which is where a
+ * translator adds the strings of Workspaces/Design.json. A lookup that finds
+ * nothing returns the source string, so an English build is unaffected.
+ */
+QString translateRibbon(const QString& text)
+{
+    if (text.isEmpty()) {
+        return text;
+    }
+
+    return QCoreApplication::translate("Ribbon", text.toUtf8().constData());
+}
+
 void reportMissing(const QString& command, bool quiet)
 {
     if (quiet) {
@@ -265,7 +282,7 @@ void RibbonManager::pushContextTab(const QString& id)
         visibleTabs.push_back(definition);
         pageBuilt.push_back(false);
 
-        index = ribbonBar->addTab(definition->id);
+        index = ribbonBar->addTab(translateRibbon(definition->id));
         ribbonBar->setContextTabPresent(true);
         ribbonBar->setCurrentIndex(index);
     }
@@ -626,7 +643,9 @@ void RibbonManager::rebuildTabs(const QString& workbench)
         }
 
         for (const TabDefinition* tab : visibleTabs) {
-            ribbonBar->addTab(tab->id);
+            // The id stays the untranslated lookup key; only the strip is named
+            // in the user's language.
+            ribbonBar->addTab(translateRibbon(tab->id));
         }
 
         ribbonBar->setContextTabPresent(!activeContextTabs.empty());
@@ -648,6 +667,22 @@ void RibbonManager::rebuildTabs(const QString& workbench)
     }
 
     buildPage(selected);
+}
+
+void RibbonManager::retranslate()
+{
+    if (ribbonBar.isNull()) {
+        return;
+    }
+
+    // Every caption is read from the definition while a page is built, so the
+    // strip has to be built again for a language change to reach it. The pushed
+    // context tabs are kept, and the tab that matches the active workbench is
+    // selected again.
+    const std::string active = WorkbenchManager::instance()->activeName();
+    if (!active.empty()) {
+        rebuildTabs(QString::fromStdString(active));
+    }
 }
 
 void RibbonManager::buildPage(int index)
@@ -686,13 +721,13 @@ QWidget* RibbonManager::createPage(const TabDefinition& tab) const
     std::vector<RibbonPanel*> trailing;
 
     for (const PanelDefinition& panelDefinition : tab.panels) {
-        auto* panel = new RibbonPanel(panelDefinition.caption, page);
+        auto* panel = new RibbonPanel(translateRibbon(panelDefinition.caption), page);
 
         for (const ItemDefinition& item : panelDefinition.items) {
             auto* button = new RibbonButton(panel);
             const bool bound = button->setCommand(
                 item.command,
-                item.label,
+                translateRibbon(item.label),
                 item.subCommands,
                 ButtonSize::Large,
                 item.optional
@@ -781,7 +816,8 @@ QMenu* RibbonManager::createPanelMenu(const PanelDefinition& panel, QWidget* par
         }
 
         if (!children.isEmpty()) {
-            const QString title = item.label.isEmpty() && action ? action->text() : item.label;
+            const QString title =
+                item.label.isEmpty() && action ? action->text() : translateRibbon(item.label);
             if (title.isEmpty()) {
                 continue;
             }
@@ -800,7 +836,9 @@ QMenu* RibbonManager::createPanelMenu(const PanelDefinition& panel, QWidget* par
         }
 
         menu->addAction(
-            item.label.isEmpty() ? action : createLabelledAction(action, item.label, menu)
+            item.label.isEmpty()
+                ? action
+                : createLabelledAction(action, translateRibbon(item.label), menu)
         );
     }
 

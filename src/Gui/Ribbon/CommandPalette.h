@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include <QString>
 #include <QStringList>
 #include <QWidget>
@@ -70,6 +72,11 @@ public:
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
+    /**
+     * Lets the arrow keys drive the tile grid before the search field sees them,
+     * which it would otherwise swallow to move its own caret.
+     */
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     CommandPalette();
@@ -94,13 +101,34 @@ private:
     void showTileMenu(const QString& command, const QPoint& where);
     void togglePinned(const QString& command);
 
+    /**
+     * Handles the grid movement keys of \a event and answers whether it did.
+     * Down steps into the grid; Up, Left, Right, Home and End only move a tile
+     * once the cursor is in it, so that a query can still be edited normally.
+     */
+    bool navigate(const QKeyEvent* event);
+    /// Moves the keyboard cursor by \a rows and \a columns of the tile grid.
+    void moveCurrentTile(int rows, int columns);
+    /// Highlights the tile at \a index; an index outside the grid is ignored.
+    void setCurrentTile(int index);
+    /// The visual row the tile at \a index sits in.
+    int rowOfTile(int index) const;
+    /// Runs the tile under the cursor, or the first one while it sits nowhere.
+    void activateCurrentTile();
+
     static CommandPalette* _instance;
 
     QLineEdit* searchField;
     QWidget* body;
     QVBoxLayout* bodyLayout;
-    /// The tile a plain Return runs, which is the first one of the body.
+    /// The tile a plain Return runs while the keyboard cursor sits nowhere.
     QToolButton* firstTile;
+    /// Every tile of the body, in reading order across all of its sections.
+    std::vector<QToolButton*> tiles;
+    /// Index into tiles of the first tile of each visual row, ascending.
+    std::vector<int> tileRows;
+    /// The tile the arrow keys sit on, -1 while they sit nowhere.
+    int currentTile {-1};
 
     Q_DISABLE_COPY(CommandPalette)
 };

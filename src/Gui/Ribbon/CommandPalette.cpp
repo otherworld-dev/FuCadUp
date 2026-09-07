@@ -21,11 +21,13 @@
 
 
 #include <algorithm>
+#include <iterator>
 #include <vector>
 
 #include <QAction>
 #include <QCoreApplication>
 #include <QCursor>
+#include <QEvent>
 #include <QFontMetrics>
 #include <QGridLayout>
 #include <QKeyEvent>
@@ -38,6 +40,7 @@
 #include <QScreen>
 #include <QSize>
 #include <QString>
+#include <QStyle>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -71,6 +74,8 @@ const char* const paletteParameters = "User parameter:BaseApp/Preferences/Comman
 const char* const pinnedKey = "Pinned";
 const char* const recentKey = "Recent";
 const char* const paletteCommand = "Std_CommandPalette";
+// Selected on by the stylesheet as QToolButton#CommandPaletteTile[current="true"].
+const char* const currentTileProperty = "current";
 
 /// What Fusion offers before the user has pinned anything of their own.
 const char* const defaultPinned = "PartDesign_Extrude,PartDesign_Revolve,PartDesign_Hole,"
@@ -127,6 +132,22 @@ QString commandTooltip(const Command* command)
     }
 
     return QCoreApplication::translate(command->className(), text);
+}
+
+/// Marks \a tile as the one the keyboard cursor sits on, or as a plain tile again.
+void markCurrentTile(QToolButton* tile, bool current)
+{
+    if (!tile || tile->property(currentTileProperty).toBool() == current) {
+        return;
+    }
+
+    tile->setProperty(currentTileProperty, current);
+
+    // A rule that selects on a dynamic property is only re-evaluated once the
+    // style is asked to look at the widget again.
+    tile->style()->unpolish(tile);
+    tile->style()->polish(tile);
+    tile->update();
 }
 }  // namespace
 
@@ -195,6 +216,9 @@ void CommandPalette::buildLayout()
     searchField->setObjectName(QStringLiteral("CommandPaletteSearch"));
     searchField->setPlaceholderText(tr("Search commands"));
     searchField->setClearButtonEnabled(true);
+    // The field holds the caret, so the grid keys have to be taken from it
+    // before it spends them on moving that caret.
+    searchField->installEventFilter(this);
     layout->addWidget(searchField);
 
     body = new QWidget(this);
@@ -208,9 +232,7 @@ void CommandPalette::buildLayout()
         rebuild();
     });
     connect(searchField, &QLineEdit::returnPressed, this, [this]() {
-        if (firstTile) {
-            firstTile->click();
-        }
+        activateCurrentTile();
     });
 }
 
@@ -250,12 +272,85 @@ void CommandPalette::keyPressEvent(QKeyEvent* event)
         return;
     }
 
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        activateCurrentTile();
+        event->accept();
+        return;
+    }
+
+    if (navigate(event)) {
+        event->accept();
+        return;
+    }
+
     QWidget::keyPressEvent(event);
+}
+
+bool CommandPalette::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == searchField && event->type() == QEvent::KeyPress
+        && navigate(static_cast<QKeyEvent*>(event))) {
+        return true;
+    }
+
+    return QWidget::eventFilter(watched, event);
+}
+
+bool CommandPalette::navigate(const QKeyEvent* event)
+{
+    if (tiles.empty()) {
+        return false;
+    }
+
+    // Down is what steps into the grid; until it has been pressed the search
+    // field keeps the caret keys, so a query still edits the way a query should.
+    const bool inGrid = currentTile >= 0;
+
+    switch (event->key()) {
+        case Qt::Key_Down:
+            moveCurrentTile(1, 0);
+            return true;
+        case Qt::Key_Up:
+            if (!inGrid) {
+                return false;
+            }
+            moveCurrentTile(-1, 0);
+            return true;
+        case Qt::Key_Right:
+            if (!inGrid) {
+                return false;
+            }
+            moveCurrentTile(0, 1);
+            return true;
+        case Qt::Key_Left:
+            if (!inGrid) {
+                return false;
+            }
+            moveCurrentTile(0, -1);
+            return true;
+        case Qt::Key_Home:
+            if (!inGrid) {
+                return false;
+            }
+            setCurrentTile(0);
+            return true;
+        case Qt::Key_End:
+            if (!inGrid) {
+                return false;
+            }
+            setCurrentTile(static_cast<int>(tiles.size()) - 1);
+            return true;
+        default:
+            return false;
+    }
 }
 
 void CommandPalette::clearBody()
 {
     firstTile = nullptr;
+    tiles.clear();
+    tileRows.clear();
+    currentTile = -1;
 
     // Reparenting to nothing and deleting later keeps a tile that is still
     // inside its own clicked() handler alive until that handler has returned.
@@ -315,6 +410,14 @@ void CommandPalette::addSection(const QString& caption, const QStringList& comma
         if (!firstTile) {
             firstTile = tile;
         }
+
+        // Every section starts a row of its own and its last row is usually
+        // shorter than the grid, so where the rows begin is recorded rather
+        // than worked out from the tile count.
+        if (placed % gridColumns == 0) {
+            tileRows.push_back(static_cast<int>(tiles.size()));
+        }
+        tiles.push_back(tile);
         ++placed;
     }
 
@@ -344,6 +447,7 @@ QToolButton* CommandPalette::createTile(const QString& command, QWidget* parent)
 
     auto* tile = new QToolButton(parent);
     tile->setObjectName(QStringLiteral("CommandPaletteTile"));
+    tile->setProperty(currentTileProperty, false);
     tile->setAutoRaise(true);
     tile->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     tile->setIcon(action->icon());
@@ -474,6 +578,82 @@ void CommandPalette::togglePinned(const QString& command)
 
     writeList(pinnedKey, pinned);
     rebuild();
+}
+
+void CommandPalette::setCurrentTile(int index)
+{
+    if (index < 0 || index >= static_cast<int>(tiles.size())) {
+        return;
+    }
+
+    if (currentTile >= 0 && currentTile < static_cast<int>(tiles.size())) {
+        markCurrentTile(tiles[currentTile], false);
+    }
+
+    currentTile = index;
+    markCurrentTile(tiles[currentTile], true);
+}
+
+int CommandPalette::rowOfTile(int index) const
+{
+    // The row a tile sits in is the last one that starts at or before it.
+    const auto row = std::upper_bound(tileRows.cbegin(), tileRows.cend(), index);
+    return static_cast<int>(std::distance(tileRows.cbegin(), row)) - 1;
+}
+
+void CommandPalette::moveCurrentTile(int rows, int columns)
+{
+    if (tiles.empty()) {
+        return;
+    }
+
+    if (currentTile < 0) {
+        // The first step of the keyboard cursor is into the grid, wherever it
+        // was aimed.
+        setCurrentTile(0);
+        return;
+    }
+
+    const int last = static_cast<int>(tiles.size()) - 1;
+
+    if (rows == 0) {
+        setCurrentTile(std::clamp(currentTile + columns, 0, last));
+        return;
+    }
+
+    const int row = rowOfTile(currentTile);
+    const int target = row + rows;
+    if (target < 0 || target >= static_cast<int>(tileRows.size())) {
+        return;
+    }
+
+    // Keeping the column rather than adding a fixed number of tiles is what
+    // makes a vertical step land under the tile it started on, even where a
+    // short last row sits between the two.
+    const int column = currentTile - tileRows[row];
+    const int end =
+        target + 1 < static_cast<int>(tileRows.size()) ? tileRows[target + 1] - 1 : last;
+
+    setCurrentTile(std::min(tileRows[target] + column, end));
+}
+
+void CommandPalette::activateCurrentTile()
+{
+    // QLineEdit ignores Return rather than consuming it, so the very same key
+    // press reaches keyPressEvent() after returnPressed() has already run the
+    // tile. By then the palette has hidden itself, and the command must not be
+    // started a second time.
+    if (!isVisible()) {
+        return;
+    }
+
+    QToolButton* tile = currentTile >= 0 && currentTile < static_cast<int>(tiles.size())
+        ? tiles[currentTile]
+        : firstTile;
+
+    if (tile) {
+        tile->click();
+    }
 }
 
 #include "moc_CommandPalette.cpp"

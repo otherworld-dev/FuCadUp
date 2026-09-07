@@ -98,6 +98,14 @@ public:
      */
     void popContextTab(const QString& id);
 
+public Q_SLOTS:
+    /**
+     * Rebuilds the tab strip so that every caption the workspace definition
+     * supplies is looked up again, in the language that is now active. Called
+     * from Workbench::retranslate(), which is where a language change lands.
+     */
+    void retranslate();
+
 private:
     struct ItemDefinition
     {
