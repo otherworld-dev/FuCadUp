@@ -34,6 +34,15 @@ SET(Test_SRCS
     TestCornerAxisCrossVisual.py
     TestViewProviderLink.py
     TestOriginPlaneHover.py
+    TestFusionShortcuts.py
+    TestExtrudeFlip.py
+    TestPartDesignLetters.py
+    TestRibbon.py
+    TestFuCadDefaults.py
+    TestSketcherSnapFeedback.py
+    TestMarkingMenu.py
+    TestTimeline.py
+    TestPartDesignDialogTitles.py
 )
 
 SET(TestData_SRCS
