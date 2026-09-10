@@ -90,11 +90,12 @@ struct ScreenPreselectionPolicy
 struct PreselectionPriority
 {
     static constexpr int None = 0;
-    static constexpr int ConstraintDatumLabel = 100;
+    static constexpr int ConstraintDatumPresentation = 100;
     static constexpr int Face = 200;
     static constexpr int Axis = 300;
     static constexpr int ConstraintFallback = 350;
     static constexpr int Edge = 400;
+    static constexpr int ConstraintDatumAnnotation = 425;
     static constexpr int ConstraintIcon = 450;
     static constexpr int Point = 500;
 };
@@ -110,8 +111,11 @@ int preselectionPriority(const EditModeCoinManager::PreselectionResult& result)
             if (result.ConstraintKind == Result::ConstraintHitKind::Icon) {
                 return PreselectionPriority::ConstraintIcon;
             }
-            if (result.ConstraintKind == Result::ConstraintHitKind::DatumLabel) {
-                return PreselectionPriority::ConstraintDatumLabel;
+            if (result.ConstraintKind == Result::ConstraintHitKind::DatumPresentation) {
+                return PreselectionPriority::ConstraintDatumPresentation;
+            }
+            if (result.ConstraintKind == Result::ConstraintHitKind::DatumAnnotation) {
+                return PreselectionPriority::ConstraintDatumAnnotation;
             }
             return PreselectionPriority::ConstraintFallback;
         case Result::HitKind::Edge:
@@ -1136,9 +1140,6 @@ void EditModeCoinManager::drawEdit(const std::vector<Base::Vector2d>& EditCurve,
     editModeScenegraphNodes.EditCurvesMaterials->diffuseColor.setNum(EditCurve.size());
     SbVec3f* verts = editModeScenegraphNodes.EditCurvesCoordinate->point.startEditing();
     int32_t* index = editModeScenegraphNodes.EditCurveSet->numVertices.startEditing();
-    SbColor* color = editModeScenegraphNodes.EditCurvesMaterials->diffuseColor.startEditing();
-
-    setEditDrawStyle(mode);
 
     int i = 0;  // setting up the line set
     for (std::vector<Base::Vector2d>::const_iterator it = EditCurve.begin(); it != EditCurve.end();
@@ -1149,20 +1150,12 @@ void EditModeCoinManager::drawEdit(const std::vector<Base::Vector2d>& EditCurve,
             ViewProviderSketchCoinAttorney::getViewOrientationFactor(viewProvider)
                 * drawingParameters.zEdit
         );
-        switch (mode) {
-            case GeometryCreationMode::Normal:
-                color[i] = drawingParameters.CurveColor;
-                break;
-            case GeometryCreationMode::Construction:
-                color[i] = drawingParameters.CurveDraftColor;
-                break;
-        }
     }
 
     index[0] = EditCurve.size();
     editModeScenegraphNodes.EditCurvesCoordinate->point.finishEditing();
     editModeScenegraphNodes.EditCurveSet->numVertices.finishEditing();
-    editModeScenegraphNodes.EditCurvesMaterials->diffuseColor.finishEditing();
+    updateEditCurveAppearance(mode);
 }
 
 void EditModeCoinManager::drawEdit(
@@ -1181,9 +1174,6 @@ void EditModeCoinManager::drawEdit(
     editModeScenegraphNodes.EditCurvesMaterials->diffuseColor.setNum(ncoords);
     SbVec3f* verts = editModeScenegraphNodes.EditCurvesCoordinate->point.startEditing();
     int32_t* index = editModeScenegraphNodes.EditCurveSet->numVertices.startEditing();
-    SbColor* color = editModeScenegraphNodes.EditCurvesMaterials->diffuseColor.startEditing();
-
-    setEditDrawStyle(mode);
 
     int coordindex = 0;
     int indexindex = 0;
@@ -1195,16 +1185,6 @@ void EditModeCoinManager::drawEdit(
                 ViewProviderSketchCoinAttorney::getViewOrientationFactor(viewProvider)
                     * drawingParameters.zEdit
             );
-
-            switch (mode) {
-                case GeometryCreationMode::Normal:
-                    color[coordindex] = drawingParameters.CurveColor;
-                    break;
-                case GeometryCreationMode::Construction:
-                    color[coordindex] = drawingParameters.CurveDraftColor;
-                    break;
-            }
-
             coordindex++;
         }
         index[indexindex] = v.size();
@@ -1213,7 +1193,23 @@ void EditModeCoinManager::drawEdit(
 
     editModeScenegraphNodes.EditCurvesCoordinate->point.finishEditing();
     editModeScenegraphNodes.EditCurveSet->numVertices.finishEditing();
-    editModeScenegraphNodes.EditCurvesMaterials->diffuseColor.finishEditing();
+    updateEditCurveAppearance(mode);
+}
+
+void EditModeCoinManager::updateEditCurveAppearance(GeometryCreationMode mode)
+{
+    setEditDrawStyle(mode);
+
+    auto& colors = editModeScenegraphNodes.EditCurvesMaterials->diffuseColor;
+    SbColor* values = colors.startEditing();
+    const SbColor& color = mode == GeometryCreationMode::Normal ? drawingParameters.CurveColor
+                                                                : drawingParameters.CurveDraftColor;
+
+    for (int i = 0; i < colors.getNum(); ++i) {
+        values[i] = color;
+    }
+
+    colors.finishEditing();
 }
 
 void EditModeCoinManager::drawLineExtensionAutoConstraintHint(
@@ -1354,8 +1350,11 @@ EditModeCoinManager::PreselectionResult EditModeCoinManager::detectConstraintPre
             case ConstraintResult::HitKind::Icon:
                 target.ConstraintKind = PreselectionResult::ConstraintHitKind::Icon;
                 break;
-            case ConstraintResult::HitKind::DatumLabel:
-                target.ConstraintKind = PreselectionResult::ConstraintHitKind::DatumLabel;
+            case ConstraintResult::HitKind::DatumPresentation:
+                target.ConstraintKind = PreselectionResult::ConstraintHitKind::DatumPresentation;
+                break;
+            case ConstraintResult::HitKind::DatumAnnotation:
+                target.ConstraintKind = PreselectionResult::ConstraintHitKind::DatumAnnotation;
                 break;
             case ConstraintResult::HitKind::None:
                 target.ConstraintKind = PreselectionResult::ConstraintHitKind::None;
@@ -1861,6 +1860,17 @@ void EditModeCoinManager::setConstraintSelectability(bool enabled /* = true */)
     pEditModeConstraintCoinManager->setConstraintSelectability(enabled);
 }
 
+void EditModeCoinManager::setOriginPointMarker(bool hollow)
+{
+    originPointMarkerHollow = hollow;
+    const char* markerName = hollow ? "CIRCLE_LINE" : "CIRCLE_FILLED";
+
+    editModeScenegraphNodes.OriginPointSet->markerIndex
+        = Gui::Inventor::MarkerBitmaps::getMarkerIndex(markerName, drawingParameters.markerSize);
+    editModeScenegraphNodes.OriginPointSetOccluded->markerIndex
+        = Gui::Inventor::MarkerBitmaps::getMarkerIndex(markerName, drawingParameters.markerSize);
+}
+
 
 void EditModeCoinManager::updateGeometryLayersConfiguration()
 {
@@ -1971,6 +1981,9 @@ void EditModeCoinManager::createEditModeInventorNodes()
 
     editModeScenegraphNodes.OriginPointMaterial = new SoMaterial;
     editModeScenegraphNodes.OriginPointMaterial->setName("OriginPointMaterial");
+    editModeScenegraphNodes.OriginPointMaterial->transparency.setValue(
+        drawingParameters.originTransparency
+    );
     visibleOrigin->addChild(editModeScenegraphNodes.OriginPointMaterial);
 
     editModeScenegraphNodes.OriginPointDrawStyle = new SoDrawStyle;
@@ -2069,6 +2082,9 @@ void EditModeCoinManager::createEditModeInventorNodes()
     editModeScenegraphNodes.OriginPointMaterialOccluded->setName("OriginPointMaterialOccluded");
     editModeScenegraphNodes.OriginPointMaterialOccluded->diffuseColor.setValue(
         drawingParameters.FullyConstraintElementColor
+    );
+    editModeScenegraphNodes.OriginPointMaterialOccluded->transparency.setValue(
+        drawingParameters.occludedAxisTransparency
     );
     occludedOverlayRoot->addChild(editModeScenegraphNodes.OriginPointMaterialOccluded);
 
@@ -2403,10 +2419,7 @@ void EditModeCoinManager::updateInventorNodeSizes()
 
     editModeScenegraphNodes.OriginPointDrawStyle->pointSize = 8
         * drawingParameters.pixelScalingFactor;
-    editModeScenegraphNodes.OriginPointSet->markerIndex
-        = Gui::Inventor::MarkerBitmaps::getMarkerIndex("CIRCLE_FILLED", drawingParameters.markerSize);
-    editModeScenegraphNodes.OriginPointSetOccluded->markerIndex
-        = Gui::Inventor::MarkerBitmaps::getMarkerIndex("CIRCLE_FILLED", drawingParameters.markerSize);
+    setOriginPointMarker(originPointMarkerHollow);
 
     editModeScenegraphNodes.RootCrossDrawStyle->lineWidth = drawingParameters.AxisLineWidth
         * drawingParameters.pixelScalingFactor;
@@ -2472,10 +2485,16 @@ void EditModeCoinManager::updateInventorColors()
     editModeScenegraphNodes.RootCrossVMaterials->transparency.setValue(
         drawingParameters.axisTransparency
     );
+    editModeScenegraphNodes.OriginPointMaterial->transparency.setValue(
+        drawingParameters.originTransparency
+    );
     editModeScenegraphNodes.RootCrossMaterialsOccludedH->transparency.setValue(
         drawingParameters.occludedAxisTransparency
     );
     editModeScenegraphNodes.RootCrossMaterialsOccludedV->transparency.setValue(
+        drawingParameters.occludedAxisTransparency
+    );
+    editModeScenegraphNodes.OriginPointMaterialOccluded->transparency.setValue(
         drawingParameters.occludedAxisTransparency
     );
     editModeScenegraphNodes.textMaterial->diffuseColor = drawingParameters.CursorTextColor;

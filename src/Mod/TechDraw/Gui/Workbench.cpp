@@ -205,6 +205,7 @@ Gui::MenuItem* Workbench::setupMenuBar() const
     *pages << "Separator";
     *pages << "TechDraw_ExportPageSVG";
     *pages << "TechDraw_ExportPageDXF";
+    *pages << "TechDraw_ExportPagePDF";
 
     // views
     Gui::MenuItem* views = new Gui::MenuItem;
@@ -303,6 +304,7 @@ Gui::ToolBarItem* Workbench::setupToolBars() const
     *views << "TechDraw_SectionGroup";
     *views << "TechDraw_DetailView";
     *views << "TechDraw_DraftView";
+    *views << "TechDraw_SpreadsheetView";
     *views << "TechDraw_ClipGroup";
 
     Gui::ToolBarItem* stacking = new Gui::ToolBarItem(root);

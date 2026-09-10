@@ -36,6 +36,7 @@
 #include "FeatureBase.h"
 #include "FeatureBoolean.h"
 #include "FeatureChamfer.h"
+#include "FeatureDefeaturing.h"
 #include "FeatureDraft.h"
 #include "FeatureDressUp.h"
 #include "FeatureFillet.h"
@@ -125,6 +126,7 @@ PyMOD_INIT_FUNC(_PartDesign)
     PartDesign::OffsetFace                  ::init();
     PartDesign::MoveFace                    ::init();
     PartDesign::DeleteFace                  ::init();
+    PartDesign::Defeaturing                 ::init();
     PartDesign::Pipe                        ::init();
     PartDesign::AdditivePipe                ::init();
     PartDesign::SubtractivePipe             ::init();

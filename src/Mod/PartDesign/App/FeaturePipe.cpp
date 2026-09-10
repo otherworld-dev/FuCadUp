@@ -527,7 +527,7 @@ App::DocumentObjectExecReturn* Pipe::execute()
         }
 
         if (base.isNull() || !combinesWithBase()) {
-            if (getAddSubType() == FeatureAddSub::Subtractive) {
+            if (getAddSubType() == FeatureAddSub::Type::Subtractive) {
                 return new App::DocumentObjectExecReturn(
                     QT_TRANSLATE_NOOP("Exception", "Pipe: There is nothing to subtract from")
                 );
@@ -548,7 +548,7 @@ App::DocumentObjectExecReturn* Pipe::execute()
             return App::DocumentObject::StdReturn;
         }
 
-        Part::TopoShape boolOp = Part::TopoShape(base.Tag, getDocument()->getStringHasher());
+        Part::TopoShape boolOp(0, getDocument()->getStringHasher());
 
         result.Tag = -getID();  // invert tag to differentiate the pre-boolean pipe
         //                        from the post-boolean pipe
@@ -590,16 +590,16 @@ App::DocumentObjectExecReturn* Pipe::execute()
         }
 
         // store shape before refinement
-        this->rawShape = boolOp;
-        boolOp = refineShapeIfActive(boolOp);
-        if (!isSingleSolidRuleSatisfied(boolOp.getShape())) {
+        this->rawShape = solid;
+        solid = refineShapeIfActive(solid);
+        if (!isSingleSolidRuleSatisfied(solid.getShape())) {
             return new App::DocumentObjectExecReturn(QT_TRANSLATE_NOOP(
                 "Exception",
                 "Result has multiple solids: enable 'Allow Compound' in the active body."
             ));
         }
-        boolOp = getSolid(boolOp);
-        Shape.setValue(boolOp);
+
+        Shape.setValue(solid);
         return App::DocumentObject::StdReturn;
     }
     catch (Standard_Failure& e) {
@@ -764,13 +764,13 @@ void Pipe::buildPipePath(
 PROPERTY_SOURCE(PartDesign::AdditivePipe, PartDesign::Pipe)
 AdditivePipe::AdditivePipe()
 {
-    addSubType = Additive;
+    defineAdditive();
 }
 
 PROPERTY_SOURCE(PartDesign::SubtractivePipe, PartDesign::Pipe)
 SubtractivePipe::SubtractivePipe()
 {
-    addSubType = Subtractive;
+    defineSubtractive();
 }
 
 void Pipe::handleChangedPropertyType(Base::XMLReader& reader, const char* TypeName, App::Property* prop)

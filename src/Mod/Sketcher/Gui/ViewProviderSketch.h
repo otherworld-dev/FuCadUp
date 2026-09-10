@@ -1016,6 +1016,7 @@ private:
 
     //********* ViewProviderSketchDrawSketchHandlerAttorney **********//
     void setConstraintSelectability(bool enabled = true);
+    void setOriginPointMarker(bool hollow);
     void setPositionText(const Base::Vector2d& Pos, const SbString& txt);
     void setPositionText(const Base::Vector2d& Pos);
     void resetPositionText();

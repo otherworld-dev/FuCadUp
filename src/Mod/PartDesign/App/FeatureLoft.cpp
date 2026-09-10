@@ -397,13 +397,13 @@ App::DocumentObjectExecReturn* Loft::execute()
 PROPERTY_SOURCE(PartDesign::AdditiveLoft, PartDesign::Loft)
 AdditiveLoft::AdditiveLoft()
 {
-    addSubType = Additive;
+    defineAdditive();
 }
 
 PROPERTY_SOURCE(PartDesign::SubtractiveLoft, PartDesign::Loft)
 SubtractiveLoft::SubtractiveLoft()
 {
-    addSubType = Subtractive;
+    defineSubtractive();
 }
 
 void Loft::handleChangedPropertyType(Base::XMLReader& reader, const char* TypeName, App::Property* prop)

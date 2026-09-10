@@ -41,7 +41,7 @@ class PartDesignExport FeatureAddSub: public PartDesign::FeatureRefine
     PROPERTY_HEADER_WITH_OVERRIDE(PartDesign::FeatureAddSub);
 
 public:
-    enum Type
+    enum class Type
     {
         Additive = 0,
         Subtractive
@@ -59,6 +59,7 @@ public:
     FeatureAddSub();
 
     void onChanged(const App::Property*) override;
+
     Type getAddSubType();
     OperationType getOperationType() const;
 
@@ -66,6 +67,8 @@ public:
     bool combinesWithBase() const;
     /// Part::OpCodes maker matching Operation; throws for operations without a boolean
     const char* getBooleanOpCode() const;
+    /// Upstream's name for getBooleanOpCode(), so FreeCAD's feature classes merge cleanly
+    const char* getBooleanMaker() const;
 
     short mustExecute() const override;
 
@@ -83,7 +86,12 @@ public:
 protected:
     void onDocumentRestored() override;
 
-    Type addSubType {Additive};
+    /// Seed Operation with Join and Cut respectively. Unlike upstream these leave
+    /// every operation on offer, because one FuCadUp tool does both.
+    void defineAdditive();
+    void defineSubtractive();
+
+    Type addSubType {Type::Additive};
 
 private:
     /// False until something outside the constructor assigns Operation, which for a document

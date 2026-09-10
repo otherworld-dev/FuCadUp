@@ -76,7 +76,7 @@ void FeatureAddSub::setupObject()
     FeatureRefine::setupObject();
 
     Operation.setValue(
-        static_cast<long>(addSubType == Subtractive ? OperationType::Cut : OperationType::Join)
+        static_cast<long>(addSubType == Type::Subtractive ? OperationType::Cut : OperationType::Join)
     );
 }
 
@@ -86,7 +86,7 @@ void FeatureAddSub::onDocumentRestored()
     // add/sub nature the concrete feature class was hardcoded to.
     if (!operationInitialized) {
         Operation.setValue(
-            static_cast<long>(addSubType == Subtractive ? OperationType::Cut : OperationType::Join)
+            static_cast<long>(addSubType == Type::Subtractive ? OperationType::Cut : OperationType::Join)
         );
     }
 
@@ -118,15 +118,30 @@ const char* FeatureAddSub::getBooleanOpCode() const
     }
 }
 
+void FeatureAddSub::defineAdditive()
+{
+    addSubType = Type::Additive;
+}
+
+void FeatureAddSub::defineSubtractive()
+{
+    addSubType = Type::Subtractive;
+}
+
+const char* FeatureAddSub::getBooleanMaker() const
+{
+    return getBooleanOpCode();
+}
+
 FeatureAddSub::Type FeatureAddSub::getAddSubType()
 {
     switch (getOperationType()) {
         case OperationType::Join:
         case OperationType::NewBody:
-            return Additive;
+            return Type::Additive;
         case OperationType::Cut:
         case OperationType::Intersect:
-            return Subtractive;
+            return Type::Subtractive;
         default:
             throw Base::ValueError("Unhandled value of the Operation property");
     }
@@ -142,13 +157,14 @@ short FeatureAddSub::mustExecute() const
 
 void FeatureAddSub::getAddSubShape(Part::TopoShape& addShape, Part::TopoShape& subShape)
 {
-    if (getAddSubType() == Additive) {
+    if (getAddSubType() == Type::Additive) {
         addShape = AddSubShape.getShape();
     }
     else {
         subShape = AddSubShape.getShape();
     }
 }
+
 void FeatureAddSub::updatePreviewShape()
 {
     const auto notifyWarning = [](const QString& message) {
@@ -159,7 +175,7 @@ void FeatureAddSub::updatePreviewShape()
     };
 
     // for subtractive shapes we want to also showcase removed volume, not only the tool
-    if (getAddSubType() == Subtractive) {
+    if (getAddSubType() == Type::Subtractive) {
         TopoShape base = getBaseTopoShape(true).moved(getLocation().Inverted());
         const TopoShape& tool = AddSubShape.getShape();
 
@@ -203,7 +219,7 @@ void FeatureAddSub::updatePreviewShape()
                 notifyWarning(QString::fromUtf8(e.GetMessageString()));
             }
             catch (Base::Exception& e) {
-                notifyWarning(QString::fromStdString(e.getMessage()));
+                notifyWarning(QString::fromStdString(e.what()));
             }
             PreviewShape.setValue(base);
             return;
@@ -247,7 +263,7 @@ PROPERTY_SOURCE(PartDesign::FeatureAdditivePython, PartDesign::FeatureAddSubPyth
 
 FeatureAdditivePython::FeatureAdditivePython()
 {
-    addSubType = Additive;
+    defineAdditive();
 }
 
 FeatureAdditivePython::~FeatureAdditivePython() = default;
@@ -257,7 +273,7 @@ PROPERTY_SOURCE(PartDesign::FeatureSubtractivePython, PartDesign::FeatureAddSubP
 
 FeatureSubtractivePython::FeatureSubtractivePython()
 {
-    addSubType = Subtractive;
+    defineSubtractive();
 }
 
 FeatureSubtractivePython::~FeatureSubtractivePython() = default;

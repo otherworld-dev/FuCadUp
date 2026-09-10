@@ -77,6 +77,8 @@ SET(FeaturesDressUp_SRCS
     FeatureMoveFace.h
     FeatureDeleteFace.cpp
     FeatureDeleteFace.h
+    FeatureDefeaturing.cpp
+    FeatureDefeaturing.h
 )
 SOURCE_GROUP("DressUpFeatures" FILES ${FeaturesDressUp_SRCS})
 
@@ -162,9 +164,7 @@ if (MSVC)
     target_compile_options(PartDesign PRIVATE /wd4275)
 endif()
 
-if (FREECAD_WARN_ERROR)
-    target_compile_warn_error(PartDesign)
-endif()
+target_compile_warn_error(PartDesign)
 
 if(FREECAD_USE_PCH)
     target_precompile_headers(PartDesign PRIVATE

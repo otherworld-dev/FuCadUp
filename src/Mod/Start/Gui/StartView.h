@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <fastsignals/signal.h>
+
 #include <Mod/Start/StartGlobal.h>
 #include <Base/Type.h>
 #include <Gui/MDIView.h>
@@ -119,6 +121,7 @@ private:
     QLabel* _fusionControlsBodyLabel;
     QPushButton* _openFirstStart;
     QCheckBox* _showOnStartupCheckBox;
+    fastsignals::scoped_connection _saveddoc;
 
     bool isInitialized = false;
 

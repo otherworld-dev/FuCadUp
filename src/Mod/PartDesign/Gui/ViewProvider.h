@@ -93,8 +93,6 @@ public:
 
     void toggleVisibility() override;
 
-    /// Provides preview shape
-    Part::TopoShape getPreviewShape() const override;
     /// Toggles visibility of the preview
     void showPreviousFeature(bool);
 

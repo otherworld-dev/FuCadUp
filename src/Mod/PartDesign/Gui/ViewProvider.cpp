@@ -294,7 +294,7 @@ void ViewProvider::updatePreview()
     if (auto* addSubFeature = getObject<PartDesign::FeatureAddSub>()) {
         // The tool preview is only for subtractive features; an operation turned back
         // into an additive one takes its tool off the screen.
-        if (addSubFeature->getAddSubType() != PartDesign::FeatureAddSub::Subtractive) {
+        if (addSubFeature->getAddSubType() != PartDesign::FeatureAddSub::Type::Subtractive) {
             updatePreviewShape({}, pcToolPreview);
             return;
         }
@@ -417,17 +417,6 @@ bool ViewProvider::onDelete(const std::vector<std::string>&)
     makeChildrenVisible();
 
     return true;
-}
-
-Part::TopoShape ViewProvider::getPreviewShape() const
-{
-    if (auto feature = getObject()->getExtensionByType<Part::PreviewExtension>(true)) {
-        // Feature is responsible for generating proper shape and this ViewProvider
-        // is using it instead of more normal `Shape` property.
-        return feature->PreviewShape.getShape();
-    }
-
-    return {};
 }
 
 void ViewProvider::showPreviousFeature(bool enable)

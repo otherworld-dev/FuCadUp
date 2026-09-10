@@ -53,6 +53,8 @@
 #include <Mod/Part/App/FaceMakerCheese.h>
 
 #include "FeatureHelix.h"
+#include "App/Document.h"
+#include "Mod/Part/App/TopoShapeOpCode.h"
 
 using namespace PartDesign;
 
@@ -70,7 +72,7 @@ const App::PropertyAngle::Constraints Helix::floatAngle = {-89.0, 89.0, 1.0};
 
 Helix::Helix()
 {
-    addSubType = FeatureAddSub::Additive;
+    defineAdditive();
     auto initialMode = HelixMode::pitch_height_angle;
 
     const char* group = "Helix";
@@ -181,16 +183,6 @@ Helix::Helix()
         )
     );
     ADD_PROPERTY_TYPE(
-        Outside,
-        (false),
-        group,
-        App::Prop_None,
-        QT_TRANSLATE_NOOP(
-            "App::Property",
-            "If set, the result will be the intersection of the profile and the preexisting body."
-        )
-    );
-    ADD_PROPERTY_TYPE(
         HasBeenEdited,
         (false),
         group,
@@ -210,6 +202,13 @@ Helix::Helix()
         QT_TRANSLATE_NOOP("App::Property", "Fusion Tolerance for the Helix, increase if helical shape does not merge nicely with part.")
     );
     Tolerance.setConstraints(&floatTolerance);
+    ADD_PROPERTY_TYPE(
+        Outside,
+        (false),
+        group,
+        App::Prop_Hidden,
+        QT_TRANSLATE_NOOP("App::Property", "deprecated, do not use")
+    );
 
     setReadWriteStatusForMode(initialMode);
 }
@@ -230,7 +229,7 @@ App::DocumentObjectExecReturn* Helix::execute()
     }
 
     // Validate and normalize parameters
-    HelixMode mode = static_cast<HelixMode>(Mode.getValue());
+    auto mode = static_cast<HelixMode>(Mode.getValue());
     if (mode == HelixMode::pitch_height_angle) {
         if (Pitch.getValue() < Precision::Confusion()) {
             return new App::DocumentObjectExecReturn(
@@ -410,7 +409,7 @@ App::DocumentObjectExecReturn* Helix::execute()
 
         if (base.isNull() || !combinesWithBase()) {
 
-            if (getAddSubType() == FeatureAddSub::Subtractive) {
+            if (getAddSubType() == FeatureAddSub::Type::Subtractive) {
                 return new App::DocumentObjectExecReturn(
                     QT_TRANSLATE_NOOP("Exception", "Error: There is nothing to subtract")
                 );
@@ -853,13 +852,11 @@ void Helix::setReadWriteStatusForMode(HelixMode inputMode)
 PROPERTY_SOURCE(PartDesign::AdditiveHelix, PartDesign::Helix)
 AdditiveHelix::AdditiveHelix()
 {
-    addSubType = Additive;
-    Outside.setStatus(App::Property::Hidden, true);
+    defineAdditive();
 }
 
 PROPERTY_SOURCE(PartDesign::SubtractiveHelix, PartDesign::Helix)
 SubtractiveHelix::SubtractiveHelix()
 {
-    addSubType = Subtractive;
-    Outside.setStatus(App::Property::Hidden, false);
+    defineSubtractive();
 }

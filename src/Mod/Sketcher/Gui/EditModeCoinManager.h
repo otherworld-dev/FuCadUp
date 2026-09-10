@@ -199,7 +199,8 @@ public:
         {
             None,
             Icon,
-            DatumLabel
+            DatumPresentation,
+            DatumAnnotation
         };
 
         enum SpecialValues
@@ -277,6 +278,7 @@ public:
     void clearSnapMarker();
     void drawEdit(const std::vector<Base::Vector2d>& EditCurve, GeometryCreationMode mode);
     void drawEdit(const std::list<std::vector<Base::Vector2d>>& list, GeometryCreationMode mode);
+    void updateEditCurveAppearance(GeometryCreationMode mode);
     void drawLineExtensionAutoConstraintHint(const std::vector<Base::Vector2d>& HintCurve);
     void drawParallelPerpendicularHint(const std::vector<Base::Vector2d>& HintLines, int activeLineIndex);
     void setPositionText(const Base::Vector2d& Pos, const SbString& txt);
@@ -344,6 +346,9 @@ public:
     //@{
     void setConstraintSelectability(bool enabled = true);
     //@}
+
+    /// Use an outline origin marker while a drawing tool is active.
+    void setOriginPointMarker(bool hollow);
 
     // Updates the Axes extension to span the specified area.
     void updateAxesLength(const Base::BoundBox2d& bb);
@@ -437,6 +442,8 @@ private:
     // Coin Helpers
     std::unique_ptr<EditModeConstraintCoinManager> pEditModeConstraintCoinManager;
     std::unique_ptr<EditModeGeometryCoinManager> pEditModeGeometryCoinManager;
+
+    bool originPointMarkerHollow = false;
 };
 
 
