@@ -86,6 +86,9 @@ public:
 protected:
     void onDocumentRestored() override;
 
+    /// Re-read Operation from a document whose enumeration is not FuCadUp's
+    void migrateForeignOperation();
+
     /// Seed Operation with Join and Cut respectively. Unlike upstream these leave
     /// every operation on offer, because one FuCadUp tool does both.
     void defineAdditive();

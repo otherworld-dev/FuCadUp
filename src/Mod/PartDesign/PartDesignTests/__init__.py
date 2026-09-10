@@ -13,6 +13,7 @@ from . import TestLinearPattern
 from . import TestLoft
 from . import TestMirrored
 from . import TestMultiTransform
+from . import TestOperationMigration
 from . import TestPad
 from . import TestPipe
 from . import TestPocket

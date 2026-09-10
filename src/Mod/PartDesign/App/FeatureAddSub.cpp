@@ -23,6 +23,10 @@
  ***************************************************************************/
 
 
+#include <cstring>
+#include <string>
+#include <vector>
+
 #include <Standard_Failure.hxx>
 
 
@@ -71,6 +75,33 @@ void FeatureAddSub::onChanged(const App::Property* property)
     Feature::onChanged(property);
 }
 
+namespace
+{
+/// Upstream FreeCAD narrows Operation to what one feature class can do: {"Union"} for an
+/// additive feature, {"Subtraction", "Common"} for a subtractive one. Those lists are
+/// custom enumerations, so a FreeCAD document stores the value names alongside the index
+/// it saves, and the index alone means something else here, where every feature offers
+/// all four operations. Such a document is therefore read by name.
+FeatureAddSub::OperationType operationFromName(const char* name)
+{
+    if (name) {
+        if (strcmp(name, "Subtraction") == 0 || strcmp(name, "Cut") == 0) {
+            return FeatureAddSub::OperationType::Cut;
+        }
+        if (strcmp(name, "Common") == 0 || strcmp(name, "Intersect") == 0) {
+            return FeatureAddSub::OperationType::Intersect;
+        }
+        if (strcmp(name, "NewBody") == 0) {
+            return FeatureAddSub::OperationType::NewBody;
+        }
+    }
+
+    // "Union", "Join", and anything unrecognised: adding material is the safe reading,
+    // and it is what index 0 means in every list involved.
+    return FeatureAddSub::OperationType::Join;
+}
+}  // namespace
+
 void FeatureAddSub::setupObject()
 {
     FeatureRefine::setupObject();
@@ -89,8 +120,39 @@ void FeatureAddSub::onDocumentRestored()
             static_cast<long>(addSubType == Type::Subtractive ? OperationType::Cut : OperationType::Join)
         );
     }
+    else {
+        migrateForeignOperation();
+    }
 
     FeatureRefine::onDocumentRestored();
+}
+
+void FeatureAddSub::migrateForeignOperation()
+{
+    // Only a custom enumeration travels with the document, and ours is a plain static
+    // list, so a file written here restores the list the constructor already set and
+    // leaves this alone. Anything else was written by a build that numbers the operations
+    // differently.
+    const std::vector<std::string> restored = Operation.getEnumVector();
+
+    std::vector<std::string> ours;
+    for (const char** value = OperationEnums; *value; ++value) {
+        ours.emplace_back(*value);
+    }
+
+    if (restored == ours) {
+        return;
+    }
+
+    const OperationType operation =
+        restored.empty()
+        ? (addSubType == Type::Subtractive ? OperationType::Cut : OperationType::Join)
+        : operationFromName(Operation.getValueAsString());
+
+    // Put our own list back before the value, because setting the list keeps the old
+    // name and that name is not in it.
+    Operation.setEnums(OperationEnums);
+    Operation.setValue(static_cast<long>(operation));
 }
 
 FeatureAddSub::OperationType FeatureAddSub::getOperationType() const
