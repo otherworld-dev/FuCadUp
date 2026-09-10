@@ -22,6 +22,11 @@
 
 #include <FCConfig.h>
 
+#include <atomic>
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <Inventor/errors/SoDebugError.h>
 #include <Inventor/errors/SoError.h>
@@ -2651,14 +2656,38 @@ void tryRunEventLoop(GUISingleApplication& mainApp)
     }
 }
 
+namespace
+{
+/// The status runEventLoop() is leaving with, for the signal handler below.
+std::atomic<int> systemExitStatus {0};
+
+/// Used only while the process is already on its way out, so that a signal raised by
+/// another thread mid-teardown ends it quietly instead of printing over a finished run.
+extern "C" void exitQuietlyOnSignal(int)
+{
+    std::_Exit(systemExitStatus.load());
+}
+}  // namespace
+
 void runEventLoop(GUISingleApplication& mainApp)
 {
     try {
         tryRunEventLoop(mainApp);
     }
-    catch (const Base::SystemExitException&) {
+    catch (const Base::SystemExitException& e) {
         Base::Console().message("System exit\n");
-        throw;
+
+        // Go straight out instead of unwinding. Tearing the Qt application and the
+        // interpreter down from here walks into a null dereference inside PySide's
+        // cleanup, which took the process down along with everything it had printed:
+        // a test run would report nothing at all and still exit 0. Nothing below this
+        // point saves anything either - parameters are written further along the
+        // ordinary shutdown, which a SystemExit already skips.
+        systemExitStatus.store(e.getExitCode());
+        std::signal(SIGABRT, exitQuietlyOnSignal);
+        std::signal(SIGSEGV, exitQuietlyOnSignal);
+        std::fflush(nullptr);
+        std::_Exit(e.getExitCode());
     }
     catch (const std::exception& e) {
         // catching nasty stuff coming out of the event loop
