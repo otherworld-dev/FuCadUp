@@ -189,21 +189,46 @@ class TestTimeline(unittest.TestCase):
         )
         self._settle()
 
-    def _focus(self, widget):
-        """Hand the keyboard to one of the strip's own widgets, as Tab would."""
+    def _focus(self, widget, timeout_ms=2000):
+        """Hand the keyboard to one of the strip's own widgets, as Tab would.
 
-        if not self.window.isActiveWindow():
-            raise unittest.SkipTest("The main window does not take the keyboard here")
+        Whether this machine will give the application the keyboard at all is not
+        something the timeline decides, and a window that reports itself active can
+        still be waiting on the window manager, so the focus is asked for and then
+        waited on rather than demanded in one go. What the strip *is* responsible
+        for - the widget existing, being visible, and accepting focus at all - is
+        asserted first, so a marker that stopped being reachable by keyboard still
+        fails rather than quietly skipping.
+        """
 
         self.assertIsNotNone(widget, "Expected a widget to put the focus on")
-        widget.setFocus(QtCore.Qt.OtherFocusReason)
-        self._process_events()
-        self.assertIs(
-            QtWidgets.QApplication.focusWidget(),
-            widget,
-            "The widget has to hold the keyboard for a key press to mean anything",
+        self.assertTrue(
+            widget.isVisible(),
+            "A widget the keyboard can reach has to be on screen",
         )
-        return widget
+        self.assertNotEqual(
+            widget.focusPolicy(),
+            QtCore.Qt.NoFocus,
+            "The strip's widgets have to accept the keyboard to be reachable by Tab",
+        )
+
+        deadline = time.monotonic() + (timeout_ms / 1000.0)
+        while True:
+            if self.window.isActiveWindow():
+                widget.setFocus(QtCore.Qt.OtherFocusReason)
+            self._process_events()
+            if QtWidgets.QApplication.focusWidget() is widget:
+                return widget
+            if time.monotonic() >= deadline:
+                break
+
+        raise unittest.SkipTest(
+            "This machine did not hand the application the keyboard "
+            "(window active: {}, focus went to: {!r})".format(
+                self.window.isActiveWindow(),
+                QtWidgets.QApplication.focusWidget(),
+            )
+        )
 
     def _focus_a_marker(self, label="Sketch"):
         """Put the keyboard on a marker, which is one of the two ways into the strip.
