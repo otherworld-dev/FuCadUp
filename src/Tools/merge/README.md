@@ -37,19 +37,35 @@ git submodule update --init --recursive
 
 ## What the audit catches
 
-`check_merge.py` looks for two things that neither git nor the compiler will
-tell you about:
+`check_merge.py` compares committed blobs, following renames on both sides, and
+reports four things:
 
-- **A dropped change.** A file this fork had modified comes out byte-identical
-  to upstream, because a hunk was resolved with "theirs" when it should have
-  combined both sides. The build stays green and the feature is quietly gone.
-  This caught a real one in the 2026-09-10 merge: upstream keys `isGroove` on
-  `getAddSubType()`, which changes with the operation here, and taking their
-  line back would have made the revolution mode list shift under the user.
+- **GONE** — a file we had changed is nowhere in the merged tree. Usually a
+  deliberate deletion; occasionally a resolution that lost it.
+- **LOST** — the merged file is byte-identical to upstream's, so the resolution
+  took their side wholesale. This caught a real one in the 2026-09-11 merge,
+  where upstream had renamed the packaging directory out from under a file we
+  had branded.
+- **THINNED** — most of the lines we added to a file are gone. A prompt to look,
+  not a verdict: upstream restructuring around us legitimately rewrites them.
+- **ENDINGS** — endings that no longer match upstream's for that file. Most of
+  this tree is CRLF while upstream drifts to LF file by file; matching them is
+  what stops the next merge seeing a whole file as changed.
 
-- **Line endings.** Most of this tree is CRLF; upstream is drifting to LF file
-  by file. Match whatever upstream has for a given file — that is what stops the
-  next merge seeing the whole file as changed.
+## What it does not catch
+
+It is one check, not a substitute for building. Two failures got past it in the
+merge it was written for, and both were found by the compiler minutes later:
+
+- A declaration kept whose definition upstream's refactor removed. Upstream
+  reparented a task panel onto a new base class; keeping "our" side of a hunk
+  preserved a method declaration whose body had gone, and it linked no further.
+- Code of ours deleted in an earlier merge that upstream later started using.
+  A parallel enum was dropped as unused; upstream then built on it.
+
+Neither is detectable by comparing our changes against upstream's. Build and run
+the tests every time, and treat a clean audit as "nothing obviously dropped"
+rather than "the merge is good".
 
 ## Where conflicts keep coming from
 

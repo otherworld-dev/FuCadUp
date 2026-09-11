@@ -1,28 +1,51 @@
 #!/usr/bin/env python3
 """Audit a resolved upstream merge before building it.
 
-Two things go wrong quietly when resolving a large merge, and neither shows up
-as a conflict or a compile error:
-
-  lost      a file this fork had changed comes out byte-identical to upstream,
-            meaning the resolution took upstream's side wholesale and dropped
-            our change. The build stays green and the feature is simply gone.
-
-  endings   most of this tree is CRLF while upstream is drifting to LF file by
-            file. An edit written back with the wrong ending turns the next
-            diff into whole-file noise. The rule is to match whatever upstream
-            has for that file, since that is what keeps future merges quiet.
-
-Run after resolving every conflict and before building:
+This looks for changes of ours that went missing in the resolution, and for line
+endings that no longer match upstream. Neither shows up as a conflict, and
+neither necessarily stops the build, so both are easy to ship by accident.
 
     python src/Tools/merge/check_merge.py [--upstream upstream/main]
+
+What it reports:
+
+  GONE      a file this fork had changed is not in the merged tree under any
+            path it could have moved to. Either it was deliberately deleted, or
+            the resolution lost it.
+
+  LOST      the merged file is byte-identical to upstream's, so the resolution
+            took their side wholesale and dropped ours.
+
+  THINNED   most of the lines this fork added to a file are no longer there.
+            Some loss is legitimate where upstream restructured around us, so a
+            low figure is a prompt to look rather than a verdict.
+
+  ENDINGS   line endings that disagree with upstream's for that file. Most of
+            this tree is CRLF while upstream drifts to LF file by file, and
+            matching them is what keeps the next diff readable.
+
+What it does not cover, so build and run the tests afterwards regardless:
+
+  - a declaration kept whose definition upstream's refactor removed, or the
+    reverse. That is what the compiler is for, and it has caught real ones.
+  - whether a resolution is semantically right. Both sides can merge cleanly
+    into something that satisfies neither.
 
 Exits non-zero if anything needs looking at.
 """
 
 import argparse
+import os
 import subprocess
 import sys
+
+# Below this share of our added lines surviving, a file is worth a look.
+THINNED_AT = 0.5
+
+# ...but only once a file has enough added lines for the share to mean anything.
+# A two-line branding tweak that upstream reworded reads as nought per cent kept,
+# which is noise rather than signal.
+MIN_ADDED = 4
 
 
 def git(*args, check=True):
@@ -37,11 +60,63 @@ def git(*args, check=True):
 def blob(rev, path):
     """The committed (or staged) bytes for a path, or None if it is not there.
 
-    Always bytes as git stores them, never as the working tree renders them.
+    Always bytes as git stores them, never as the working tree renders them:
+    git converts line endings on checkout, so reading from disk would report
+    every LF file in the repository as a mismatch.
     """
-    spec = f"{rev}:{path}" if rev != ":0" else f":{path}"
+    spec = f":{path}" if rev == ":0" else f"{rev}:{path}"
     result = subprocess.run(["git", "show", spec], capture_output=True)
     return result.stdout if result.returncode == 0 else None
+
+
+def renames(base, tip):
+    """Map of old path -> new path for files renamed between two revisions."""
+    moved = {}
+    for line in git("diff", "-M", "--name-status", base, tip).splitlines():
+        parts = line.split("\t")
+        if parts and parts[0].startswith("R") and len(parts) == 3:
+            moved[parts[1]] = parts[2]
+    return moved
+
+
+def directory_moves(moved):
+    """Directory renames inferred from file renames.
+
+    Upstream renaming a directory while we renamed a file inside it produces a
+    path neither map gives on its own, which is exactly how a lost file hides.
+    """
+    dirs = {}
+    for old, new in moved.items():
+        old_dir, new_dir = os.path.dirname(old), os.path.dirname(new)
+        if old_dir and new_dir and old_dir != new_dir:
+            dirs[old_dir] = new_dir
+    return dirs
+
+
+def candidates(path, up_moved, our_moved, up_dirs):
+    """Every path the merged file could reasonably be living at, best guess first."""
+    found = [path]
+    for mapping in (up_moved, our_moved):
+        if path in mapping:
+            found.append(mapping[path])
+
+    # Our rename of a file combined with upstream's rename of its directory.
+    ours = our_moved.get(path, path)
+    for old_dir, new_dir in up_dirs.items():
+        if ours.startswith(old_dir + "/"):
+            found.append(new_dir + ours[len(old_dir):])
+        if path.startswith(old_dir + "/"):
+            relocated = new_dir + path[len(old_dir):]
+            found.append(relocated)
+            if relocated in our_moved:
+                found.append(our_moved[relocated])
+
+    seen, unique = set(), []
+    for item in found:
+        if item not in seen:
+            seen.add(item)
+            unique.append(item)
+    return unique
 
 
 def endings(data):
@@ -50,12 +125,7 @@ def endings(data):
 
 
 def classify(data):
-    """CRLF, LF, or mixed - the shape, for comparing two files.
-
-    Deliberately ignores the counts: a file that gained a line is still the same
-    shape as the one it came from, and upstream having twenty LF lines where we
-    have twenty-one is not a line-ending problem.
-    """
+    """CRLF, LF or mixed - the shape, ignoring counts, for comparing two files."""
     crlf, lf = endings(data)
     if lf == 0 and crlf:
         return "CRLF"
@@ -65,81 +135,111 @@ def classify(data):
 
 
 def describe(data):
-    """The same thing for a human, with the counts that make mixed meaningful."""
     crlf, lf = endings(data)
     shape = classify(data)
     return shape if shape != "mixed" else f"mixed ({crlf} CRLF / {lf} LF)"
+
+
+def added_lines(base_data, ours_data):
+    """The non-blank lines this fork added to a file."""
+    base_lines = set((base_data or b"").splitlines())
+    return [
+        line for line in ours_data.splitlines()
+        if line.strip() and line not in base_lines
+    ]
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--upstream", default="upstream/main")
     parser.add_argument("--ours", default="HEAD",
-                        help="the pre-merge tip; defaults to HEAD's first parent when merging")
+                        help="the pre-merge tip; taken from HEAD's first parent after a merge")
     args = parser.parse_args()
 
-    # During a merge, HEAD is still our pre-merge tip. Afterwards it is the merge
-    # commit, whose first parent is what we had before.
-    ours = args.ours
-    if ours == "HEAD":
+    ours_rev = args.ours
+    if ours_rev == "HEAD":
         parents = git("rev-list", "--parents", "-n", "1", "HEAD").split()
-        if len(parents) >= 3:  # a merge commit: sha, parent1, parent2
-            ours = parents[1]
+        if len(parents) >= 3:  # sha, first parent, second parent
+            ours_rev = parents[1]
 
-    base = git("merge-base", ours, args.upstream).strip()
+    base = git("merge-base", ours_rev, args.upstream).strip()
+    up_moved = renames(base, args.upstream)
+    our_moved = renames(base, ours_rev)
+    up_dirs = directory_moves(up_moved)
+
     changed = [
-        p for p in git("diff", "--name-only", base, ours).splitlines()
+        p for p in git("diff", "--name-only", base, ours_rev).splitlines()
         if p.strip() and "/translations/" not in p
     ]
 
-    print(f"comparing against base {base[:10]}; "
-          f"{len(changed)} files this fork changed since then\n")
+    print(f"comparing against base {base[:10]}")
+    print(f"{len(changed)} files this fork changed; upstream renamed {len(up_moved)} "
+          f"of its own ({len(up_dirs)} directories)\n")
 
-    lost, eol = [], []
+    gone, lost, thinned, eol = [], [], [], []
+
     for path in changed:
-        ours_blob = blob(ours, path)
-        up_blob = blob(args.upstream, path)
-        if ours_blob is None:
-            continue  # we deleted it; nothing of ours left to lose
+        ours_data = blob(ours_rev, path)
+        if ours_data is None:
+            continue  # we deleted it ourselves; nothing of ours left to lose
 
-        # Read the resolved content from the index rather than the working tree:
-        # git converts line endings on checkout, so working-tree bytes would flag
-        # every LF file in the repository as a mismatch. The index holds what will
-        # actually be committed, during a merge and after one alike.
-        now = blob(":0", path) or blob("HEAD", path)
+        now = where = None
+        for candidate in candidates(path, up_moved, our_moved, up_dirs):
+            now = blob(":0", candidate) or blob("HEAD", candidate)
+            if now is not None:
+                where = candidate
+                break
+
         if now is None:
-            continue  # deleted by the merge, which is a deliberate resolution
+            gone.append(path)
+            continue
 
         if b"\x00" in now[:8000]:
             continue  # binary
 
-        # Our change survived only if the result still differs from upstream,
-        # unless upstream happens to agree with us already.
-        if up_blob is not None and ours_blob != up_blob and now == up_blob:
-            lost.append(path)
+        base_data = blob(base, path)
+        up_data = blob(args.upstream, where) or blob(args.upstream, path)
 
-        # Endings should follow upstream where upstream has the file at all.
-        if up_blob is not None and classify(up_blob) != classify(now):
-            eol.append((path, describe(ours_blob), describe(up_blob), describe(now)))
+        if up_data is not None and ours_data != up_data and now == up_data:
+            lost.append((path, where))
+            continue
 
-    if lost:
-        print(f"LOST - resolved to upstream's version, our change is gone ({len(lost)}):")
-        for path in lost:
-            print(f"  {path}")
-        print()
+        mine = added_lines(base_data, ours_data)
+        if len(mine) >= MIN_ADDED:
+            surviving = set(now.splitlines())
+            kept = sum(1 for line in mine if line in surviving)
+            if kept / len(mine) < THINNED_AT:
+                thinned.append((path, where, kept, len(mine)))
 
-    if eol:
-        print(f"LINE ENDINGS - do not match upstream ({len(eol)}):")
-        for path, was, want, got in eol:
-            print(f"  {path}\n      was {was} / upstream {want} / now {got}")
-        print()
+        if up_data is not None and classify(up_data) != classify(now):
+            eol.append((where, describe(base_data or b""),
+                        describe(up_data), describe(now)))
 
-    if not lost and not eol:
-        print("clean: nothing dropped, endings match upstream")
+    def report(title, rows, render):
+        if rows:
+            print(f"{title} ({len(rows)}):")
+            for row in rows:
+                print(render(row))
+            print()
+
+    report("GONE - not found under any path it could have moved to", gone,
+           lambda p: f"  {p}")
+    report("LOST - resolved to upstream's version, our change is gone", lost,
+           lambda r: f"  {r[0]}" + (f"   -> {r[1]}" if r[1] != r[0] else ""))
+    report("THINNED - most of our added lines are missing", thinned,
+           lambda r: f"  {r[1]}   kept {r[2]}/{r[3]} added lines")
+    report("ENDINGS - do not match upstream", eol,
+           lambda r: f"  {r[0]}\n      was {r[1]} / upstream {r[2]} / now {r[3]}")
+
+    tail = ("\nStill build and run the tests: this does not catch a declaration whose\n"
+            "definition upstream removed, nor a resolution that is merely wrong.")
+
+    if not (gone or lost or thinned or eol):
+        print("clean: nothing dropped, endings match upstream" + tail)
         return 0
 
-    print("Review each of the above. A LOST file usually means a hunk was resolved")
-    print("with 'theirs' when it should have combined both sides.")
+    print("Review each of the above. A LOST or THINNED file usually means a hunk was")
+    print("resolved with 'theirs' where it should have combined both sides." + tail)
     return 1
 
 
