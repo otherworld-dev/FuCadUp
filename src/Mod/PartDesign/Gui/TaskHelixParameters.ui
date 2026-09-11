@@ -285,14 +285,8 @@
     </widget>
    </item>
    <item>
-    <widget class="QCheckBox" name="checkBoxOutside">
-     <property name="text">
-      <string>Remove outside of profile</string>
-     </property>
-     <property name="checked">
-      <bool>false</bool>
-     </property>
-    </widget>
+    <layout class="QHBoxLayout" name="operationLayout">
+</layout>
    </item>
    <item>
     <widget class="Line" name="line">
@@ -331,7 +325,6 @@
   <tabstop>growth</tabstop>
   <tabstop>checkBoxLeftHanded</tabstop>
   <tabstop>checkBoxReversed</tabstop>
-  <tabstop>checkBoxOutside</tabstop>
   <tabstop>checkBoxUpdateView</tabstop>
  </tabstops>
  <resources/>

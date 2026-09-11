@@ -2658,18 +2658,27 @@ void NavigationStyle::openPopupMenu(const SbVec2s& position)
     // Taken once and kept: the entries below and the row that heads them have to
     // agree on what the menu is about, and building it can move on.
     const App::SubObjectT preselected = Gui::Selection().getPreselection().Object;
-    App::DocumentObject* preselectedObject = preselected.getObject();
+    App::DocumentObject* contextObject = preselected.getSubObject();
+    if (!contextObject) {
+        // Nothing under the cursor, so a single selected object is what the menu is
+        // about. The heading above stays empty in that case, since it reports what
+        // the pointer is over.
+        const auto selection = Gui::Selection().getSelection();
+        if (selection.size() == 1) {
+            contextObject = selection.front().pObject;
+        }
+    }
 
-    if (preselectedObject) {
-        auto* preselectedViewProvider
+    if (contextObject) {
+        auto* contextViewProvider
             = Gui::Application::Instance->getViewProvider<Gui::ViewProviderDocumentObject>(
-                preselectedObject
+                contextObject
             );
 
-        if (preselectedViewProvider) {
+        if (contextViewProvider) {
             objectMenu = new QMenu(contextMenu);
-            auto receiver = new NavigationStyleContextMenuReceiver(preselectedViewProvider, objectMenu);
-            preselectedViewProvider->setupContextMenu(objectMenu, receiver, SLOT(startEditing()));
+            auto receiver = new NavigationStyleContextMenuReceiver(contextViewProvider, objectMenu);
+            contextViewProvider->setupContextMenu(objectMenu, receiver, SLOT(startEditing()));
             objectActions = objectMenu->actions();
             if (!objectActions.empty()) {
                 contextMenu->setDefaultAction(objectActions.front());

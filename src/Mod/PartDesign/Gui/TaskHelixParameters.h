@@ -86,7 +86,6 @@ private Q_SLOTS:
     void onReversedChanged(bool);
     void onModeChanged(int);
     void onOperationChanged(int);
-    void onOutsideChanged(bool);
 
 
 protected:
@@ -108,7 +107,6 @@ protected:
     App::PropertyDistance* propGrowth;
     App::PropertyEnumeration* propMode;
     App::PropertyEnumeration* propOperation;
-    App::PropertyBool* propOutside;
 
 
 private:
