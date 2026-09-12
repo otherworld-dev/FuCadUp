@@ -212,7 +212,7 @@ private:
     SoCallback* actionSync = nullptr;
 };
 
-int NaviCubeImplementation::cubeWidgetSize = 132;
+int NaviCubeImplementation::cubeWidgetSize = 150;
 
 int NaviCube::getNaviCubeSize()
 {
@@ -721,7 +721,8 @@ void NaviCubeImplementation::createCubeFaceTextures()
     int texSize = 192;  // Works well for the max cube size 1024
     QFont font;
     if (textFont.empty()) {
-        font.fromString(QStringLiteral("Arial"));
+        // Unless a font was chosen for them, the labels follow the rest of the interface.
+        font.fromString(QApplication::font().family());
     }
     else {
         font.fromString(QString::fromStdString(textFont));

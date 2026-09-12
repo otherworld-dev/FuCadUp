@@ -614,10 +614,12 @@ void NaviCubeSettings::parameterChanged(const char* Name)
         nc->setOffset(hGrp->GetInt("OffsetX", 0), hGrp->GetInt("OffsetY", 0));
     }
     else if (strcmp(Name, "ChamferSize") == 0) {
-        nc->setChamfer(hGrp->GetFloat("ChamferSize", 0.12f));
+        // Flatter than upstream's 0.12, which reads as a faceted ball, yet wide enough
+        // that the corner and edge views it carves out can still be clicked.
+        nc->setChamfer(hGrp->GetFloat("ChamferSize", 0.06f));
     }
     else if (strcmp(Name, "CubeSize") == 0) {
-        nc->setSize(hGrp->GetInt("CubeSize", 132));
+        nc->setSize(hGrp->GetInt("CubeSize", 150));
     }
     else if (strcmp(Name, "NaviRotateToNearest") == 0) {
         nc->setNaviRotateToNearest(hGrp->GetBool("NaviRotateToNearest", true));
@@ -632,7 +634,8 @@ void NaviCubeSettings::parameterChanged(const char* Name)
         nc->setFont(hGrp->GetASCII("FontString"));
     }
     else if (strcmp(Name, "FontWeight") == 0) {
-        nc->setFontWeight(hGrp->GetInt("FontWeight", 0));
+        // 57 is QFont::Medium, see convertWeights in NaviCube.cpp.
+        nc->setFontWeight(hGrp->GetInt("FontWeight", 57));
     }
     else if (strcmp(Name, "FontStretch") == 0) {
         nc->setFontStretch(hGrp->GetInt("FontStretch", 0));
@@ -654,10 +657,11 @@ void NaviCubeSettings::parameterChanged(const char* Name)
         nc->setHiliteColor(Base::Color::fromPackedRGBA<QColor>(col));
     }
     else if (strcmp(Name, "BorderWidth") == 0) {
-        nc->setBorderWidth(hGrp->GetFloat("BorderWidth", 1.1));
+        nc->setBorderWidth(hGrp->GetFloat("BorderWidth", 0.7));
     }
     else if (strcmp(Name, "ShowCS") == 0) {
-        nc->setShowCS(hGrp->GetBool("ShowCS", true));
+        // Off by default: the axis tripod sits over the FRONT and RIGHT labels.
+        nc->setShowCS(hGrp->GetBool("ShowCS", false));
     }
     else if (strcmp(Name, "InactiveOpacity") == 0) {
         float opacity = static_cast<float>(hGrp->GetInt("InactiveOpacity", 50)) / 100;

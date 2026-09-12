@@ -25,14 +25,18 @@ To run tests:
     FreeCAD -t TestFuCadDefaults
 """
 
+import os
+import tempfile
 import time
 import unittest
 
 import FreeCAD
 import FreeCADGui
+from PySide import QtGui, QtWidgets
 
 VIEW_PARAMS = "User parameter:BaseApp/Preferences/View"
 WEBSITES_PARAMS = "User parameter:BaseApp/Preferences/Websites"
+NAVICUBE_PARAMS = "User parameter:BaseApp/Preferences/NaviCube"
 
 FUSION_STYLE = "Gui::FusionNavigationStyle"
 
@@ -205,3 +209,220 @@ class TestDatumScaleDefault(unittest.TestCase):
             "scale gives %.1f: the default is not three times it"
             % (by_default, upstream),
         )
+
+
+# The cube as upstream ships it, and the shape the fork draws instead
+# (NaviCubeSettings::parameterChanged in View3DSettings.cpp).
+UPSTREAM_CUBE_SHAPE = {
+    "ChamferSize": 0.12,
+    "CubeSize": 132,
+    "ShowCS": True,
+    "BorderWidth": 1.1,
+    "FontWeight": 0,
+}
+FORK_CUBE_SHAPE = {
+    "ChamferSize": 0.06,
+    "CubeSize": 150,
+    "ShowCS": False,
+    "BorderWidth": 0.7,
+    "FontWeight": 57,
+}
+
+# (list the names, read one, write one, remove one) for each kind of parameter.
+PARAMETER_KINDS = (
+    ("GetFloats", "GetFloat", "SetFloat", "RemFloat"),
+    ("GetInts", "GetInt", "SetInt", "RemInt"),
+    ("GetUnsigneds", "GetUnsigned", "SetUnsigned", "RemUnsigned"),
+    ("GetBools", "GetBool", "SetBool", "RemBool"),
+    ("GetStrings", "GetString", "SetString", "RemString"),
+)
+SETTER_FOR_TYPE = {bool: "SetBool", int: "SetInt", float: "SetFloat", str: "SetString"}
+
+
+def snapshot_group(group):
+    """Every entry in the group, as (setter, remover, name, value)."""
+    entries = []
+    for list_names, getter, setter, remover in PARAMETER_KINDS:
+        for name in getattr(group, list_names)():
+            entries.append((setter, remover, name, getattr(group, getter)(name)))
+    return entries
+
+
+def clear_group(group):
+    for _, remover, name, _ in snapshot_group(group):
+        getattr(group, remover)(name)
+
+
+def restore_group(group, entries):
+    clear_group(group)
+    for setter, _, name, value in entries:
+        getattr(group, setter)(name, value)
+
+
+def differing_samples(first, second, tolerance=3):
+    """How many sampled pixels differ between two renders by more than tolerance."""
+    if first.size() != second.size():
+        return first.width() * first.height()
+    count = 0
+    for y in range(0, first.height(), 2):
+        for x in range(0, first.width(), 2):
+            a = first.pixelColor(x, y)
+            b = second.pixelColor(x, y)
+            if max(
+                abs(a.red() - b.red()), abs(a.green() - b.green()), abs(a.blue() - b.blue())
+            ) > tolerance:
+                count += 1
+    return count
+
+
+class TestNaviCubeDefaults(unittest.TestCase):
+    """A fresh install must draw the navigation cube the way the fork dresses it.
+
+    The shape is a C++ default and so reaches every theme; the dark colours belong
+    to the FuCad Dark preference pack, since the Light and Classic packs keep their
+    own light cube. The cube is compared by rendering it: none of its geometry can
+    be read from Python, as the chamfer is a private member of SoNaviCube rather
+    than a field.
+
+    Every cube preference the user has set is put aside for the test and restored
+    afterwards.
+    """
+
+    # Two renders of the same settings may still differ in a stray sample or two.
+    SAME = 5
+    # Below this, two settings are not visibly different on the cube.
+    DIFFERENT = 20
+
+    def setUp(self):
+        self.group = FreeCAD.ParamGet(NAVICUBE_PARAMS)
+        self._saved = snapshot_group(self.group)
+        clear_group(self.group)
+
+    def tearDown(self):
+        restore_group(self.group, self._saved)
+
+    def render(self, **settings):
+        """A view rendered with exactly these cube preferences set.
+
+        A new document each time: a view reads the cube preferences as it is
+        created, and a cube built before an entry was removed would keep what
+        the entry said, so a stale cube could pass for the defaults.
+        """
+        clear_group(self.group)
+        for name, value in settings.items():
+            getattr(self.group, SETTER_FOR_TYPE[type(value)])(name, value)
+
+        doc = FreeCAD.newDocument("TestFuCadDefaultsNaviCube")
+        try:
+            view = self.activeView(doc)
+            previous, stable = None, 0
+            deadline = time.monotonic() + 5.0
+            while stable < 10 and time.monotonic() < deadline:
+                FreeCADGui.updateGui()
+                time.sleep(0.01)
+                current = str(view.getCameraOrientation())
+                stable = stable + 1 if current == previous else 0
+                previous = current
+
+            path = os.path.join(tempfile.gettempdir(), "TestFuCadDefaultsNaviCube.png")
+            view.saveImage(path, 480, 360, "Current")
+            image = QtGui.QImage(path)
+        finally:
+            FreeCAD.closeDocument(doc.Name)
+
+        self.assertFalse(image.isNull(), "the view could not be rendered")
+        return image
+
+    def activeView(self, doc, timeout_ms=2000):
+        deadline = time.monotonic() + (timeout_ms / 1000.0)
+        while True:
+            view = FreeCADGui.getDocument(doc.Name).ActiveView
+            if view is not None:
+                return view
+            if time.monotonic() >= deadline:
+                self.fail("No active 3D view appeared for the new document")
+            FreeCADGui.updateGui()
+            time.sleep(0.02)
+
+    def test_a_fresh_install_draws_the_fork_cube_shape(self):
+        by_default = self.render()
+        fork = self.render(**FORK_CUBE_SHAPE)
+        upstream = self.render(**UPSTREAM_CUBE_SHAPE)
+
+        self.assertGreater(
+            differing_samples(fork, upstream),
+            self.DIFFERENT,
+            "the fork and upstream cube shapes render alike, so this test cannot tell them apart",
+        )
+        self.assertLessEqual(
+            differing_samples(by_default, fork),
+            self.SAME,
+            "with no cube preferences set, the cube is not drawn in the fork shape "
+            "(bevel 0.06, 150 px, no axis cross, 0.7 edges, medium labels)",
+        )
+
+    def test_a_bevel_below_the_old_floor_still_changes_the_cube(self):
+        """SoNaviCube used to clamp the chamfer to 0.05, so anything sharper was ignored."""
+        at_old_floor = self.render(ChamferSize=0.05)
+        below_it = self.render(ChamferSize=0.02)
+
+        self.assertGreater(
+            differing_samples(at_old_floor, below_it),
+            self.DIFFERENT,
+            "a 0.02 bevel draws the same cube as 0.05: the chamfer is still clamped at 0.05",
+        )
+
+    def test_labels_fall_back_to_the_application_font(self):
+        """With no font chosen the labels used to be hard-coded Arial, whatever the UI used."""
+        family = QtWidgets.QApplication.font().family()
+        by_default = self.render(**FORK_CUBE_SHAPE)
+        in_the_ui_font = self.render(FontString=family, **FORK_CUBE_SHAPE)
+
+        self.assertLessEqual(
+            differing_samples(by_default, in_the_ui_font),
+            self.SAME,
+            "with no font chosen, the cube labels are not drawn in the UI font %r" % family,
+        )
+
+        if family.lower() != "arial":
+            in_arial = self.render(FontString="Arial", **FORK_CUBE_SHAPE)
+            self.assertGreater(
+                differing_samples(in_the_ui_font, in_arial),
+                self.DIFFERENT,
+                "labels in %r and in Arial render alike, so this test cannot tell the "
+                "fallback apart" % family,
+            )
+
+    def test_the_fucad_dark_pack_dresses_the_cube_dark(self):
+        import xml.etree.ElementTree as ElementTree
+
+        path = os.path.join(
+            FreeCAD.getResourceDir(), "Gui", "PreferencePacks", "FuCad Dark", "FuCad Dark.cfg"
+        )
+        self.assertTrue(os.path.isfile(path), "no FuCad Dark preference pack at %s" % path)
+        tree = ElementTree.parse(path)
+
+        cube = next(
+            (group for group in tree.iter("FCParamGroup") if group.get("Name") == "NaviCube"),
+            None,
+        )
+        self.assertIsNotNone(cube, "the FuCad Dark pack has no NaviCube group")
+        values = {entry.get("Name"): entry.get("Value") for entry in cube}
+        accent = next(
+            entry.get("Value")
+            for entry in tree.iter("FCUInt")
+            if entry.get("Name") == "ThemeAccentColor1"
+        )
+
+        self.assertNotIn(
+            "Color",
+            values,
+            "the pack still sets NaviCube/Color, which nothing reads - the cube takes BaseColor",
+        )
+        self.assertEqual(values.get("EmphaseColor"), accent, "cube edges and labels are not the accent")
+        self.assertEqual(values.get("HiliteColor"), accent, "the cube hover is not the accent")
+        self.assertEqual(values.get("InactiveOpacity"), "100", "the cube is not solid at rest")
+        self.assertIn("BaseColor", values, "the pack leaves the cube faces at the light default")
+        base = int(values["BaseColor"])
+        brightest = max((base >> 24) & 0xFF, (base >> 16) & 0xFF, (base >> 8) & 0xFF)
+        self.assertLess(brightest, 80, "the cube faces are not dark: BaseColor %08x" % base)
