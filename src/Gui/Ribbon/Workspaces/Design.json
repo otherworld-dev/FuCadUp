@@ -610,6 +610,16 @@
         {
             "id": "SKETCH",
             "workbench": "SketcherWorkbench",
+            "finish": {
+                "command": "Sketcher_LeaveSketch",
+                "keepSelected": [
+                    "PartDesign_Extrude",
+                    "PartDesign_Revolve",
+                    "PartDesign_Hole",
+                    "PartDesign_Sweep",
+                    "PartDesign_Loft"
+                ]
+            },
             "panels": [
                 {
                     "caption": "CREATE",

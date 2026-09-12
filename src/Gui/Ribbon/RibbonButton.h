@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include <QList>
 #include <QString>
 #include <QStringList>
@@ -46,6 +48,12 @@ enum class ButtonSize
     Large,
     Small,
 };
+
+/**
+ * What a ribbon entry shows for \a source, the action of \a command: \a source
+ * itself, or an action made to stand in for it and owned by \a parent.
+ */
+using ActionStandIn = std::function<QAction*(QAction* source, const QString& command, QObject* parent)>;
 
 /**
  * A single ribbon entry: a large icon with its label underneath, driven by the
@@ -76,13 +84,17 @@ public:
      * \a quiet marks an entry whose module is not loaded by the workbench that
      * backs the page, so that it disappears without the warning an entry the
      * definition simply gets wrong deserves.
+     *
+     * \a standIn, when set, picks the action the button and its drop-down show
+     * for each command instead of the command's own; see RibbonManager::createPage().
      */
     bool setCommand(
         const QString& command,
         const QString& label,
         const QStringList& subCommands,
         ButtonSize size,
-        bool quiet
+        bool quiet,
+        const ActionStandIn& standIn = {}
     );
 
     /// The command setCommand() bound, or an empty string before that.

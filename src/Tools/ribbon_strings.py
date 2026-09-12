@@ -24,10 +24,11 @@ The keys collected are the ones ``translateRibbon`` is actually called with:
   menu-entry labels (lines 730, 820 and 841)
 
 Nothing else in the file reaches a user: ``command``, ``workbench``,
-``initWorkbench``, ``align``, ``optional``, ``primary`` and the ``commands``
-lists are identifiers, and the document's own ``name`` ("Design") is never
-displayed. A menu item that carries no ``label`` falls back to its command's own
-text, which ``lupdate`` already finds in the command's source.
+``initWorkbench``, ``align``, ``optional``, ``primary``, the ``commands``
+lists and a context tab's ``finish`` block are identifiers, and the document's
+own ``name`` ("Design") is never displayed. A menu item that carries no
+``label`` falls back to its command's own text, which ``lupdate`` already finds
+in the command's source.
 
 Usage::
 

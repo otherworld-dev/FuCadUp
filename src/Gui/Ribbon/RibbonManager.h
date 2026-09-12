@@ -34,6 +34,8 @@
 
 // QPointer needs the complete type of its target.
 #include "RibbonBar.h"
+// ActionStandIn.
+#include "RibbonButton.h"
 
 class QJsonObject;
 class QWidget;
@@ -158,6 +160,11 @@ private:
         /// Built from the toolbars of a workbench the definition does not
         /// describe, whose id is the workbench's menu text.
         bool generated {false};
+        /// The command that ends the mode a context tab stands for. While such a
+        /// tab is pushed the ordinary tabs stay usable: their entries run it first.
+        QString finishCommand;
+        /// The commands that start with the object the mode was editing selected.
+        QStringList keepSelected;
         std::vector<PanelDefinition> panels;
 
         /// Names the tab in the user's stored layout: the id, or the workbench
@@ -207,10 +214,19 @@ private:
     );
     /// Whether the curated drop-down of \a panel lists \a command somewhere.
     static bool menuCovers(const PanelDefinition& panel, const QString& command);
-    /// Appends \a items to the drop-down \a menu, naming every entry it can.
-    static void fillPanelMenu(RibbonPanelMenu* menu, const std::vector<ItemDefinition>& items);
+    /**
+     * Appends \a items to the drop-down \a menu, naming every entry it can, and
+     * showing what \a standIn picks for each command when it is set.
+     */
+    static void fillPanelMenu(
+        RibbonPanelMenu* menu,
+        const std::vector<ItemDefinition>& items,
+        const ActionStandIn& standIn
+    );
 
     const TabDefinition* findContextTab(const QString& id) const;
+    /// The innermost pushed context tab that names a finish command, or nullptr.
+    const TabDefinition* finishingMode() const;
     int indexOfTab(const TabDefinition* tab) const;
     int indexOfTab(const QString& id) const;
 

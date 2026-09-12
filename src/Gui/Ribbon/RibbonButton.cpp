@@ -143,7 +143,8 @@ bool RibbonButton::setCommand(
     const QString& label,
     const QStringList& subCommands,
     ButtonSize size,
-    bool quiet
+    bool quiet,
+    const ActionStandIn& standIn
 )
 {
     if (!Application::Instance) {
@@ -178,7 +179,7 @@ bool RibbonButton::setCommand(
         return false;
     }
 
-    setDefaultAction(guiAction->action());
+    setDefaultAction(standIn ? standIn(guiAction->action(), command, this) : guiAction->action());
     commandName = command;
     applySize(size);
 
@@ -214,6 +215,9 @@ bool RibbonButton::setCommand(
     QList<QAction*> children;
     for (const QString& subCommand : subCommands) {
         if (QAction* action = resolveAction(subCommand)) {
+            if (standIn) {
+                action = standIn(action, subCommand, this);
+            }
             // Named so that the entry can be dragged onto the row once the
             // button has folded into the caption drop-down.
             RibbonPanelMenu::tagCommand(action, subCommand);
@@ -242,6 +246,11 @@ bool RibbonButton::setCommand(
         group = qobject_cast<ActionGroup*>(guiAction);
         if (group) {
             children = group->actions();
+            if (standIn) {
+                for (QAction*& child : children) {
+                    child = standIn(child, command, this);
+                }
+            }
         }
     }
 

@@ -37,6 +37,7 @@
 #include <QMenu>
 #include <QTimer>
 #include <QWidget>
+#include <QWidgetAction>
 
 #include <App/Application.h>
 #include <Base/Console.h>
@@ -50,6 +51,7 @@
 #include <Gui/ToolBarManager.h>
 #include <Gui/WorkbenchManager.h>
 
+#include "FinishModeAction.h"
 #include "RibbonBar.h"
 #include "RibbonButton.h"
 #include "RibbonManager.h"
@@ -312,6 +314,10 @@ void RibbonManager::pushContextTab(const QString& id)
         ribbonBar->setCurrentIndex(index);
     }
 
+    // The ordinary pages are built again when next shown, so that their entries
+    // can finish the mode this tab stands for; see createPage().
+    pageBuilt.assign(pageBuilt.size(), false);
+
     buildPage(index);
 }
 
@@ -360,6 +366,9 @@ void RibbonManager::popContextTab(const QString& id)
         ribbonBar->setCurrentIndex(selected);
     }
 
+    // And again once it is gone, so that they go back to the plain command actions.
+    pageBuilt.assign(pageBuilt.size(), false);
+
     buildPage(selected);
 }
 
@@ -372,6 +381,17 @@ const RibbonManager::TabDefinition* RibbonManager::findContextTab(const QString&
     for (const TabDefinition& tab : contextTabs) {
         if (tab.id == id) {
             return &tab;
+        }
+    }
+
+    return nullptr;
+}
+
+const RibbonManager::TabDefinition* RibbonManager::finishingMode() const
+{
+    for (auto it = activeContextTabs.rbegin(); it != activeContextTabs.rend(); ++it) {
+        if (!it->tab->finishCommand.isEmpty()) {
+            return it->tab;
         }
     }
 
@@ -506,6 +526,18 @@ bool RibbonManager::parseTab(const QJsonObject& source, TabDefinition& tab)
 
     tab.workbench = source.value(QLatin1String("workbench")).toString();
     tab.optional = source.value(QLatin1String("optional")).toBool(false);
+
+    // A context tab may name the command that ends its mode, which keeps the
+    // ordinary tabs usable while the mode runs; see createPage().
+    const QJsonObject finish = source.value(QLatin1String("finish")).toObject();
+    tab.finishCommand = finish.value(QLatin1String("command")).toString();
+    const QJsonArray keepSelected = finish.value(QLatin1String("keepSelected")).toArray();
+    for (int i = 0; i < keepSelected.size(); ++i) {
+        const QString command = keepSelected.at(i).toString();
+        if (!command.isEmpty()) {
+            tab.keepSelected.append(command);
+        }
+    }
 
     const QJsonArray panels = source.value(QLatin1String("panels")).toArray();
     for (int i = 0; i < panels.size(); ++i) {
@@ -737,6 +769,26 @@ QWidget* RibbonManager::createPage(const TabDefinition& tab)
     auto* page = new RibbonPage();
     const QString tabKey = tab.key();
 
+    // While a mode that knows how to finish itself runs, the entries of the
+    // ordinary tabs stand in for their commands: a click finishes the mode and
+    // then runs the command, the way Fusion's SOLID tab works from inside a
+    // sketch. The context tab's own entries belong to the mode and run as they are.
+    ActionStandIn standIn;
+    if (const TabDefinition* mode = tab.context ? nullptr : finishingMode()) {
+        standIn = [mode](QAction* source, const QString& command, QObject* parent) -> QAction* {
+            // A settings widget has nothing to run.
+            if (qobject_cast<QWidgetAction*>(source)) {
+                return source;
+            }
+            return new FinishModeAction(
+                source,
+                mode->finishCommand,
+                mode->keepSelected.contains(command),
+                parent
+            );
+        };
+    }
+
     for (const PanelDefinition& panelDefinition : tab.panels) {
         const QString panelKey = tabKey + keySeparator + panelDefinition.caption;
         const QString caption = panelDefinition.displayCaption.isEmpty()
@@ -757,7 +809,8 @@ QWidget* RibbonManager::createPage(const TabDefinition& tab)
                 translateRibbon(item.label),
                 item.subCommands,
                 ButtonSize::Large,
-                item.optional
+                item.optional,
+                standIn
             );
             if (!bound) {
                 delete button;
@@ -782,11 +835,11 @@ QWidget* RibbonManager::createPage(const TabDefinition& tab)
         }
 
         RibbonPanelMenu* menu = panel->dropDown();
-        fillPanelMenu(menu, parked);
+        fillPanelMenu(menu, parked, standIn);
         if (!menu->isEmpty() && !panelDefinition.menuItems.empty()) {
             menu->addSeparator();
         }
-        fillPanelMenu(menu, panelDefinition.menuItems);
+        fillPanelMenu(menu, panelDefinition.menuItems, standIn);
 
         if (panel->isEmpty()) {
             delete panel;
@@ -963,7 +1016,11 @@ bool RibbonManager::menuCovers(const PanelDefinition& panel, const QString& comm
     return false;
 }
 
-void RibbonManager::fillPanelMenu(RibbonPanelMenu* menu, const std::vector<ItemDefinition>& items)
+void RibbonManager::fillPanelMenu(
+    RibbonPanelMenu* menu,
+    const std::vector<ItemDefinition>& items,
+    const ActionStandIn& standIn
+)
 {
     for (const ItemDefinition& item : items) {
         Gui::Action* guiAction = resolveGuiAction(item.command);
@@ -977,6 +1034,9 @@ void RibbonManager::fillPanelMenu(RibbonPanelMenu* menu, const std::vector<ItemD
         QList<QAction*> children;
         for (const QString& subCommand : item.subCommands) {
             if (QAction* child = RibbonButton::resolveAction(subCommand)) {
+                if (standIn) {
+                    child = standIn(child, subCommand, menu);
+                }
                 RibbonPanelMenu::tagCommand(child, subCommand);
                 children.append(child);
             }
@@ -993,6 +1053,11 @@ void RibbonManager::fillPanelMenu(RibbonPanelMenu* menu, const std::vector<ItemD
             group = qobject_cast<Gui::ActionGroup*>(guiAction);
             if (group) {
                 children = group->actions();
+                if (standIn) {
+                    for (QAction*& child : children) {
+                        child = standIn(child, item.command, menu);
+                    }
+                }
             }
         }
 
@@ -1017,9 +1082,16 @@ void RibbonManager::fillPanelMenu(RibbonPanelMenu* menu, const std::vector<ItemD
             continue;
         }
 
-        QAction* entry = item.label.isEmpty()
-            ? action
-            : RibbonPanelMenu::createProxyAction(action, translateRibbon(item.label), menu);
+        QAction* entry = standIn ? standIn(action, item.command, menu) : action;
+        if (!item.label.isEmpty()) {
+            if (entry == action) {
+                entry = RibbonPanelMenu::createProxyAction(action, translateRibbon(item.label), menu);
+            }
+            else {
+                // A stand-in is the ribbon's own action already, so it can carry the label.
+                entry->setText(translateRibbon(item.label));
+            }
+        }
         RibbonPanelMenu::tagCommand(entry, item.command);
         menu->addAction(entry);
     }

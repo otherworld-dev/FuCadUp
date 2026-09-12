@@ -113,6 +113,7 @@ FreeCAD.__unit_test__ += [
     "TestPartDesignLetters",
     "TestRibbon",
     "TestRibbonLayout",
+    "TestRibbonSketchSolid",
     "TestFuCadDefaults",
     "TestSketcherSnapFeedback",
     "TestSketchPlanePick",
