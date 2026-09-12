@@ -38,6 +38,7 @@ SET(Test_SRCS
     TestCornerAxisCrossVisual.py
     TestViewProviderLink.py
     TestOriginPlaneHover.py
+    TestNavigationBarIcons.py
     TestFusionShortcuts.py
     TestExtrudeFlip.py
     TestPartDesignLetters.py

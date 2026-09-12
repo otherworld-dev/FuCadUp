@@ -139,3 +139,69 @@ class TestReportBugUrl(unittest.TestCase):
         # activated() also persists what it opened, so the fork's URL becomes
         # the parameter's effective value from here on.
         self.assertIn("otherworld-dev/FuCadUp", self.websites_params.GetString("IssuesPage", ""))
+
+
+class TestDatumScaleDefault(unittest.TestCase):
+    """A fresh install must draw the origin bigger than upstream draws it.
+
+    Asserted as a ratio against the scale upstream ships rather than against a
+    number, so the test says what the default is for -- an origin you can hit when
+    you are picking a plane to sketch on -- without restating the sizes ViewParams
+    multiplies together to get there.
+    """
+
+    def setUp(self):
+        self.view_params = FreeCAD.ParamGet(VIEW_PARAMS)
+        # Save whatever the user already had, then remove it so the C++ default
+        # (ViewParams.cpp) is what answers.
+        self._had_value = "DatumScale" in self.view_params.GetFloats()
+        self._saved_value = self.view_params.GetFloat("DatumScale", 0.0)
+        self.view_params.RemFloat("DatumScale")
+
+    def tearDown(self):
+        if self._had_value:
+            self.view_params.SetFloat("DatumScale", self._saved_value)
+        else:
+            self.view_params.RemFloat("DatumScale")
+
+    def drawnExtent(self, name):
+        """How far an origin plane reaches, in a document made just now.
+
+        A new document each time because ViewProviderPlane reads the scale as it
+        attaches: the handler that resizes what is already on screen runs delayed,
+        so a plane built before the parameter moved keeps the size it was built at.
+        """
+        from pivy import coin
+
+        doc = FreeCAD.newDocument(name)
+        try:
+            FreeCADGui.ActiveDocument = FreeCADGui.getDocument(doc.Name)
+            lcs = doc.addObject("App::LocalCoordinateSystem", "LCS")
+            doc.recompute()
+            lcs.ViewObject.Visibility = True
+            FreeCADGui.updateGui()
+
+            plane = doc.getObject("XY_Plane")
+            self.assertIsNotNone(plane, "the coordinate system grew no XY plane")
+
+            action = coin.SoGetBoundingBoxAction(coin.SbViewportRegion(1000, 1000))
+            action.apply(plane.ViewObject.RootNode)
+            return action.getBoundingBox().getMax().getValue()[0]
+        finally:
+            FreeCAD.closeDocument(doc.Name)
+
+    def test_the_origin_is_drawn_three_times_the_size_upstream_draws_it(self):
+        by_default = self.drawnExtent("TestFuCadDefaultsDatumScaleDefault")
+
+        self.view_params.SetFloat("DatumScale", 100.0)
+        upstream = self.drawnExtent("TestFuCadDefaultsDatumScaleUpstream")
+
+        self.assertGreater(upstream, 0.0, "the plane is drawn with no extent at all")
+        self.assertAlmostEqual(
+            by_default,
+            3.0 * upstream,
+            delta=0.5,
+            msg="a fresh install draws the origin plane out to %.1f, where upstream's "
+            "scale gives %.1f: the default is not three times it"
+            % (by_default, upstream),
+        )

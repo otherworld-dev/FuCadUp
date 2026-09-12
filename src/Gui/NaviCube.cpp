@@ -276,7 +276,7 @@ void NaviCube::setSize(int size)
 
 void NaviCube::setChamfer(float chamfer)
 {
-    naviCubeImplementation->chamfer = min(max(0.05f, chamfer), 0.18f);
+    naviCubeImplementation->chamfer = min(max(0.0f, chamfer), 0.18f);
     naviCubeImplementation->prepared = false;
     naviCubeImplementation->requestRedraw();
 }

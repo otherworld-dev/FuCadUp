@@ -417,7 +417,7 @@ SoNaviCube::~SoNaviCube()
 
 void SoNaviCube::setChamfer(float chamfer)
 {
-    float clamped = std::clamp(chamfer, 0.05F, 0.18F);
+    float clamped = std::clamp(chamfer, 0.0F, 0.18F);
     if (std::abs(clamped - this->chamfer) > std::numeric_limits<float>::epsilon()) {
         this->chamfer = clamped;
         geometryDirty = true;
@@ -1161,8 +1161,8 @@ void SoNaviCube::updateButtons(const RenderParams& params) const
         if (!nodes.fillMaterial) {
             return;
         }
-        nodes.fillMaterial->diffuseColor.setValue(hilite ? params.hiliteRgb : params.baseRgb);
-        nodes.fillMaterial->transparency = hilite ? params.hiliteTr : params.baseTr;
+        nodes.fillMaterial->diffuseColor.setValue(hilite ? params.hiliteRgb : params.emphRgb);
+        nodes.fillMaterial->transparency = hilite ? params.hiliteTr : params.emphTr;
     };
 
     if (buttonsStyleChanged) {
@@ -1170,8 +1170,8 @@ void SoNaviCube::updateButtons(const RenderParams& params) const
             ButtonNodes& nodes = buttonNodes[pickIndex(pickId)];
             if (nodes.fillMaterial) {
                 const bool hilite = (pickId == params.hilitePick);
-                nodes.fillMaterial->diffuseColor.setValue(hilite ? params.hiliteRgb : params.baseRgb);
-                nodes.fillMaterial->transparency = hilite ? params.hiliteTr : params.baseTr;
+                nodes.fillMaterial->diffuseColor.setValue(hilite ? params.hiliteRgb : params.emphRgb);
+                nodes.fillMaterial->transparency = hilite ? params.hiliteTr : params.emphTr;
             }
             if (nodes.outlineMaterial) {
                 nodes.outlineMaterial->diffuseColor.setValue(params.emphRgb);

@@ -22,18 +22,26 @@
 
 #include <array>
 
+#include <QAction>
+#include <QColor>
 #include <QEvent>
+#include <QIcon>
+#include <QImage>
+#include <QPixmap>
 #include <QSize>
 #include <QString>
 #include <QToolButton>
 
 #include <App/Application.h>
+#include <Base/Color.h>
 #include <Base/Console.h>
 #include <Base/Parameter.h>
+#include <Base/ServiceProvider.h>
 
 #include "Application.h"
 #include "Command.h"
 #include "NavigationBar.h"
+#include "StyleParameters/ParameterManager.h"
 
 
 using namespace Gui;
@@ -61,6 +69,71 @@ constexpr std::array<const char*, 11> barCommands = {
     "Std_PerspectiveCamera",
     "Std_AxisCross",
 };
+
+/// The colour the rest of the application's chrome is accented with.
+DEFINE_STYLE_PARAMETER(AccentColor, Base::Color(0.024F, 0.588F, 0.843F));
+
+// FreeCAD draws the geometry of its view icons in a cyan family (#16d0d2,
+// #34e0e2, #2bdbdd), a colour nothing else in the window uses. Measured over
+// every icon the bar carries, that family covers hues 175 to 186 and then stops:
+// nothing at all until 196, and the blues the same icons are drawn with begin at
+// 206. The band sits in that gap, wide enough for the cyan with room to spare and
+// short of both the accent it moves onto and the blues it must leave alone.
+constexpr int cyanHueLow = 170;
+constexpr int cyanHueHigh = 190;
+/// Below this a pixel is a grey and its hue says nothing worth keeping.
+constexpr int minSaturation = 60;
+
+QColor accentColor()
+{
+    auto* parameters = Base::provideService<StyleParameters::ParameterManager>();
+
+    return parameters->resolve(AccentColor).asValue<QColor>();
+}
+
+/// \a image with its cyan geometry moved onto \a accent, everything else as it was.
+QImage accented(QImage image, const QColor& accent)
+{
+    const int accentHue = accent.hue();
+
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            const QColor pixel = image.pixelColor(x, y);
+            const int hue = pixel.hue();
+
+            if (pixel.alpha() == 0 || pixel.saturation() < minSaturation
+                || hue < cyanHueLow || hue > cyanHueHigh) {
+                continue;
+            }
+
+            // Only the hue: the shading the icon was drawn with is what makes its
+            // faces readable, and it lives in the saturation and the value.
+            image.setPixelColor(
+                x,
+                y,
+                QColor::fromHsv(accentHue, pixel.saturation(), pixel.value(), pixel.alpha())
+            );
+        }
+    }
+
+    return image;
+}
+
+/// \a icon as the bar shows it: at the bar's extent, accented, for \a ratio.
+QIcon accentedIcon(const QIcon& icon, const QColor& accent, qreal ratio)
+{
+    const QPixmap source = icon.pixmap(QSize(iconExtent, iconExtent), ratio);
+    if (source.isNull()) {
+        return icon;
+    }
+
+    QPixmap result = QPixmap::fromImage(
+        accented(source.toImage().convertToFormat(QImage::Format_ARGB32), accent)
+    );
+    result.setDevicePixelRatio(source.devicePixelRatio());
+
+    return QIcon(result);
+}
 }  // namespace
 
 
@@ -114,8 +187,29 @@ void NavigationBar::populate()
         command->addTo(this);
     }
 
+    const QColor accent = accentColor();
+
     for (QToolButton* button : findChildren<QToolButton*>()) {
         button->setFocusPolicy(Qt::NoFocus);
+
+        QAction* action = button->defaultAction();
+        if (!action) {
+            continue;
+        }
+
+        // Onto the button rather than onto the action: the action is the one the
+        // command framework hands to the ribbon and the menus too, and recolouring
+        // it would carry the accent across the whole application.
+        auto accentuate = [button, accent, ratio = devicePixelRatioF()]() {
+            button->setIcon(accentedIcon(button->defaultAction()->icon(), accent, ratio));
+        };
+
+        accentuate();
+
+        // A group command swaps its icon for the mode last picked, and the button
+        // takes that straight from the action. Qt sends the button its event before
+        // it emits this, so the accent goes back on over the icon that just arrived.
+        connect(action, &QAction::changed, button, accentuate);
     }
 }
 

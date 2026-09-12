@@ -505,6 +505,19 @@ bool SoBrepFaceSet::overrideMaterialBinding(SoGLRenderAction* action, SelContext
     }
 
     state->push();
+
+    // A wholly selected object arrives here already carrying the selection root's
+    // emissive glow in the selection colour (SoFCSelectionRoot::renderPrivate), and
+    // its faces are about to be repainted in that same colour as their lit diffuse.
+    // Together the two add up to about twice the colour and clip - #0696d7 rendered
+    // as #1cffff - while a single selected face, which only gets the lit repaint,
+    // shows the colour itself. The repaint already carries the selection, so the
+    // glow is dropped for these faces; edges and other nodes keep it.
+    if (ctx && ctx->isSelectAll()) {
+        static const SbColor noEmission(0.0F, 0.0F, 0.0F);
+        SoLazyElement::setEmissive(state, &noEmission);
+    }
+
     packedColors.clear();
 
     if (ctx2) {

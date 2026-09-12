@@ -136,6 +136,96 @@ class TestSelectionVisual(unittest.TestCase):
             "Clearing preselection did not restore the original rendering.",
         )
 
+    def test_whole_object_selection_matches_face_selection(self):
+        """Selecting the whole object must paint its face the colour selecting the face does.
+
+        The selection root tints a wholly selected subtree with an emissive glow in
+        the selection colour, and SoBrepFaceSet also repaints the lit faces in it,
+        so a whole-object selection came out at about twice the colour and clipped -
+        #0696d7 rendered as #1cffff - while a single selected face, which only gets
+        the lit repaint, showed the colour itself.
+        """
+        view_params = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/View")
+        had_color = "SelectionColor" in view_params.GetUnsigneds()
+        saved_color = view_params.GetUnsigned("SelectionColor", 0)
+        # A mid colour, so doubling it overshoots visibly instead of hiding in a
+        # channel that was already near the top.
+        view_params.SetUnsigned("SelectionColor", self._pack_color((0.30, 0.45, 0.60)))
+        try:
+            plane = self._create_test_plane()
+            self._prepare_view()
+            # Preselection draws flat in its own colour; a pointer resting over the
+            # plane would paint over both samples and hide the difference.
+            self._set_preselection_mode("OFF")
+
+            base_color = self._rendered_center_color()
+
+            Selection.addSelection(plane, "Face1")
+            self._flush_gui()
+            face_color = self._rendered_center_color()
+
+            Selection.clearSelection()
+            Selection.addSelection(plane)
+            self._flush_gui()
+            whole_color = self._rendered_center_color()
+        finally:
+            self._set_preselection_mode("AUTO")
+            if had_color:
+                view_params.SetUnsigned("SelectionColor", saved_color)
+            else:
+                view_params.RemUnsigned("SelectionColor")
+
+        # Without these, a capture that came back blank would make the two samples
+        # equal and pass the comparison below.
+        self._assert_color_changed(
+            base_color, face_color, "Selecting the face did not visibly change it."
+        )
+        self._assert_color_changed(
+            base_color, whole_color, "Selecting the whole object did not visibly change its face."
+        )
+        self.assertLess(
+            self._color_distance(face_color, whole_color),
+            self._COLOR_DELTA_RESTORE_MAX,
+            msg=(
+                "Selecting the whole object painted its face a different colour than "
+                f"selecting the face itself. face={face_color}, whole={whole_color}"
+            ),
+        )
+
+    def _set_preselection_mode(self, mode):
+        """Switch this viewer's live preselection on or off.
+
+        The EnablePreselection preference is only read when settings are applied,
+        so the field on the viewer's SoFCUnifiedSelection node is set directly.
+        """
+        from pivy import coin
+
+        node_type = coin.SoType.fromName(coin.SbName("SoFCUnifiedSelection"))
+        self.assertFalse(node_type.isBad(), "SoFCUnifiedSelection is not a registered node type")
+        search = coin.SoSearchAction()
+        search.setType(node_type)
+        search.setInterest(coin.SoSearchAction.FIRST)
+        search.apply(self.viewer.getSoRenderManager().getSceneGraph())
+        path = search.getPath()
+        self.assertIsNotNone(path, "the viewer has no SoFCUnifiedSelection node")
+        path.getTail().getField("preselectionMode").set(mode)
+
+    def _rendered_center_color(self):
+        """The centre pixel of an offscreen render of the view.
+
+        grabFramebuffer() comes back all black in this build - the capture contract
+        in TestView3DFramebufferCapture fails the same way - so this renders the
+        scene offscreen instead.
+        """
+        image = self.viewer.renderToImage(width=400, height=300, samples=0)
+        color = image.pixelColor(image.width() // 2, image.height() // 2)
+        return (color.redF(), color.greenF(), color.blueF())
+
+    @staticmethod
+    def _pack_color(rgb):
+        r, g, b = (int(round(channel * 255)) for channel in rgb)
+        return (r << 24) | (g << 16) | (b << 8) | 0xFF
+
     def _create_test_plane(self):
         plane = self.doc.addObject(PART_PLANE_TYPE, "Plane")
         plane.Length = 40

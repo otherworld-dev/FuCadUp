@@ -626,7 +626,7 @@ bounding box size of the 3D object that is currently displayed.</string>
            <double>5.000000000000000</double>
           </property>
           <property name="value">
-           <double>100.000000000000000</double>
+           <double>300.000000000000000</double>
           </property>
           <property name="prefEntry" stdset="0">
            <cstring>DatumScale</cstring>

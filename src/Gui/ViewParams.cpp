@@ -405,7 +405,7 @@ void ViewParams::setup()
     addParameter("NeutralColor", Unsigned {0xB3B380FF});
     addParameter("PlacementIndicatorScale", Double {40.0});
     addParameter("DraggerScale", Double {0.03});
-    addParameter("DatumScale", Double {100.0});
+    addParameter("DatumScale", Double {300.0});
     addParameter("DatumPlaneSize", Double {62.0});
     addParameter("DatumLineSize", Double {70.0});
     addParameter("DatumTemporaryScaleFactor", Double {2.0});

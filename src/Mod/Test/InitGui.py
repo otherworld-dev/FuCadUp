@@ -107,6 +107,7 @@ FreeCAD.__unit_test__ += [
     "TestCoinNodeSnapshots",
     "TestViewProviderLink",
     "TestOriginPlaneHover",
+    "TestNavigationBarIcons",
     "TestFusionShortcuts",
     "TestExtrudeFlip",
     "TestPartDesignLetters",

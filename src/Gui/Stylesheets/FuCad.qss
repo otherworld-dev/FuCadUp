@@ -3159,13 +3159,17 @@ QToolBar#NavigationBar QToolButton {
 }
 
 QToolBar#NavigationBar QToolButton:hover {
-  background-color: @AccentHoverColor;
+  /* Neutral for the same reason the checked state is: @AccentHoverColor leaves
+     the accent-coloured icons at 1.7:1 against it, where this holds them at 3.6. */
+  background-color: @PrimaryColorLighten1;
   border: 1px solid @AccentColor;
 }
 
 QToolBar#NavigationBar QToolButton:pressed,
 QToolBar#NavigationBar QToolButton:checked {
-  background-color: @AccentBackgroundColor;
+  /* Neutral rather than the accent fill the rest of the sheet uses: the icons
+     on this bar are themselves accent-coloured, and blue on blue buries them. */
+  background-color: @PrimaryColorLighten2;
   border: 1px solid @AccentColor;
 }
 
