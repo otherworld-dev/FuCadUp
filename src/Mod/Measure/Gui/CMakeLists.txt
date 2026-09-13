@@ -2,7 +2,7 @@
 
 set(MeasureGui_LIBS
     Measure
-    #Part
+    Part
     FreeCADGui
 )
 
@@ -43,6 +43,8 @@ SET(MeasureGui_SRCS
     QuickMeasure.h
     TaskMeasure.cpp
     TaskMeasure.h
+    MeasurePreview.cpp
+    MeasurePreview.h
     TaskMassProperties.ui
     TaskMassProperties.cpp
     TaskMassProperties.h

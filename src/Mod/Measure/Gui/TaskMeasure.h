@@ -45,8 +45,12 @@
 
 #include <fastsignals/connection.h>
 
+#include <memory>
+
 namespace MeasureGui
 {
+
+class MeasurePreview;
 
 class TaskMeasure: public Gui::TaskView::TaskDialog, public Gui::SelectionObserver
 {
@@ -122,6 +126,9 @@ private:
     bool mAutoSave = false;
     bool mGreedySelection = false;
     Gui::Document* mTargetDoc;
+
+    // The value of what is under the cursor, before anything is picked
+    std::unique_ptr<MeasurePreview> preview;
 };
 
 }  // namespace MeasureGui

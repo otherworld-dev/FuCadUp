@@ -27,6 +27,7 @@
 
 
 #include "TaskMeasure.h"
+#include "MeasurePreview.h"
 
 #include <App/DocumentObjectGroup.h>
 #include <App/Link.h>
@@ -260,6 +261,8 @@ TaskMeasure::TaskMeasure()
         mTargetDoc = doc;
         mTargetDoc->openCommand("Add Measurement");
     }
+
+    preview = std::make_unique<MeasurePreview>();
 
     setAutoCloseOnDeletedDocument(true);
     // Call invoke method delayed, otherwise the dialog might not be fully initialized
