@@ -65,6 +65,8 @@
 #include <Mod/Sketcher/App/GeoList.h>
 #include <Mod/Sketcher/App/SketchObject.h>
 
+#include <Gui/SoDatumLabel.h>
+
 #include "EditModeCoinManager.h"
 #include "EditModeConstraintCoinManager.h"
 #include "EditModeGeometryCoinConverter.h"
@@ -2505,6 +2507,25 @@ void EditModeCoinManager::updateInventorColors()
 SoSeparator* EditModeCoinManager::getRootEditNode()
 {
     return editModeScenegraphNodes.EditRoot;
+}
+
+Gui::SoDatumLabel* EditModeCoinManager::getConstraintDatumLabel(int constraint)
+{
+    SoGroup* group = editModeScenegraphNodes.constrGroup;
+    if (!group || constraint < 0 || constraint >= group->getNumChildren()) {
+        return nullptr;
+    }
+
+    SoSeparator* sep = pEditModeConstraintCoinManager->getConstraintIdSeparator(constraint);
+    // A dimension's label is the first child of its separator (DatumLabelIndex)
+    if (!sep || sep->getNumChildren() == 0) {
+        return nullptr;
+    }
+    SoNode* node = sep->getChild(0);
+    if (!node->isOfType(Gui::SoDatumLabel::getClassTypeId())) {
+        return nullptr;
+    }
+    return static_cast<Gui::SoDatumLabel*>(node);
 }
 
 void EditModeCoinManager::updateInternalFaces()

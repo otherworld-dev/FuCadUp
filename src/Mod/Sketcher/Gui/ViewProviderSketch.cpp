@@ -61,7 +61,11 @@
 #include <Base/Converter.h>
 #include <Base/ServiceProvider.h>
 #include <Base/Vector3D.h>
+#include <QTimer>
+
+#include <App/DocumentObserver.h>
 #include <Gui/Application.h>
+#include <Gui/SoDatumLabel.h>
 #include <Gui/BitmapFactory.h>
 #include <Gui/CommandT.h>
 #include <Gui/Control.h>
@@ -87,6 +91,7 @@
 #include "DrawSketchHandler.h"
 #include "DrawSketchHandlerDragAutoConstraint.h"
 #include "EditDatumDialog.h"
+#include "DimensionValueEditor.h"
 #include "EditTextDialog.h"
 #include "EditModeCoinManager.h"
 #include "SketchStatusChip.h"
@@ -789,6 +794,9 @@ void ViewProviderSketch::activateHandler(std::unique_ptr<DrawSketchHandler> newH
     assert(editCoinManager);
     assert(!sketchHandler);
 
+    // A new tool takes over the keyboard: an open dimension box applies what was typed
+    closeDimensionEditor(true);
+
     sketchHandler = std::move(newHandler);
     setSketchMode(STATUS_SKETCH_UseHandler);
     sketchHandler->activate(this);
@@ -810,6 +818,76 @@ void ViewProviderSketch::deactivateHandler()
         editCoinManager->clearSnapMarker();
     }
     setSketchMode(STATUS_NONE);
+}
+
+/***************************** dimension values in the view ******************************/
+
+bool ViewProviderSketch::canEditDimensionInView(int constraint)
+{
+    if (!editDimensionsInView() || !isInEditMode() || !editCoinManager) {
+        return false;
+    }
+
+    Sketcher::SketchObject* sketch = getSketchObject();
+    const std::vector<Sketcher::Constraint*>& constraints = sketch->Constraints.getValues();
+    if (constraint < 0 || constraint >= static_cast<int>(constraints.size())) {
+        return false;
+    }
+
+    // Reference, weight and refraction ratio values keep the dialog, which handles them, and
+    // so does a sketch with conflicts, where the dialog says why nothing can be edited
+    const Sketcher::Constraint* constr = constraints[constraint];
+    return constr->isDimensional() && constr->isDriving && constr->Type != Sketcher::Weight
+        && constr->Type != Sketcher::SnellsLaw && !sketch->hasConflicts();
+}
+
+void ViewProviderSketch::editDimension(int constraint)
+{
+    closeDimensionEditor(true);
+
+    // Opened once the current event is over: finishing a tool hands the keyboard back to the
+    // view, which would close a box opened now straight away
+    App::DocumentObjectT sketchT(getSketchObject());
+    QTimer::singleShot(0, [sketchT, constraint]() {
+        App::DocumentObject* obj = sketchT.getObject();
+        if (!obj) {
+            return;
+        }
+        if (auto vp = dynamic_cast<ViewProviderSketch*>(
+                Gui::Application::Instance->getViewProvider(obj)
+            )) {
+            vp->openDimensionEditor(constraint);
+        }
+    });
+}
+
+void ViewProviderSketch::openDimensionEditor(int constraint)
+{
+    closeDimensionEditor(true);
+    if (!canEditDimensionInView(constraint)) {
+        return;
+    }
+
+    auto view = qobject_cast<Gui::View3DInventor*>(getActiveView());
+    Gui::SoDatumLabel* shown = editCoinManager->getConstraintDatumLabel(constraint);
+    if (!view || !shown) {
+        return;
+    }
+    dimensionEditor = new DimensionValueEditor(
+        view->getViewer(),
+        getEditingPlacement(),
+        getSketchObject(),
+        constraint,
+        *shown
+    );
+}
+
+void ViewProviderSketch::closeDimensionEditor(bool apply)
+{
+    if (dimensionEditor) {
+        dimensionEditor->finish(apply);
+        dimensionEditor = nullptr;
+    }
 }
 
 /// removes the active handler
@@ -1732,6 +1810,10 @@ void ViewProviderSketch::editDoubleClicked()
 
             // if its the right constraint
             if (Constr->isDimensional()) {
+                if (canEditDimensionInView(id)) {
+                    editDimension(id);
+                    return;
+                }
                 int tid = getDocument()->openCommand(
                     QT_TRANSLATE_NOOP("Command", "Modify sketch constraints"));
                 EditDatumDialog editDatumDialog(tid, this, id);
@@ -4677,6 +4759,9 @@ void ViewProviderSketch::unsetEdit(int ModNum)
     }
 
     SketchStatusChip::dismiss();
+
+    // What was typed in an open dimension box counts, unless the whole edit is being cancelled
+    closeDimensionEditor(!editingCancelled);
 
     if (dragAutoConstraintHandler) {
         dragAutoConstraintHandler->clear();

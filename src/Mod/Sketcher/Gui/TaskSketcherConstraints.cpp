@@ -1341,6 +1341,10 @@ void TaskSketcherConstraints::onListWidgetConstraintsItemActivated(QListWidgetIt
 
     // if its the right constraint
     if (it->isDimensional()) {
+        if (sketchView->canEditDimensionInView(it->ConstraintNbr)) {
+            sketchView->editDimension(it->ConstraintNbr);
+            return;
+        }
         int tid = this->sketchView->getDocument()->openCommand(
                     QT_TRANSLATE_NOOP("Command", "Modify sketch constraints"));
         EditDatumDialog(tid, this->sketchView, it->ConstraintNbr).exec(false);

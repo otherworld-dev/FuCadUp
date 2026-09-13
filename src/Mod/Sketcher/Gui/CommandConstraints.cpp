@@ -398,10 +398,10 @@ void finishDatumConstraint(Gui::Command* cmd,
         }
     }
 
+    SketcherGui::ViewProviderSketch* vp = nullptr;
     if (doc && doc->getInEdit()
         && doc->getInEdit()->isDerivedFrom<SketcherGui::ViewProviderSketch>()) {
-        SketcherGui::ViewProviderSketch* vp =
-            static_cast<SketcherGui::ViewProviderSketch*>(doc->getInEdit());
+        vp = static_cast<SketcherGui::ViewProviderSketch*>(doc->getInEdit());
 
         int firstConstraintIndex = lastConstraintIndex - numberofconstraints + 1;
 
@@ -436,7 +436,13 @@ void finishDatumConstraint(Gui::Command* cmd,
     bool show = hGrp->GetBool("ShowDialogOnDistanceConstraint", true);
 
     // Ask for the value of the distance immediately
-    if (show && isDriving) {
+    int newConstraint = static_cast<int>(lastConstraintIndex);
+    if (show && isDriving && vp && vp->canEditDimensionInView(newConstraint)) {
+        // In a box on the new dimension: it is made now, and a value typed there is its own step
+        cmd->commitCommand();
+        vp->editDimension(newConstraint);
+    }
+    else if (show && isDriving) {
         EditDatumDialog editDatumDialog(cmd->transactionID(), sketch, ConStr.size() - 1);
         cmd->resetTransactionID();
         editDatumDialog.exec();
@@ -2880,14 +2886,33 @@ protected:
         bool show = hGrp->GetBool("ShowDialogOnDistanceConstraint", true);
         const std::vector<Sketcher::Constraint*>& ConStr = Obj->Constraints.getValues();
 
-        bool commandHandledInEditDatum = false;
-        for (int index : cstrIndexes | boost::adaptors::reversed) {
-            if (show && ConStr[index]->isDimensional() && ConStr[index]->isDriving) {
-                commandHandledInEditDatum = true;
-                EditDatumDialog editDatumDialog(currentTransactionID, sketchgui, index);
-                editDatumDialog.exec();
-                if (!editDatumDialog.isSuccess()) {
+        // The last driving dimension made gets a box on its label: the dimensions are made now,
+        // and a value typed there is its own step
+        int boxIndex = -1;
+        if (show) {
+            for (int index : cstrIndexes | boost::adaptors::reversed) {
+                if (ConStr[index]->isDimensional() && ConStr[index]->isDriving) {
+                    boxIndex = index;
                     break;
+                }
+            }
+        }
+
+        bool commandHandledInEditDatum = false;
+        if (boxIndex >= 0 && sketchgui->canEditDimensionInView(boxIndex)) {
+            commitCommand();
+            commandHandledInEditDatum = true;
+            sketchgui->editDimension(boxIndex);
+        }
+        else {
+            for (int index : cstrIndexes | boost::adaptors::reversed) {
+                if (show && ConStr[index]->isDimensional() && ConStr[index]->isDriving) {
+                    commandHandledInEditDatum = true;
+                    EditDatumDialog editDatumDialog(currentTransactionID, sketchgui, index);
+                    editDatumDialog.exec();
+                    if (!editDatumDialog.isSuccess()) {
+                        break;
+                    }
                 }
             }
         }
@@ -11670,6 +11695,12 @@ void CmdSketcherChangeDimensionConstraint::activated(int iMsg)
 
     try {
         auto value = getDimConstraint();
+        auto vp = dynamic_cast<SketcherGui::ViewProviderSketch*>(
+            Gui::Application::Instance->getViewProvider(std::get<0>(value)));
+        if (vp && vp->canEditDimensionInView(std::get<1>(value))) {
+            vp->editDimension(std::get<1>(value));
+            return;
+        }
         int tid = openActiveDocumentCommand(QT_TRANSLATE_NOOP("Command", "Modify sketch constraints"));
         EditDatumDialog(tid, std::get<0>(value), std::get<1>(value)).exec(false);
     }

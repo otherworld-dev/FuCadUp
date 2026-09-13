@@ -41,6 +41,11 @@ class Ui_InsertDatum;
 
 bool checkConstraintName(const Sketcher::SketchObject* sketch, std::string constraintName);
 
+/// Scales the whole sketch so that its single scale defining dimension, the given constraint,
+/// takes newDatum (per the Auto-scale preference). The constraint's index can change on the
+/// way, so it is updated in place.
+void performAutoScale(Sketcher::SketchObject* sketch, int& constraint, double newDatum);
+
 class EditDatumDialog: public QObject
 {
     Q_OBJECT
@@ -70,7 +75,6 @@ private Q_SLOTS:
     void typeChanged(bool);
 
 private:
-    void performAutoScale(double newDatum);
 };
 
 }  // namespace SketcherGui

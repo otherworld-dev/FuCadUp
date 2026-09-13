@@ -45,6 +45,8 @@
 #include <Mod/Sketcher/App/GeoList.h>
 #include <Mod/Sketcher/App/GeoEnum.h>
 
+#include <QPointer>
+
 #include "EditModeCoinManager.h"
 #include "PropertyVisualLayerList.h"
 #include "AutoConstraint.h"
@@ -103,6 +105,7 @@ namespace SketcherGui
 {
 
 class EditModeCoinManager;
+class DimensionValueEditor;
 class SnapManager;
 class DrawSketchHandler;
 class DrawSketchHandlerDragAutoConstraint;
@@ -564,6 +567,18 @@ public:
     void activateHandler(std::unique_ptr<DrawSketchHandler> newHandler);
     /// removes the active handler
     void purgeHandler();
+    //@}
+
+    /** @name dimension values typed in the view */
+    //@{
+    /// Whether a constraint's value is typed in a box on its label rather than in the dialog
+    bool canEditDimensionInView(int constraint);
+    /// Opens that box once the current event is over; the constraint must be committed already
+    void editDimension(int constraint);
+    /// Opens the box at once
+    void openDimensionEditor(int constraint);
+    /// Closes an open box, applying a valid typed value when apply is true
+    void closeDimensionEditor(bool apply = true);
     //@}
 
     bool isConstructionMode() const;
@@ -1091,6 +1106,8 @@ private:
     std::unique_ptr<ShortcutListener> listener;
 
     std::unique_ptr<EditModeCoinManager> editCoinManager;
+
+    QPointer<DimensionValueEditor> dimensionEditor;
 
     std::unique_ptr<SnapManager> snapManager;
 

@@ -45,6 +45,11 @@ class SbVec2s;
 class SoRayPickAction;
 class SoPickedPoint;
 class SoPickedPointList;
+
+namespace Gui
+{
+class SoDatumLabel;
+}
 class SbVec3s;
 
 namespace Base
@@ -318,6 +323,8 @@ public:
 
     /** @name coin node access*/
     SoSeparator* getRootEditNode();
+    /// The label a dimensional constraint is drawn with, or nullptr for other constraints
+    Gui::SoDatumLabel* getConstraintDatumLabel(int constraint);
     /// Rebuilds the internal face geometry from the sketch InternalShape property.
     void updateInternalFaces();
     /** Turns picking of the internal faces on for the duration of a pick.

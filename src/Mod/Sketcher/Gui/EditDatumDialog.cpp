@@ -288,7 +288,7 @@ void EditDatumDialog::accepted()
                     auto unitString = newQuant.getUnit().getString();
                     unitString = Base::Tools::escapeQuotesFromString(unitString);
 
-                    performAutoScale(newDatum);
+                    performAutoScale(sketch, ConstrNbr, newDatum);
 
                     Gui::cmdAppObjectArgs(
                         sketch,
@@ -450,7 +450,7 @@ bool hasVisualFeature(App::DocumentObject* obj, App::DocumentObject* rootObj, Gu
     return false;
 }
 
-void EditDatumDialog::performAutoScale(double newDatum)
+void SketcherGui::performAutoScale(Sketcher::SketchObject* sketch, int& constraint, double newDatum)
 {
     const std::vector<Sketcher::Constraint*>& constraints = sketch->Constraints.getValues();
     for (auto* constr : constraints) {
@@ -483,11 +483,11 @@ void EditDatumDialog::performAutoScale(double newDatum)
             // Handle the case where multiple datum constraints are present but only one is scale
             // defining e.g. a bunch of angle constraints and a single length constraint
             int scaleDefiningConstraint = sketch->getSingleScaleDefiningConstraint();
-            if (scaleDefiningConstraint != ConstrNbr) {
+            if (scaleDefiningConstraint != constraint) {
                 return;
             }
 
-            double oldDatum = sketch->getDatum(ConstrNbr);
+            double oldDatum = sketch->getDatum(constraint);
             if (!std::isfinite(newDatum) || !std::isfinite(oldDatum)
                 || std::abs(oldDatum) <= Precision::Confusion()) {
                 return;
@@ -502,7 +502,7 @@ void EditDatumDialog::performAutoScale(double newDatum)
 
             // Some constraints cannot be scaled so the actual datum constraint
             // might change index
-            ConstrNbr = sketch->getSingleScaleDefiningConstraint();
+            constraint = sketch->getSingleScaleDefiningConstraint();
         }
         catch (const Base::Exception& e) {
             Base::Console().error("Exception performing autoscale: %s\n", e.what());
