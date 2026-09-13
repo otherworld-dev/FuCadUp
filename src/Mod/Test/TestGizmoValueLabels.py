@@ -374,6 +374,46 @@ class TestGizmoValueLabels(GizmoLabelCase):
 
     # -- angles ----------------------------------------------------------
 
+    def _dragger_under(self, box, type_name):
+        """Whether any part of a dragger of this type lies under the box on screen."""
+
+        from pivy import coin
+
+        manager = self.viewer.getSoRenderManager()
+        ratio = self.viewport.devicePixelRatioF()
+        corner = self.viewport.mapFromGlobal(box.mapToGlobal(QtCore.QPoint(0, 0)))
+        for across in (0.1, 0.3, 0.5, 0.7, 0.9):
+            for down in (0.2, 0.5, 0.8):
+                x = (corner.x() + box.width() * across) * ratio
+                y = (self.viewport.height() - (corner.y() + box.height() * down)) * ratio
+                pick = coin.SoRayPickAction(manager.getViewportRegion())
+                pick.setPoint(coin.SbVec2s(int(x), int(y)))
+                pick.setRadius(2)
+                pick.setPickAll(True)
+                pick.apply(manager.getSceneGraph())
+                picked = pick.getPickedPointList()
+                for index in range(picked.getLength()):
+                    path = picked[index].getPath()
+                    for depth in range(path.getLength()):
+                        if path.getNode(depth).getTypeId().getName().getString() == type_name:
+                            return True
+        return False
+
+    def test_the_taper_box_leaves_its_handle_free(self):
+        self._wait(lambda: len(self._boxes()) == 2)
+        taper = next(box for box in self._boxes() if "°" in box.text())
+        self.assertFalse(
+            self._dragger_under(taper, "SoRotationDraggerContainer"),
+            "the taper angle's box covers the handle that changes it",
+        )
+
+    def test_the_length_box_leaves_its_arrow_free(self):
+        box = self._wait_for_distance_boxes(1)[0]
+        self.assertFalse(
+            self._dragger_under(box, "SoLinearDraggerContainer"),
+            "the length box covers the arrow that changes it",
+        )
+
     def test_an_extrude_shows_its_taper_angle_in_a_second_box(self):
         self._wait(lambda: len(self._boxes()) == 2)
         angle_boxes = [box for box in self._boxes() if "°" in box.text()]

@@ -767,7 +767,10 @@ void RotationGizmo::updateValueLabel()
     SbVec3f zeroRay;
     placement.multVec(pivot, zeroRay);
 
-    float radius = pivot.length() * dragger->geometryScale.getValue()[0];
+    // Just outside the handle, so the box never covers the handle it belongs to; in the
+    // rotator's own units, so the gap stays the same on screen at any zoom
+    constexpr float clearance = 2.5F;
+    float radius = (pivot.length() + clearance) * dragger->geometryScale.getValue()[0];
     auto sweep = static_cast<float>(property->rawValue() * multFactor + addFactor);
 
     valueLabel->showAngle(draggerContainer->translation.getValue(), axis, zeroRay, sweep, radius);
