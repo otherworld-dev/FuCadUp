@@ -41,6 +41,7 @@ SET(Test_SRCS
     TestNavigationBarIcons.py
     TestFusionShortcuts.py
     TestExtrudeFlip.py
+    TestGizmoValueLabels.py
     TestPartDesignLetters.py
     TestRibbon.py
     TestRibbonLayout.py

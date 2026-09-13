@@ -110,6 +110,7 @@ FreeCAD.__unit_test__ += [
     "TestNavigationBarIcons",
     "TestFusionShortcuts",
     "TestExtrudeFlip",
+    "TestGizmoValueLabels",
     "TestPartDesignLetters",
     "TestRibbon",
     "TestRibbonLayout",

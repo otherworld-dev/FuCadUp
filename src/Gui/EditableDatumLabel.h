@@ -70,8 +70,18 @@ public:
     void activate();
     void deactivate();
 
-    void startEdit(double val, QObject* eventFilteringObj = nullptr, bool visibleToMouse = false);
+    void startEdit(
+        double val,
+        QObject* eventFilteringObj = nullptr,
+        bool visibleToMouse = false,
+        bool takeFocus = true
+    );
     void stopEdit(bool writeChanges = true);
+    /// Shows or hides the label and its box without ending the edit.
+    void setVisible(bool visible);
+    /// Drops the label's points: nothing is drawn and the box sits at the placement origin.
+    void clearPoints();
+    QuantitySpinBox* getSpinBox() const;
     bool isActive() const;
     bool isInEdit() const;
     double getValue() const;

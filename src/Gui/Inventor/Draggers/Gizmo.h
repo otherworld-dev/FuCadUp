@@ -35,6 +35,8 @@
 #include <Inventor/nodekits/SoBaseKit.h>
 #include <Inventor/SbVec3f.h>
 #include <QMetaObject>
+#include <QObject>
+#include <QPointer>
 
 #include <Base/Placement.h>
 #include <Gui/DocumentObserver.h>
@@ -48,6 +50,8 @@ class SoInteractionKit;
 
 namespace Gui
 {
+class GizmoContainer;
+class GizmoValueLabel;
 class QuantitySpinBox;
 class SoLinearDragger;
 class SoLinearDraggerContainer;
@@ -82,7 +86,23 @@ public:
 
     bool getVisibility();
 
+    /// The task panel field this gizmo edits
+    QuantitySpinBox* getProperty() const;
+    /// The in-view value of this gizmo, or nullptr when it has none
+    GizmoValueLabel* getValueLabel() const;
+    void setValueLabel(GizmoValueLabel* label);
+    /// Brings the value label in line with the gizmo's place and value
+    virtual void updateValueLabel()
+    {}
+    /// Whether the gizmo is drawn: set visible and not driven by a formula
+    bool isShownInView();
+    void setContainer(GizmoContainer* container);
+
 protected:
+    /// Shows or hides the gizmo's own guide line or arc, which the value label replaces
+    virtual void showGuideGeometry([[maybe_unused]] bool show)
+    {}
+
     double multFactor = 1.0f;
     double addFactor = 0.0f;
 
@@ -90,6 +110,10 @@ protected:
     double initialValue;
 
     bool visible = true;
+
+    GizmoValueLabel* valueLabel = nullptr;
+    GizmoContainer* container = nullptr;
+    QMetaObject::Connection valueLabelConnection;
 };
 
 enum class LinearDraggerStyle
@@ -126,6 +150,10 @@ public:
     void setDraggerStyle(LinearDraggerStyle style);
     void setClickCallback(ClickCallback callback);
     void setVisibility(bool visible);
+    void updateValueLabel() override;
+
+protected:
+    void showGuideGeometry(bool show) override;
 
 private:
     SoLinearDragger* dragger = nullptr;
@@ -180,6 +208,15 @@ public:
     void setAddFactor(const double val);
     void setClickCallback(ClickCallback callback);
     void setVisibility(bool visible);
+    void updateValueLabel() override;
+
+protected:
+    void showGuideGeometry(bool show) override;
+    /// Whether the dragger draws a guide arc of its own (see RadialGizmo)
+    virtual bool hasGuideGeometry() const
+    {
+        return false;
+    }
 
 private:
     SoRotationDragger* dragger = nullptr;
@@ -225,6 +262,12 @@ public:
     void setRadius(float radius);
     void flipArrow();
 
+protected:
+    bool hasGuideGeometry() const override
+    {
+        return true;
+    }
+
 private:
     using inherited = RotationGizmo;
 };
@@ -269,6 +312,14 @@ public:
     static InputHint::UserInput getFineSnapKey();
     // Returns true when coarse dragging is the default behavior
     static bool isCoarseByDefault();
+    // Checks if gizmo values are shown in the 3D view in the preferences
+    static bool isValueLabelsEnabled();
+
+    /// Shows the value labels of the gizmos that are shown; a box that newly appears
+    /// takes the keyboard if it is in the 3D view
+    void refreshValueLabels();
+    /// Makes the value labels again, e.g. after a gizmo was bound to another field
+    void rebuildValueLabels();
 
     static std::unique_ptr<GizmoContainer> create(
         std::initializer_list<Gui::Gizmo*> gizmos,
@@ -280,8 +331,21 @@ private:
     SoFieldSensor cameraSensor;
     SoFieldSensor cameraPositionSensor;
     WeakPtrT<ViewProviderDragger> viewProvider;
+    std::unique_ptr<QObject> labelContext;
+    std::vector<std::unique_ptr<GizmoValueLabel>> valueLabels;
+    QPointer<View3DInventorViewer> labelViewer;
+    Base::Placement labelOrigin;
+    SoFieldSensor visibleSensor;
+    bool firstFocusDone = false;
 
     void addGizmo(Gizmo* gizmo);
+    void createValueLabels();
+    void removeValueLabels();
+    void focusFirstValueLabel();
+    void focusNextValueLabel(GizmoValueLabel* from, bool backwards);
+    bool isKeyboardOnView() const;
+
+    static void visibleChangedCallback(void* data, SoSensor*);
 
     static void cameraChangeCallback(void* data, SoSensor*);
     static void cameraPositionChangeCallback(void* data, SoSensor*);

@@ -151,6 +151,20 @@ EditableDatumLabel::EditableDatumLabel(
 EditableDatumLabel::~EditableDatumLabel()
 {
     deactivate();
+
+    // Switching the label off is not enough: take it out of the scene, or every label
+    // ever made stays behind as a dead node.
+    if (viewer) {
+        SoNode* sceneGraph = viewer->getSceneGraph();
+        if (sceneGraph && sceneGraph->isOfType(SoGroup::getClassTypeId())) {
+            auto group = static_cast<SoGroup*>(sceneGraph);  // NOLINT
+            int index = group->findChild(root);
+            if (index >= 0) {
+                group->removeChild(index);
+            }
+        }
+    }
+
     transform->unref();
     annotation->unref();
     eventCallback->unref();
@@ -198,7 +212,12 @@ void EditableDatumLabel::deactivate()
     root->whichChild = SO_SWITCH_NONE;
 }
 
-void EditableDatumLabel::startEdit(double val, QObject* eventFilteringObj, bool visibleToMouse)
+void EditableDatumLabel::startEdit(
+    double val,
+    QObject* eventFilteringObj,
+    bool visibleToMouse,
+    bool takeFocus
+)
 {
     if (isInEdit()) {
         return;
@@ -251,13 +270,17 @@ void EditableDatumLabel::startEdit(double val, QObject* eventFilteringObj, bool 
         updateGeometry(edit);
         positionSpinbox();
     }
-    setFocusToSpinbox();
-    QTimer::singleShot(0, this, [this]() {
+    if (takeFocus) {
+        setFocusToSpinbox();
+    }
+    QTimer::singleShot(0, this, [this, takeFocus]() {
         if (!spinBox) {
             return;
         }
         positionSpinbox();
-        setFocusToSpinbox();
+        if (takeFocus) {
+            setFocusToSpinbox();
+        }
     });
 
     connect(
@@ -682,6 +705,8 @@ void EditableDatumLabel::setLabelStartAngle(double val)
 void EditableDatumLabel::setLabelRange(double val)
 {
     label->param3 = float(val);
+    // param3 is not one of the node's registered fields, so setting it alone does not redraw
+    label->touch();
 }
 
 void EditableDatumLabel::setLabelRecommendedDistance()
@@ -739,6 +764,28 @@ void EditableDatumLabel::resetLockedState()
 {
     hasFinishedEditing = false;
     setLockedAppearance(false);
+}
+
+void EditableDatumLabel::setVisible(bool visible)
+{
+    root->whichChild = visible ? 0 : SO_SWITCH_NONE;
+    if (spinBox) {
+        spinBox->setVisible(visible);
+        if (visible) {
+            positionSpinbox();
+        }
+    }
+}
+
+void EditableDatumLabel::clearPoints()
+{
+    label->pnts.setNum(0);
+    positionSpinbox();
+}
+
+QuantitySpinBox* EditableDatumLabel::getSpinBox() const
+{
+    return spinBox;
 }
 
 EditableDatumLabel::Function EditableDatumLabel::getFunction()

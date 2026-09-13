@@ -24,9 +24,13 @@
 #include "Gizmo.h"
 
 #include <cmath>
+#include <iterator>
 #include <utility>
 #include <numbers>
+#include <QAbstractSpinBox>
 #include <QApplication>
+#include <QLineEdit>
+#include <QTimer>
 
 #include <Inventor/nodes/SoOrthographicCamera.h>
 #include <Inventor/nodes/SoPerspectiveCamera.h>
@@ -40,6 +44,7 @@
 #include "Base/ServiceProvider.h"
 #include <Base/Tools.h>
 #include <Document.h>
+#include <Gui/Control.h>
 #include <Gui/Inventor/Draggers/GizmoStyleParameters.h>
 #include <Gui/Inventor/So3DAnnotation.h>
 #include <Gui/Inventor/SoToggleSwitch.h>
@@ -48,6 +53,7 @@
 #include <Gui/Utilities.h>
 #include <Gui/View3DInventorViewer.h>
 
+#include "GizmoValueLabel.h"
 #include "SoLinearDragger.h"
 #include "SoLinearDraggerGeometry.h"
 #include "SoRotationDragger.h"
@@ -124,6 +130,18 @@ double clampDragAngle(double value, double min, double max, double period)
 
     return Base::clampAngle(value, min, max, Base::Precision::Confusion());
 }
+
+void acceptActiveDialog()
+{
+    // Queued: accepting closes the task panel, which owns the box whose key press is
+    // still being handled
+    QMetaObject::invokeMethod(qApp, []() { Gui::Control().accept(); }, Qt::QueuedConnection);
+}
+
+void rejectActiveDialog()
+{
+    QMetaObject::invokeMethod(qApp, []() { Gui::Control().reject(); }, Qt::QueuedConnection);
+}
 }  // namespace
 
 void Gizmo::setDraggerPlacement(const Base::Vector3d& pos, const Base::Vector3d& dir)
@@ -149,6 +167,41 @@ double Gizmo::getAddFactor()
 bool Gizmo::getVisibility()
 {
     return visible;
+}
+
+QuantitySpinBox* Gizmo::getProperty() const
+{
+    return property;
+}
+
+GizmoValueLabel* Gizmo::getValueLabel() const
+{
+    return valueLabel;
+}
+
+void Gizmo::setValueLabel(GizmoValueLabel* label)
+{
+    QObject::disconnect(valueLabelConnection);
+    valueLabel = label;
+    if (label) {
+        // Typing in the box is typing in the task panel field
+        valueLabelConnection
+            = QObject::connect(label, &GizmoValueLabel::valueEdited, label, [this](double value) {
+                  property->setValue(value);
+              });
+    }
+    showGuideGeometry(!label);
+    updateValueLabel();
+}
+
+bool Gizmo::isShownInView()
+{
+    return visible && property && !property->hasExpression();
+}
+
+void Gizmo::setContainer(GizmoContainer* container)
+{
+    this->container = container;
 }
 
 LinearGizmo::LinearGizmo(QuantitySpinBox* property)
@@ -228,12 +281,14 @@ void LinearGizmo::setDraggerPlacement(const SbVec3f& pos, const SbVec3f& dir)
     assert(draggerContainer && "Forgot to call GizmoContainer::initGizmos?");
     draggerContainer->translation = pos;
     draggerContainer->setPointerDirection(dir);
+    updateValueLabel();
 }
 
 void LinearGizmo::reverseDir()
 {
     auto dir = getDraggerContainer()->getPointerDirection();
     getDraggerContainer()->setPointerDirection(dir * -1);
+    updateValueLabel();
 }
 
 double LinearGizmo::getDragLength()
@@ -248,6 +303,7 @@ void LinearGizmo::setDragLength(double dragLength)
 {
     dragLength = dragLength * multFactor + addFactor;
     dragger->translation = {0, static_cast<float>(dragLength), 0};
+    updateValueLabel();
 }
 
 void LinearGizmo::setGeometryScale(float scale)
@@ -285,6 +341,10 @@ void LinearGizmo::setProperty(QuantitySpinBox* property)
     // Updates the gizmo state based on the new property
     setDragLength(property->rawValue());
     setVisibility(visible);
+
+    if (container) {
+        container->rebuildValueLabels();
+    }
 }
 
 void LinearGizmo::setMultFactor(const double val)
@@ -313,6 +373,31 @@ void LinearGizmo::setVisibility(bool visible)
 {
     this->visible = visible;
     getDraggerContainer()->visible = visible && !property->hasExpression();
+
+    if (container) {
+        container->refreshValueLabels();
+    }
+}
+
+void LinearGizmo::updateValueLabel()
+{
+    if (!valueLabel || !draggerContainer) {
+        return;
+    }
+
+    valueLabel->showDistance(
+        draggerContainer->translation.getValue(),
+        draggerContainer->getPointerDirection(),
+        dragger->translation.getValue()[1]
+    );
+    valueLabel->setValue(property->rawValue());
+}
+
+void LinearGizmo::showGuideGeometry(bool show)
+{
+    if (dragger) {
+        dragger->baseGeomVisible = show && draggerStyle == LinearDraggerStyle::Arrow;
+    }
 }
 
 void LinearGizmo::draggingStarted()
@@ -337,8 +422,13 @@ void LinearGizmo::draggingFinished()
         clickCallback();
     }
 
-    property->setFocus();
-    property->selectAll();
+    if (valueLabel && valueLabel->isShown()) {
+        valueLabel->focus();
+    }
+    else {
+        property->setFocus();
+        property->selectAll();
+    }
 }
 
 void LinearGizmo::draggingContinued()
@@ -441,12 +531,14 @@ void RotationGizmo::setDraggerPlacement(const SbVec3f& pos, const SbVec3f& dir)
     assert(draggerContainer && "Forgot to call GizmoContainer::initGizmos?");
     draggerContainer->translation = pos;
     draggerContainer->setPointerDirection(dir);
+    updateValueLabel();
 }
 
 void RotationGizmo::reverseDir()
 {
     auto dir = getDraggerContainer()->getPointerDirection();
     getDraggerContainer()->setPointerDirection(dir * -1);
+    updateValueLabel();
 }
 
 void RotationGizmo::placeOverLinearGizmo(LinearGizmo* gizmo)
@@ -466,6 +558,7 @@ void RotationGizmo::placeOverLinearGizmo(LinearGizmo* gizmo)
     translation.touch();
 
     automaticOrientation = true;
+    updateValueLabel();
 }
 
 void RotationGizmo::translationSensorCB(void* data, SoSensor* sensor)
@@ -480,6 +573,7 @@ void RotationGizmo::translationSensorCB(void* data, SoSensor* sensor)
     SbVec3f dir = placement.dir;
     dir.normalize();
     sudoThis->draggerContainer->translation = placement.pos + dir * (yComp + sudoThis->sepDistance);
+    sudoThis->updateValueLabel();
 }
 
 void RotationGizmo::placeBelowLinearGizmo(LinearGizmo* gizmo)
@@ -497,6 +591,7 @@ void RotationGizmo::placeBelowLinearGizmo(LinearGizmo* gizmo)
     SoSFVec3f& translation = gizmo->getDraggerContainer()->getDragger()->translation;
     translationSensor.attach(&translation);
     translation.touch();
+    updateValueLabel();
 }
 
 double RotationGizmo::getRotAngle()
@@ -511,6 +606,7 @@ void RotationGizmo::setRotAngle(double angle)
 {
     angle = multFactor * angle + addFactor;
     dragger->rotation = SbRotation({0, 0, 1.0f}, static_cast<float>(angle));
+    updateValueLabel();
 }
 
 void RotationGizmo::setGeometryScale(float scale)
@@ -547,8 +643,13 @@ void RotationGizmo::draggingFinished()
         clickCallback();
     }
 
-    property->setFocus();
-    property->selectAll();
+    if (valueLabel && valueLabel->isShown()) {
+        valueLabel->focus();
+    }
+    else {
+        property->setFocus();
+        property->selectAll();
+    }
 }
 
 void RotationGizmo::draggingContinued()
@@ -616,6 +717,10 @@ void RotationGizmo::setProperty(QuantitySpinBox* property)
     // Updates the gizmo state based on the new property
     setRotAngle(property->rawValue());
     setVisibility(visible);
+
+    if (container) {
+        container->rebuildValueLabels();
+    }
 }
 
 void RotationGizmo::setMultFactor(const double val)
@@ -639,6 +744,41 @@ void RotationGizmo::setVisibility(bool visible)
 {
     this->visible = visible;
     getDraggerContainer()->visible = visible && !property->hasExpression();
+
+    if (container) {
+        container->refreshValueLabels();
+    }
+}
+
+void RotationGizmo::updateValueLabel()
+{
+    if (!valueLabel || !draggerContainer) {
+        return;
+    }
+
+    // The handle sits at the rotator's pivot, turned by the dragger's rotation about the
+    // container's local Z; at a value of zero it points along the pivot
+    auto rotator = SO_GET_PART(dragger, "rotator", SoRotatorGeometryKit);
+    SbVec3f pivot = rotator->pivotPosition.getValue();
+    SbRotation placement = draggerContainer->rotation.getValue();
+
+    SbVec3f axis(0.0F, 0.0F, 1.0F);
+    placement.multVec(axis, axis);
+    SbVec3f zeroRay;
+    placement.multVec(pivot, zeroRay);
+
+    float radius = pivot.length() * dragger->geometryScale.getValue()[0];
+    auto sweep = static_cast<float>(property->rawValue() * multFactor + addFactor);
+
+    valueLabel->showAngle(draggerContainer->translation.getValue(), axis, zeroRay, sweep, radius);
+    valueLabel->setValue(property->rawValue());
+}
+
+void RotationGizmo::showGuideGeometry(bool show)
+{
+    if (dragger) {
+        dragger->baseGeomVisible = show && hasGuideGeometry();
+    }
 }
 
 DirectedRotationGizmo::DirectedRotationGizmo(QuantitySpinBox* property)
@@ -734,6 +874,7 @@ void GizmoContainer::initClass()
 
 GizmoContainer::GizmoContainer()
     : viewProvider(nullptr)
+    , labelContext(std::make_unique<QObject>())
 {
     SO_KIT_CONSTRUCTOR(GizmoContainer);
 
@@ -763,10 +904,21 @@ GizmoContainer::GizmoContainer()
 
     cameraPositionSensor.setData(this);
     cameraPositionSensor.setFunction(cameraPositionChangeCallback);
+
+    visibleSensor.setFunction(&GizmoContainer::visibleChangedCallback);
+    visibleSensor.setData(this);
+    visibleSensor.setPriority(0);
+    visibleSensor.attach(&visible);
 }
 
 GizmoContainer::~GizmoContainer()
 {
+    visibleSensor.setData(nullptr);
+    visibleSensor.detach();
+
+    // The labels point back at the gizmos, so they go first
+    removeValueLabels();
+
     cameraSensor.setData(nullptr);
     cameraSensor.detach();
 
@@ -811,6 +963,7 @@ void GizmoContainer::addGizmo(Gizmo* gizmo)
 {
     assert(std::ranges::find(gizmos, gizmo) == gizmos.end() && "this gizmo is already added!");
     gizmos.push_back(gizmo);
+    gizmo->setContainer(this);
 }
 
 void GizmoContainer::attachViewer(Gui::View3DInventorViewer* viewer, Base::Placement& origin)
@@ -826,6 +979,17 @@ void GizmoContainer::attachViewer(Gui::View3DInventorViewer* viewer, Base::Place
     viewer->getDocument()->setEditingTransform(mat);
     So3DAnnotation* annotation = SO_GET_ANY_PART(this, "annotation", So3DAnnotation);
     viewer->setupEditingRoot(annotation, &mat);
+
+    labelViewer = viewer;
+    labelOrigin = origin;
+    createValueLabels();
+
+    // The task panel queues focus for its own first field while it is built, which is
+    // before this; queueing now hands the keyboard to the first box after that
+    QTimer::singleShot(0, labelContext.get(), [this]() {
+        focusFirstValueLabel();
+        firstFocusDone = true;
+    });
 }
 
 void GizmoContainer::setUpAutoScale(SoCamera* cameraIn)
@@ -867,6 +1031,7 @@ void GizmoContainer::cameraChangeCallback(void* data, SoSensor*)
     for (auto gizmo : sudoThis->gizmos) {
         float localScale = viewVolume.getWorldToScreenScale(gizmo->getDraggerPlacement().pos, 0.015);
         gizmo->setGeometryScale(localScale);
+        gizmo->updateValueLabel();
     }
 }
 
@@ -880,6 +1045,7 @@ void GizmoContainer::cameraPositionChangeCallback(void* data, SoSensor*)
 
         for (auto gizmo : sudoThis->gizmos) {
             gizmo->orientAlongCamera(camera);
+            gizmo->updateValueLabel();
         }
     }
 }
@@ -922,6 +1088,137 @@ bool GizmoContainer::isCoarseByDefault()
                static_cast<int>(DefaultDragBehavior::Coarse)
            )
         == static_cast<int>(DefaultDragBehavior::Coarse);
+}
+
+bool GizmoContainer::isValueLabelsEnabled()
+{
+    return getGizmoParameterGroup()->GetBool("ShowValueLabels", true);
+}
+
+void GizmoContainer::createValueLabels()
+{
+    removeValueLabels();
+    if (!labelViewer || !isValueLabelsEnabled()) {
+        return;
+    }
+
+    // One box per task panel field: Fillet's two arrows, and an equal-distance Chamfer's,
+    // edit the same field
+    std::vector<QuantitySpinBox*> labelled;
+    for (auto gizmo : gizmos) {
+        QuantitySpinBox* property = gizmo->getProperty();
+        if (!property || std::ranges::find(labelled, property) != labelled.end()) {
+            continue;
+        }
+        labelled.push_back(property);
+
+        auto label = std::make_unique<GizmoValueLabel>(labelViewer, labelOrigin, property->unit());
+        GizmoValueLabel* raw = label.get();
+        QObject::connect(raw, &GizmoValueLabel::accepted, labelContext.get(), &acceptActiveDialog);
+        QObject::connect(raw, &GizmoValueLabel::cancelled, labelContext.get(), &rejectActiveDialog);
+        QObject::connect(raw, &GizmoValueLabel::tabbed, labelContext.get(), [this, raw](bool backwards) {
+            focusNextValueLabel(raw, backwards);
+        });
+        QObject::connect(raw, &GizmoValueLabel::focusLeft, labelContext.get(), [this]() {
+            // Where the keyboard went is only known once the focus change is over
+            QTimer::singleShot(0, labelContext.get(), [this]() { refreshValueLabels(); });
+        });
+
+        gizmo->setValueLabel(raw);
+        valueLabels.push_back(std::move(label));
+    }
+
+    refreshValueLabels();
+}
+
+void GizmoContainer::removeValueLabels()
+{
+    for (auto gizmo : gizmos) {
+        gizmo->setValueLabel(nullptr);
+    }
+    valueLabels.clear();
+}
+
+void GizmoContainer::rebuildValueLabels()
+{
+    // Nothing to rebuild before the gizmos are attached to a view, or with labels turned off
+    if (valueLabels.empty()) {
+        return;
+    }
+    createValueLabels();
+}
+
+void GizmoContainer::refreshValueLabels()
+{
+    for (auto gizmo : gizmos) {
+        GizmoValueLabel* label = gizmo->getValueLabel();
+        if (!label) {
+            continue;
+        }
+
+        bool shown = visible.getValue() && gizmo->isShownInView();
+        // A box being typed in never disappears under the user, e.g. when what has been
+        // typed so far fails to recompute and the task panel hides its gizmos
+        if (!shown && label->hasFocus()) {
+            shown = true;
+        }
+
+        bool appears = shown && !label->isShown();
+        label->setShown(shown);
+        if (appears && firstFocusDone && isKeyboardOnView()) {
+            label->focus();
+        }
+    }
+}
+
+void GizmoContainer::focusFirstValueLabel()
+{
+    for (auto gizmo : gizmos) {
+        GizmoValueLabel* label = gizmo->getValueLabel();
+        if (label && label->isShown()) {
+            label->focus();
+            return;
+        }
+    }
+}
+
+void GizmoContainer::focusNextValueLabel(GizmoValueLabel* from, bool backwards)
+{
+    std::vector<GizmoValueLabel*> shown;
+    for (auto gizmo : gizmos) {
+        GizmoValueLabel* label = gizmo->getValueLabel();
+        if (label && label->isShown()) {
+            shown.push_back(label);
+        }
+    }
+
+    auto found = std::ranges::find(shown, from);
+    if (shown.size() < 2 || found == shown.end()) {
+        return;
+    }
+
+    auto count = static_cast<std::ptrdiff_t>(shown.size());
+    auto index = std::distance(shown.begin(), found);
+    shown[(index + (backwards ? count - 1 : 1)) % count]->focus();
+}
+
+bool GizmoContainer::isKeyboardOnView() const
+{
+    QWidget* focus = QApplication::focusWidget();
+    if (!focus) {
+        return true;
+    }
+    if (qobject_cast<QAbstractSpinBox*>(focus) || qobject_cast<QLineEdit*>(focus)) {
+        return false;
+    }
+    return labelViewer && (focus == labelViewer || labelViewer->isAncestorOf(focus));
+}
+
+void GizmoContainer::visibleChangedCallback(void* data, SoSensor*)
+{
+    if (auto self = static_cast<GizmoContainer*>(data)) {
+        self->refreshValueLabels();
+    }
 }
 
 std::unique_ptr<GizmoContainer> GizmoContainer::create(

@@ -1101,6 +1101,7 @@ SET(Inventor_CPP_SRCS
     Inventor/Draggers/SoRotationDragger.cpp
     Inventor/Draggers/SoRotationDraggerGeometry.cpp
     Inventor/Draggers/Gizmo.cpp
+    Inventor/Draggers/GizmoValueLabel.cpp
     ColorScaleOverlay.cpp
     SoFCColorBar.cpp
     SoFCColorBarNotifier.cpp
@@ -1144,6 +1145,7 @@ SET(Inventor_SRCS
     Inventor/Draggers/SoRotationDraggerGeometry.h
     Inventor/Draggers/Gizmo.h
     Inventor/Draggers/GizmoStyleParameters.h
+    Inventor/Draggers/GizmoValueLabel.h
     ColorScaleOverlay.h
     SoFCColorBar.h
     SoFCColorBarNotifier.h
@@ -1570,6 +1572,7 @@ if (EIGEN3_NO_DEPRECATED_COPY)
         Inventor/Draggers/SoRotationDragger.cpp
         Inventor/Draggers/SoRotationDraggerGeometry.cpp
         Inventor/Draggers/Gizmo.cpp
+        Inventor/Draggers/GizmoValueLabel.cpp
         SoFCOffscreenRenderer.cpp
         Selection/SoFCSelectionAction.cpp
         Quarter/QuarterWidget.cpp
