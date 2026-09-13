@@ -41,10 +41,13 @@
 #include <QPaintEvent>
 #include <QPainter>
 #include <QPixmap>
+#include <QRegion>
 #include <QResizeEvent>
 #include <QSet>
 #include <QSizePolicy>
 #include <QStyle>
+#include <QStyleOption>
+#include <QStylePainter>
 #include <QTimer>
 #include <QToolButton>
 
@@ -87,6 +90,49 @@ void collectCommands(const QMenu* menu, QSet<QString>& commands)
         }
     }
 }
+
+/**
+ * The drop-down under the row. Its frame spans the row, so that all of the
+ * strip under the buttons can be hovered and clicked, while the caption and
+ * its arrow stay together in the middle, where a button sized to them would
+ * put them.
+ */
+class CaptionButton: public QToolButton
+{
+public:
+    using QToolButton::QToolButton;
+
+protected:
+    void paintEvent(QPaintEvent* /*event*/) override
+    {
+        QStyleOptionToolButton option;
+        initStyleOption(&option);
+
+        // The style draws frame, caption and arrow from one rectangle, so the
+        // button is drawn twice, over pixels that do not overlap: the frame
+        // across the whole width, then the caption on a rectangle of its own
+        // size in the middle, clipped inside that rectangle's frame. Neither
+        // the frame nor a translucent fill is laid down twice.
+        const int labelWidth = std::min(width(), sizeHint().width());
+        const QRect label((width() - labelWidth) / 2, 0, labelWidth, height());
+        const int border = captionButtonBorder / 2;
+        const QRect inside = label.adjusted(border, border, -border, -border);
+
+        QStylePainter painter(this);
+        QStyleOptionToolButton frame = option;
+        frame.text.clear();
+        frame.features &= ~QStyleOptionToolButton::HasMenu;
+        painter.setClipRegion(QRegion(rect()).subtracted(inside));
+        painter.drawComplexControl(QStyle::CC_ToolButton, frame);
+
+        // Taller than the button, so that the rounded corners of the caption's
+        // own frame fall outside the clip; caption and arrow are centred on it
+        // vertically either way.
+        option.rect = label.adjusted(0, -height(), 0, height());
+        painter.setClipRect(inside);
+        painter.drawComplexControl(QStyle::CC_ToolButton, option);
+    }
+};
 }  // namespace
 
 
@@ -186,7 +232,7 @@ RibbonPanel::RibbonPanel(const QString& key, const QString& caption, QWidget* pa
     connect(menu, &RibbonPanelMenu::dragStarted, this, [this]() { dragging = true; });
     connect(menu, &RibbonPanelMenu::dragFinished, this, &RibbonPanel::onDragFinished);
 
-    captionButton = new QToolButton(this);
+    captionButton = new CaptionButton(this);
     captionButton->setObjectName(QStringLiteral("RibbonPanelCaptionButton"));
     captionButton->setText(captionText);
     captionButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
@@ -365,14 +411,7 @@ void RibbonPanel::layoutChildren()
 
     row->setGeometry(panelSideMargin, panelTopMargin, bodyWidth, rowHeight);
     captionLabel->setGeometry(panelSideMargin, captionTop, bodyWidth, captionHeight());
-
-    const int buttonWidth = std::min(bodyWidth, captionWidth());
-    captionButton->setGeometry(
-        panelSideMargin + (bodyWidth - buttonWidth) / 2,
-        captionTop,
-        buttonWidth,
-        captionHeight()
-    );
+    captionButton->setGeometry(panelSideMargin, captionTop, bodyWidth, captionHeight());
 
     separator->setGeometry(width() - separatorWidth, 0, separatorWidth, height());
 }

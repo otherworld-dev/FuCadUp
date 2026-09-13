@@ -433,6 +433,69 @@ class TestRibbonLayout(unittest.TestCase):
                 "Expected panel {} to have folded down to its caption".format(i),
             )
 
+    # -- the caption drop-down -------------------------------------------
+
+    def _caption_drop_down(self, key):
+        panel = self._panel(key)
+        self.assertIsNotNone(panel, "Expected the {} panel".format(key))
+        caption = self._caption(panel)
+        self.assertIsInstance(
+            caption, QtWidgets.QToolButton, "Expected the {} caption to be a drop-down".format(key)
+        )
+        return panel, caption
+
+    def test_caption_drop_down_spans_the_row(self):
+        """All of the strip under the buttons opens the drop-down, not just its text."""
+
+        panel, caption = self._caption_drop_down(CREATE_PANEL_KEY)
+        row = panel.findChild(QtWidgets.QWidget, "RibbonPanelButtons")
+        self.assertIsNotNone(row, "Expected the panel to have a button row")
+        self.assertGreater(
+            row.width(), caption.sizeHint().width(), "Expected a row wider than its caption"
+        )
+        self.assertEqual(caption.x(), row.x(), "Expected the caption to start with the row")
+        self.assertEqual(caption.width(), row.width(), "Expected the caption as wide as the row")
+
+    def test_caption_arrow_stays_beside_the_caption(self):
+        """Only the frame spans the row: the caption and its arrow are drawn
+        together in the middle, where a button sized to them would put them."""
+
+        _, caption = self._caption_drop_down(CREATE_PANEL_KEY)
+        image = caption.grab().toImage()
+        scale = image.width() / caption.width()
+        hint = caption.sizeHint().width() * scale
+        # Clear of the one-pixel frame, whose colour differs from the fill
+        # while the button is hovered.
+        edge = int(scale) + 1
+        # Well left of the caption, so the fill whatever the button's state.
+        fill = image.pixelColor(edge, image.height() // 2)
+
+        def inked(x):
+            for y in range(edge, image.height() - edge):
+                colour = image.pixelColor(x, y)
+                difference = (
+                    abs(colour.red() - fill.red())
+                    + abs(colour.green() - fill.green())
+                    + abs(colour.blue() - fill.blue())
+                )
+                if difference > 60:
+                    return True
+            return False
+
+        columns = [x for x in range(edge, image.width() - edge) if inked(x)]
+        self.assertTrue(columns, "Expected the caption to draw its text")
+        tolerance = 2 * scale
+        self.assertGreaterEqual(
+            columns[0],
+            (image.width() - hint) / 2 - tolerance,
+            "Expected the caption to start no further left than a button sized to it",
+        )
+        self.assertLessEqual(
+            columns[-1],
+            (image.width() + hint) / 2 + tolerance,
+            "Expected the arrow to stay beside the caption, not at the end of the row",
+        )
+
     # -- customising the split -------------------------------------------
 
     def test_drop_down_entries_name_their_commands(self):
