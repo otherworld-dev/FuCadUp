@@ -10,6 +10,7 @@ leaving the sketch applies what was typed.
 import FreeCAD
 import Part
 import Sketcher
+import SketcherGui
 from PySide import QtCore, QtGui, QtWidgets
 from SketcherTests.GuiTestCase import FreeCADGui, SketcherGuiTestCase
 
@@ -25,6 +26,8 @@ class TestSketchDimensionBox(SketcherGuiTestCase):
         super().setUp()
         self._set_param("ShowDialogOnDistanceConstraint", True)
         self._set_param("EditDimensionsInView", True)
+        # Constraint tools opened with nothing selected wait for picks only in this mode
+        self._set_param("ContinuousConstraintMode", True)
 
         FreeCADGui.activateWorkbench("SketcherWorkbench")
         self.doc = FreeCAD.newDocument("TestSketchDimensionBox")
@@ -217,3 +220,162 @@ class TestSketchDimensionBox(SketcherGuiTestCase):
 
         self.assertEqual(len(seen), 1, "the datum dialog did not open")
         self.assertEqual(self.boxes(), [])
+
+    # -- editing with the Dimension tool open ----------------------------
+
+    def viewport(self):
+        return FreeCADGui.ActiveDocument.ActiveView.graphicsView().viewport()
+
+    def add_distance(self, value):
+        """A distance on the line with its value 5 mm off it, and a second line to pick."""
+
+        index = self.sketch.addConstraint(Sketcher.Constraint("Distance", 0, value))
+        self.sketch.setLabelDistance(index, 5.0)
+        self.sketch.addGeometry(
+            Part.LineSegment(FreeCAD.Vector(20, 0, 0), FreeCAD.Vector(20, 10, 0)), False
+        )
+        self.doc.recompute()
+
+        view = FreeCADGui.ActiveDocument.ActiveView
+        view.viewTop()
+        self.flush_gui(300)
+        view.fitAll()
+        self.flush_gui(300)
+        return index
+
+    def screen_point(self, point):
+        view = FreeCADGui.ActiveDocument.ActiveView
+        return self.viewport_to_qpoint(view, self.viewport(), view.getPointOnViewport(point))
+
+    def label_hits(self, name):
+        """Viewport points on the constraint's label, probing both sides of the line."""
+
+        view = FreeCADGui.ActiveDocument.ActiveView
+        for seed in (FreeCAD.Vector(5, 5, 0), FreeCAD.Vector(5, -5, 0)):
+            centre = view.getPointOnViewport(seed)
+            hits = []
+            for dy in range(-48, 49, 4):
+                for dx in range(-48, 49, 4):
+                    point = (int(centre[0]) + dx, int(centre[1]) + dy)
+                    info = SketcherGui.getActiveSketchPreselection(point)
+                    if info and name in (info.get("SubElementNames") or []):
+                        hits.append(point)
+            if hits:
+                return hits
+        return []
+
+    def label_point(self, index):
+        """A point on the dimension's value, found by probing where its label can sit."""
+
+        view = FreeCADGui.ActiveDocument.ActiveView
+        name = f"Constraint{index + 1}"
+        hits = []
+
+        # The view can still be settling after the fit: probe until the value is there
+        def found():
+            hits[:] = self.label_hits(name)
+            return bool(hits)
+
+        self.assertTrue(
+            self.wait_until(found, timeout_ms=3000, step_ms=100),
+            f"{name}'s value was not found on screen",
+        )
+
+        # The hit nearest the middle of them all: on the value, not out on an arrow
+        mid_x = sum(x for x, _ in hits) / len(hits)
+        mid_y = sum(y for _, y in hits) / len(hits)
+        best = min(hits, key=lambda p: (p[0] - mid_x) ** 2 + (p[1] - mid_y) ** 2)
+        return self.viewport_to_qpoint(view, self.viewport(), best)
+
+    def double_click(self, widget, pos):
+        """The events Qt sends for a double-click: press, release, double-click, release."""
+
+        self.move(widget, pos)
+        presel = FreeCADGui.Selection.getPreselection()
+        self.hovered = list(presel.SubElementNames) if presel.ObjectName else []
+        left, none = QtCore.Qt.LeftButton, QtCore.Qt.NoButton
+        for event_type, buttons in (
+            (QtCore.QEvent.MouseButtonPress, left),
+            (QtCore.QEvent.MouseButtonRelease, none),
+            (QtCore.QEvent.MouseButtonDblClick, left),
+            (QtCore.QEvent.MouseButtonRelease, none),
+        ):
+            self.send_mouse(widget, event_type, pos, left, buttons)
+            self.pump(30)
+
+    def open_tool(self, command):
+        FreeCADGui.Selection.clearSelection()
+        FreeCADGui.runCommand(command)
+        self.flush_gui(150)
+
+    def edit_by_double_click(self, command):
+        """With the tool open, double-click the distance's value and type 9 into the box."""
+
+        index = self.add_distance(7.0)
+        label = self.label_point(index)
+        self.open_tool(command)
+
+        self.double_click(self.viewport(), label)
+        self.assertIn(
+            f"Constraint{index + 1}", self.hovered, f"{command} did not preselect the value under the cursor"
+        )
+        box = self.wait_for_box()
+        self.assertAlmostEqual(box.property("rawValue"), 7.0)
+        self.wait_for_focus(box)
+
+        self.type_into(box, "9")
+        self.key_click(box, QtCore.Qt.Key_Return)
+        self.flush_gui(150)
+        self.assertAlmostEqual(self.value(index), 9.0)
+        self.assertEqual(self.boxes(), [])
+        self.assertEqual(len(self.sketch.Constraints), 1, "double-clicking placed a constraint")
+
+    def assert_the_tool_still_picks(self, command):
+        """The tool is still open after the box closed: picking the other line constrains it."""
+
+        # Found from the line itself: setting a sketch's only dimension scales the whole sketch,
+        # and the view refits to it
+        view = FreeCADGui.ActiveDocument.ActiveView
+        line = self.sketch.Geometry[1]
+        middle = (line.StartPoint + line.EndPoint) * 0.5
+
+        def line_on_screen():
+            info = SketcherGui.getActiveSketchPreselection(view.getPointOnViewport(middle))
+            return bool(info) and "Edge2" in (info.get("SubElementNames") or [])
+
+        self.assertTrue(
+            self.wait_until(line_on_screen, timeout_ms=2000), "the other line never settled on screen"
+        )
+        other_line = self.screen_point(middle)
+        self.move(self.viewport(), other_line)
+        presel = FreeCADGui.Selection.getPreselection()
+        hovered = list(presel.SubElementNames) if presel.ObjectName else []
+        self.click(self.viewport(), other_line)
+        self.assertTrue(
+            self.wait_until(lambda: len(self.sketch.Constraints) == 2, timeout_ms=1000),
+            f"{command} did not pick a line after the box closed (under the cursor: {hovered})",
+        )
+
+    def test_double_clicking_a_dimension_with_the_tool_open_edits_it(self):
+        self.edit_by_double_click("Sketcher_Dimension")
+        self.assert_the_tool_still_picks("Sketcher_Dimension")
+
+    def test_double_clicking_a_dimension_in_the_distance_tool_edits_it(self):
+        self.edit_by_double_click("Sketcher_ConstrainDistance")
+        self.assert_the_tool_still_picks("Sketcher_ConstrainDistance")
+
+    def test_double_clicking_a_dimension_in_the_parallel_tool_edits_it(self):
+        # A tool that makes no dimension edits one all the same
+        self.edit_by_double_click("Sketcher_ConstrainParallel")
+
+    def test_one_click_on_a_dimension_with_the_tool_open_opens_nothing(self):
+        index = self.add_distance(7.0)
+        label = self.label_point(index)
+        self.open_tool("Sketcher_Dimension")
+
+        self.move(self.viewport(), label)
+        self.click(self.viewport(), label)
+        self.flush_gui(QtWidgets.QApplication.doubleClickInterval() + 200)
+        self.assertEqual(self.boxes(), [])
+        self.assertEqual(len(self.sketch.Constraints), 1)
+        self.assertAlmostEqual(self.value(index), 7.0)

@@ -1337,9 +1337,16 @@ void EditModeCoinManager::setAxisPickStyle(bool on)
 
 EditModeCoinManager::PreselectionResult EditModeCoinManager::detectConstraintPreselection(
     const SoPickedPointList& points,
-    const SbVec2s& cursorPos
+    const SbVec2s& cursorPos,
+    bool icons
 )
 {
+    using ConstraintHit = EditModeConstraintCoinManager::ConstraintPreselectionResult;
+    // A skipped icon lets a value further along the ray be hit instead
+    auto wanted = [icons](const ConstraintHit& hit) {
+        return hit.hasHit() && (icons || hit.Kind != ConstraintHit::HitKind::Icon);
+    };
+
     PreselectionResult result;
     auto toPreselectionResult = [](const auto& hit, PreselectionResult& target) {
         using ConstraintResult = EditModeConstraintCoinManager::ConstraintPreselectionResult;
@@ -1365,7 +1372,7 @@ EditModeCoinManager::PreselectionResult EditModeCoinManager::detectConstraintPre
     };
 
     auto constraintHit = pEditModeConstraintCoinManager->detectPreselectionConstr(cursorPos);
-    if (constraintHit.hasHit()) {
+    if (wanted(constraintHit)) {
         toPreselectionResult(constraintHit, result);
         return result;
     }
@@ -1377,7 +1384,7 @@ EditModeCoinManager::PreselectionResult EditModeCoinManager::detectConstraintPre
         }
 
         constraintHit = pEditModeConstraintCoinManager->detectPreselectionConstr(point, cursorPos);
-        if (!constraintHit.hasHit()) {
+        if (!wanted(constraintHit)) {
             continue;
         }
 
@@ -1675,7 +1682,8 @@ bool EditModeCoinManager::detectFacePreselection(
 EditModeCoinManager::PreselectionCandidates EditModeCoinManager::collectPreselectionCandidates(
     const SoPickedPointList& points,
     const SbVec2s& cursorPos,
-    int hoveredPointIndex
+    int hoveredPointIndex,
+    bool constraintIcons
 )
 {
     PreselectionCandidates candidates;
@@ -1685,7 +1693,7 @@ EditModeCoinManager::PreselectionCandidates EditModeCoinManager::collectPreselec
         }
     };
 
-    addCandidate(detectConstraintPreselection(points, cursorPos));
+    addCandidate(detectConstraintPreselection(points, cursorPos, constraintIcons));
 
     PreselectionResult geometry;
     detectGeometryPreselection(points, cursorPos, hoveredPointIndex, geometry);
@@ -1721,11 +1729,12 @@ EditModeCoinManager::PreselectionResult EditModeCoinManager::resolvePreselection
 EditModeCoinManager::PreselectionResult EditModeCoinManager::detectPreselection(
     const SoPickedPointList& points,
     const SbVec2s& cursorPos,
-    int hoveredPointIndex
+    int hoveredPointIndex,
+    bool constraintIcons
 )
 {
     return resolvePreselectionCandidates(
-        collectPreselectionCandidates(points, cursorPos, hoveredPointIndex)
+        collectPreselectionCandidates(points, cursorPos, hoveredPointIndex, constraintIcons)
     );
 }
 

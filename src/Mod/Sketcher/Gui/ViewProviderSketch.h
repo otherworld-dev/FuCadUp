@@ -579,6 +579,9 @@ public:
     void openDimensionEditor(int constraint);
     /// Closes an open box, applying a valid typed value when apply is true
     void closeDimensionEditor(bool apply = true);
+    /// Edits a dimension's value: in the box when it can, else in EditDatumDialog. Returns
+    /// true for the box, which opens once the current event is over
+    bool editConstraintValue(int constraint);
     //@}
 
     bool isConstructionMode() const;
@@ -900,6 +903,8 @@ private:
     int getPreselectPoint() const;
     int getPreselectCurve() const;
     int getPreselectCross() const;
+    /// The constraints whose icon or value is under the cursor
+    const std::set<int>& getPreselectConstraints() const;
     /// Sketch units covered by one screen pixel at the current zoom.
     float getSketchUnitsPerPixel() const;
     /**

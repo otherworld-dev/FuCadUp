@@ -294,10 +294,12 @@ public:
 
     /** @name handle preselection and selection of points */
     //@{
+    /// With constraintIcons false only constraint values and dimension lines can be hit
     PreselectionResult detectPreselection(
         const SoPickedPointList& points,
         const SbVec2s& cursorPos,
-        int hoveredPointIndex = PreselectionResult::InvalidPoint
+        int hoveredPointIndex = PreselectionResult::InvalidPoint,
+        bool constraintIcons = true
     );
     /// The client is responsible for unref-ing the SoGroup to release the memory.
     SoGroup* getSelectedConstraints();
@@ -365,7 +367,8 @@ public:
 private:
     PreselectionResult detectConstraintPreselection(
         const SoPickedPointList& points,
-        const SbVec2s& cursorPos
+        const SbVec2s& cursorPos,
+        bool icons
     );
     bool detectOriginPreselection(const SoPickedPoint* point, PreselectionResult& result);
     bool detectGeometryPreselection(
@@ -385,7 +388,8 @@ private:
     PreselectionCandidates collectPreselectionCandidates(
         const SoPickedPointList& points,
         const SbVec2s& cursorPos,
-        int hoveredPointIndex
+        int hoveredPointIndex,
+        bool constraintIcons
     );
     PreselectionResult resolvePreselectionCandidates(const PreselectionCandidates& candidates) const;
 

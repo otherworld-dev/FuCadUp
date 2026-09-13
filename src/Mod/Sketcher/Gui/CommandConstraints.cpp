@@ -35,6 +35,7 @@
 #include <Precision.hxx>
 #include <Bnd_Box.hxx>
 #include <QApplication>
+#include <QElapsedTimer>
 #include <QPainter>
 #include <algorithm>
 #include <sstream>
@@ -1194,6 +1195,27 @@ enum SelType
  * has to be a curve for the constraint to make sense. Thus filters are
  * changeable so that same filter can be kept on while in one mode.
  */
+/// Tells a double-click on an existing dimension's value, which the constraint tools edit, from
+/// single clicks
+class DimensionDoubleClick
+{
+public:
+    /// Notes a click on the given dimension, or on anything else with -1. True for the second
+    /// click on the same dimension within the double-click time
+    bool click(int dimension)
+    {
+        const bool second = dimension >= 0 && dimension == last && timer.isValid()
+            && timer.elapsed() < QApplication::doubleClickInterval();
+        last = second ? -1 : dimension;
+        timer.start();
+        return second;
+    }
+
+private:
+    int last = -1;
+    QElapsedTimer timer;
+};
+
 class GenericConstraintSelection: public ExternalSelection
 {
     App::DocumentObject* sketch;
@@ -1231,7 +1253,9 @@ public:
             || (allowedSelTypes & SelHAxis && element.substr(0, 6) == "H_Axis")
             || (allowedSelTypes & SelVAxis && element.substr(0, 6) == "V_Axis")
             || ((allowedSelTypes & (SelExternalEdge | SelExternalArc))
-                && element.substr(0, 12) == "ExternalEdge")) {
+                && element.substr(0, 12) == "ExternalEdge")
+            // Constraints too, so a dimension's value under the cursor can be double-clicked
+            || element.starts_with("Constraint")) {
             return true;
         }
 
@@ -1264,8 +1288,9 @@ public:
                 return false;
             }
 
+            // Constraints too, so a dimension's value under the cursor can be double-clicked
             constexpr auto prefixes = std::to_array<std::string_view>(
-                {"RootPoint", "H_Axis", "V_Axis", "Vertex", "Edge", "ExternalEdge"}
+                {"RootPoint", "H_Axis", "V_Axis", "Vertex", "Edge", "ExternalEdge", "Constraint"}
             );
             return std::ranges::any_of(prefixes, [subName](std::string_view prefix) {
                 return std::string_view(subName).starts_with(prefix);
@@ -1542,6 +1567,16 @@ public:
         }
 
         if (selIdPair.GeoId == GeoEnum::GeoUndef) {
+            // An existing dimension's value is not blank space: a second click on it edits it.
+            // Starting over would clear the preselection the second click needs.
+            const int dimension = getPreselectDimension();
+            if (dimension >= 0) {
+                if (dimensionClicks.click(dimension)) {
+                    sketchgui->editConstraintValue(dimension);
+                }
+                return true;
+            }
+            dimensionClicks.click(-1);
             // If mouse is released on "blank" space, start over
             selSeq.clear();
             resetOngoingSequences();
@@ -1549,6 +1584,7 @@ public:
             updateHint();
             return true;
         }
+        dimensionClicks.click(-1);
         return selectGeometry(selIdPair, newSelType, ss.str(), onSketchPos);
     }
 
@@ -1894,6 +1930,10 @@ private:
         Gui::Selection().rmvSelectionGate();
         Gui::Selection().addSelectionGate(selFilterGate);
 
+        // Tools make constraints unpickable; these keep them, so an existing dimension's value
+        // can be double-clicked to edit it
+        setConstraintSelectability(true);
+
         Gui::MDIView* mdi = Gui::Application::Instance->activeDocument()->getActiveView();
         if (auto* viewer = dynamic_cast<Gui::View3DInventor*>(mdi)) {
             viewer->getViewer()->setSelectionEnabled(true);
@@ -1937,6 +1977,7 @@ protected:
     unsigned int allowedSelTypes = 0;
     Base::Vector2d lastOnSketchPos;
     bool skipReleaseAfterExternalSelection = false;
+    DimensionDoubleClick dimensionClicks;
 
     /// indices of currently ongoing sequences in cmd->allowedSequences
     std::set<int> ongoingSequences, _tempOnSequences;
@@ -2305,6 +2346,10 @@ public:
         Gui::Selection().rmvSelectionGate();
         Gui::Selection().addSelectionGate(new DimensionExternalSelection(sketchgui->getObject()));
 
+        // Tools make constraints unpickable; this one keeps them, so an existing dimension's
+        // value can be double-clicked to edit it
+        setConstraintSelectability(true);
+
         handleInitialSelection();
     }
 
@@ -2493,12 +2538,34 @@ public:
         }
 
         if (selIdPair.GeoId == GeoEnum::GeoUndef) {
+            if (clickDimensionValue()) {
+                return true;
+            }
             // If mouse is released on "blank" space, finalize and start over
             finalizeCommand();
             return true;
         }
 
+        dimensionClicks.click(-1);
         return selectGeometry(selIdPair, newselGeoType, ss.str(), onSketchPos);
+    }
+
+    /// A click with nothing to pick under the cursor but an existing dimension's value: a
+    /// second click on the same value soon after edits it. Returns true when the click is used.
+    bool clickDimensionValue()
+    {
+        const int dimension = getPreselectDimension();
+        if (dimensionClicks.click(dimension)) {
+            // As placing a dimension does: the value is its own undo step, then the tool
+            // starts over
+            commitCommand();
+            sketchgui->editConstraintValue(dimension);
+            resetTool();
+            return true;
+        }
+
+        // A first click does nothing, unless it finishes a dimension being placed
+        return dimension >= 0 && selectionEmpty() && cstrIndexes.empty();
     }
 
     bool selectGeometry(const SelIdPair& selIdPair,
@@ -2592,6 +2659,7 @@ protected:
     std::vector<int> cstrIndexes;
     bool singleCircleReverseOrder;
     bool skipReleaseAfterExternalSelection = false;
+    DimensionDoubleClick dimensionClicks;
 
     Sketcher::SketchObject* Obj;
 

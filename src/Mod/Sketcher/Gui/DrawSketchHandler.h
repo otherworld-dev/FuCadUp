@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include <set>
+
 #include <QPixmap>
 #include <QCoreApplication>
 
@@ -142,6 +144,7 @@ private:
     static inline int getPreselectPoint(const ViewProviderSketch& vp);
     static inline int getPreselectCurve(const ViewProviderSketch& vp);
     static inline int getPreselectCross(const ViewProviderSketch& vp);
+    static inline const std::set<int>& getPreselectConstraints(const ViewProviderSketch& vp);
 
     static inline void moveConstraint(
         ViewProviderSketch& vp,
@@ -332,6 +335,11 @@ protected:
     int getPreselectPoint() const;
     int getPreselectCurve() const;
     int getPreselectCross() const;
+    /// The existing dimension whose value is under the cursor, or -1
+    int getPreselectDimension() const;
+    /// Whether constraints can be hovered and picked while the tool runs; off unless a tool
+    /// turns it on in activated()
+    void setConstraintSelectability(bool enabled);
 
     Sketcher::SketchObject* getSketchObject();
 

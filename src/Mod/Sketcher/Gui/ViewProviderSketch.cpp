@@ -861,6 +861,19 @@ void ViewProviderSketch::editDimension(int constraint)
     });
 }
 
+bool ViewProviderSketch::editConstraintValue(int constraint)
+{
+    if (canEditDimensionInView(constraint)) {
+        editDimension(constraint);
+        return true;
+    }
+
+    int tid = getDocument()->openCommand(QT_TRANSLATE_NOOP("Command", "Modify sketch constraints"));
+    EditDatumDialog editDatumDialog(tid, this, constraint);
+    editDatumDialog.exec();
+    return false;
+}
+
 void ViewProviderSketch::openDimensionEditor(int constraint)
 {
     closeDimensionEditor(true);
@@ -1052,7 +1065,9 @@ EditModeCoinManager::PreselectionResult ViewProviderSketch::getPreselectionResul
         hoveredPointIndex = viewProviderParameters.lastPreselectionResult.PointIndex;
     }
 
-    return editCoinManager->detectPreselection(points, pos, hoveredPointIndex);
+    // A tool that keeps constraints pickable (Dimension) is there for their values: an icon would
+    // win over the edge under it that the tool picks
+    return editCoinManager->detectPreselection(points, pos, hoveredPointIndex, !sketchHandler);
 }
 
 void ViewProviderSketch::cachePreselectionResult(
@@ -1810,14 +1825,9 @@ void ViewProviderSketch::editDoubleClicked()
 
             // if its the right constraint
             if (Constr->isDimensional()) {
-                if (canEditDimensionInView(id)) {
-                    editDimension(id);
+                if (editConstraintValue(id)) {
                     return;
                 }
-                int tid = getDocument()->openCommand(
-                    QT_TRANSLATE_NOOP("Command", "Modify sketch constraints"));
-                EditDatumDialog editDatumDialog(tid, this, id);
-                editDatumDialog.exec();
             }
             else if (Constr->Type == Sketcher::Text) {
                 EditTextDialog editTextDialog(this, id);
@@ -5086,6 +5096,11 @@ int ViewProviderSketch::getPreselectCross() const
     if (isInEditMode())
         return static_cast<int>(preselection.PreselectCross);
     return -1;
+}
+
+const std::set<int>& ViewProviderSketch::getPreselectConstraints() const
+{
+    return preselection.PreselectConstraintSet;
 }
 
 Sketcher::SketchObject* ViewProviderSketch::getSketchObject() const

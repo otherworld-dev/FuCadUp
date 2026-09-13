@@ -211,6 +211,13 @@ inline int ViewProviderSketchDrawSketchHandlerAttorney::getPreselectCross(const 
     return vp.getPreselectCross();
 }
 
+inline const std::set<int>& ViewProviderSketchDrawSketchHandlerAttorney::getPreselectConstraints(
+    const ViewProviderSketch& vp
+)
+{
+    return vp.getPreselectConstraints();
+}
+
 inline void ViewProviderSketchDrawSketchHandlerAttorney::setAngleSnapping(
     ViewProviderSketch& vp,
     bool enable,
@@ -2199,6 +2206,24 @@ int DrawSketchHandler::getPreselectCurve() const
 int DrawSketchHandler::getPreselectCross() const
 {
     return ViewProviderSketchDrawSketchHandlerAttorney::getPreselectCross(*sketchgui);
+}
+
+int DrawSketchHandler::getPreselectDimension() const
+{
+    const std::vector<Sketcher::Constraint*>& constraints
+        = sketchgui->getSketchObject()->Constraints.getValues();
+    for (int index : ViewProviderSketchDrawSketchHandlerAttorney::getPreselectConstraints(*sketchgui)) {
+        if (index >= 0 && index < static_cast<int>(constraints.size())
+            && constraints[index]->isDimensional()) {
+            return index;
+        }
+    }
+    return -1;
+}
+
+void DrawSketchHandler::setConstraintSelectability(bool enabled)
+{
+    ViewProviderSketchDrawSketchHandlerAttorney::setConstraintSelectability(*sketchgui, enabled);
 }
 
 Sketcher::SketchObject* DrawSketchHandler::getSketchObject()
