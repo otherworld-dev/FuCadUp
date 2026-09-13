@@ -82,6 +82,8 @@ protected:
 
 private:
     void copyLabel(const Gui::SoDatumLabel& shownLabel);
+    /// Selects the whole value, so typing replaces it, unless the user has started typing
+    void selectValue();
     bool constraintStillThere() const;
     void applyValue();
     void showMenu(const QPoint& globalPos);

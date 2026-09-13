@@ -32,6 +32,7 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QString>
+#include <QTimer>
 
 #include <App/Application.h>
 #include <Base/Exception.h>
@@ -101,6 +102,18 @@ DimensionValueEditor::DimensionValueEditor(
             edit->installEventFilter(this);
             connect(edit, &QLineEdit::textEdited, this, [this]() { typed = true; });
         }
+    }
+
+    // Selected only now: binding the box resizes it, which clears a selection. Again once the
+    // label's own deferred focus has run, which would leave just the number selected.
+    selectValue();
+    QTimer::singleShot(0, this, [this]() { selectValue(); });
+}
+
+void DimensionValueEditor::selectValue()
+{
+    if (edit && !typed && !finished) {
+        edit->selectAll();
     }
 }
 

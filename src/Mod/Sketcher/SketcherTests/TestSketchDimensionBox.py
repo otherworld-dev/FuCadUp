@@ -80,6 +80,14 @@ class TestSketchDimensionBox(SketcherGuiTestCase):
             self.wait_until(box.hasFocus, timeout_ms=2000), "the dimension box did not get the keyboard"
         )
 
+    def assert_value_selected(self, box):
+        """The whole value is selected, so typing replaces it."""
+        edit = box.findChild(QtWidgets.QLineEdit)
+        self.assertTrue(
+            self.wait_until(lambda: edit.text() and edit.selectedText() == edit.text(), timeout_ms=1000),
+            f"the box's value was not selected (text {edit.text()!r}, selected {edit.selectedText()!r})",
+        )
+
     def place_length_dimension(self):
         """Dimension the line through its command, the way a user would with it selected."""
 
@@ -105,6 +113,7 @@ class TestSketchDimensionBox(SketcherGuiTestCase):
         box = self.wait_for_box()
         self.assertAlmostEqual(box.property("rawValue"), 10.0)
         self.wait_for_focus(box)
+        self.assert_value_selected(box)
 
     def test_enter_applies_the_typed_value(self):
         index = self.place_length_dimension()
@@ -114,6 +123,16 @@ class TestSketchDimensionBox(SketcherGuiTestCase):
         self.flush_gui(150)
         self.assertAlmostEqual(self.value(index), 25.0)
         self.assertEqual(self.boxes(), [])
+
+    def test_typing_straight_away_replaces_the_value(self):
+        index = self.place_length_dimension()
+        box = self.wait_for_box()
+        self.wait_for_focus(box)
+        for ch in "25":
+            self.key_click(box, QtCore.Qt.Key(ord(ch)), ch)
+        self.key_click(box, QtCore.Qt.Key_Return)
+        self.flush_gui(150)
+        self.assertAlmostEqual(self.value(index), 25.0)
 
     def test_the_value_is_undone_before_the_dimension(self):
         index = self.place_length_dimension()
@@ -158,6 +177,8 @@ class TestSketchDimensionBox(SketcherGuiTestCase):
         FreeCADGui.runCommand("Sketcher_ChangeDimensionConstraint")
         box = self.wait_for_box()
         self.assertAlmostEqual(box.property("rawValue"), 7.0)
+        self.wait_for_focus(box)
+        self.assert_value_selected(box)
 
         self.type_into(box, "9")
         self.key_click(box, QtCore.Qt.Key_Return)
@@ -322,6 +343,7 @@ class TestSketchDimensionBox(SketcherGuiTestCase):
         box = self.wait_for_box()
         self.assertAlmostEqual(box.property("rawValue"), 7.0)
         self.wait_for_focus(box)
+        self.assert_value_selected(box)
 
         self.type_into(box, "9")
         self.key_click(box, QtCore.Qt.Key_Return)
