@@ -72,6 +72,7 @@ void DlgSettingsGeneral::saveSettings()
     ui->checkAllowCompoundBody->onSave();
     ui->enableGizmos->onSave();
     ui->delayedGizmoUpdate->onSave();
+    ui->showValueLabels->onSave();
     ui->enableCoarseSnap->onSave();
     ui->fineSnapModifier->onSave();
     ui->defaultCoarseDragBehavior->onSave();
@@ -94,6 +95,7 @@ void DlgSettingsGeneral::loadSettings()
     ui->checkAllowCompoundBody->onRestore();
     ui->enableGizmos->onRestore();
     ui->delayedGizmoUpdate->onRestore();
+    ui->showValueLabels->onRestore();
     ui->enableCoarseSnap->onRestore();
     ui->fineSnapModifier->onRestore();
     ui->defaultCoarseDragBehavior->onRestore();
