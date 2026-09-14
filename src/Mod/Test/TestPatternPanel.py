@@ -913,10 +913,13 @@ class TestMultiTransformStep(PatternPanelCase):
         steps.setCurrentRow(0)
         steps.activated.emit(steps.model().index(0, 0))
         self._process_events(300)
+        self.assertIsNotNone(
+            self._direction_widget(1), "the step's own pattern panel did not open"
+        )
 
     def test_the_step_shows_the_direction_field(self):
         field = self._direction_field(1)
-        self.assertIsNotNone(field)
+        self.assertIsNotNone(field, "the step's own pattern panel did not open")
         self.assertTrue(field.isVisible())
 
     def test_the_step_has_no_features_field_of_its_own(self):
