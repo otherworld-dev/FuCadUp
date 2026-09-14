@@ -270,6 +270,21 @@ class TestDirectionFields(PatternPanelCase):
         self.assertIsNone(self.pattern.Direction2)
         self.assertEqual(self.pattern.Occurrences2, 1)
 
+    def test_a_quick_pick_turns_direction_2_on_sized_to_the_feature(self):
+        """Direction 2 starts the same whichever way it is first filled."""
+
+        menu = self._direction_field(2).findChild(QtWidgets.QToolButton, "pickFieldMenu").menu()
+        wanted = self._tr("PartDesignGui::TaskTransformedParameters", "Base Y-axis")
+        next(action for action in menu.actions() if action.text() == wanted).trigger()
+        self._process_events(300)
+        self.assertEqual(getattr(self.pattern.Direction2[0], "Role", ""), "Y_Axis")
+        self.assertEqual(self.pattern.Occurrences2, 2)
+        self.assertEqual(self.pattern.Mode2, "Spacing")
+        # The Pad is 6 mm along Y: 1.5 x 6.
+        self.assertAlmostEqual(self._value(self.pattern.Offset2), 9.0)
+        values = self._direction_widget(2).findChild(QtWidgets.QWidget, "valuesRow")
+        self.assertTrue(values.isVisible())
+
     def test_a_pick_leaves_the_preview_showing_what_it_showed(self):
         """The Preview panel's "Show final result" decides whether the pattern or the
         feature before it is shown; a pick shows the originals only while it lasts."""

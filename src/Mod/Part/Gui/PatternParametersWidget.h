@@ -206,6 +206,12 @@ Q_SIGNALS:
      */
     void parametersChanged();
 
+    /**
+     * @brief Emitted after a quick pick filled the direction, with whether it was in use
+     *        before, so a direction filled for the first time can be given its start.
+     */
+    void directionQuickPicked(bool wasInUse);
+
 
 private Q_SLOTS:
     // Slots connected to UI elements

@@ -128,6 +128,9 @@ private:
     void showOriginAxes(bool show);
     /// Gives a newly picked second direction the same kind of start as the first
     void startSecondDirection(PartDesign::LinearPattern* pattern);
+    /// Direction 2 was just filled, by a click in the view or a quick pick; it gets its
+    /// start if it was not in use before
+    void onSecondDirectionFilled(bool wasInUse);
 
     void setupFeaturesAndOptions();
     void updateFeaturesField();

@@ -108,8 +108,10 @@ void PatternParametersWidget::connectSignals()
 {
     connect(directionField, &PickField::activationRequested, this, &PatternParametersWidget::pickRequested);
     connect(directionField, &PickField::quickPicked, this, [this](int index) {
+        const bool wasInUse = isInUse();
         ui->comboDirection->setCurrentIndex(index);
         onDirectionChanged(index);
+        Q_EMIT directionQuickPicked(wasInUse);
         refreshPickField();
     });
     connect(directionField, &PickField::reverseClicked, this, &PatternParametersWidget::onReversePressed);

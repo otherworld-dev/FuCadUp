@@ -194,6 +194,12 @@ void TaskPatternParameters::setupParameterUI(QWidget* widget)
             this,
             &TaskPatternParameters::onParameterWidgetParametersChanged
         );
+        connect(
+            parametersWidget2,
+            &PartGui::PatternParametersWidget::directionQuickPicked,
+            this,
+            &TaskPatternParameters::onSecondDirectionFilled
+        );
         parametersWidget2->setTitle(tr("Direction 2"));
         parametersWidget2->setClearable(true);
         parametersWidget2->setPlaceholder(tr("Click an edge to add"));
@@ -619,6 +625,18 @@ void TaskPatternParameters::startSecondDirection(PartDesign::LinearPattern* patt
     }
 }
 
+void TaskPatternParameters::onSecondDirectionFilled(bool wasInUse)
+{
+    auto* pattern = getObject<PartDesign::LinearPattern>();
+    if (wasInUse || !pattern) {
+        return;
+    }
+    startSecondDirection(pattern);
+    if (parametersWidget2) {
+        parametersWidget2->updateUI();
+    }
+}
+
 void TaskPatternParameters::onParameterWidgetParametersChanged()
 {
     // A parameter in the embedded widget changed, trigger a recompute
@@ -679,9 +697,7 @@ void TaskPatternParameters::onSelectionChanged(const Gui::SelectionChanges& msg)
             else {
                 const bool wasInUse = parametersWidget2->isInUse();
                 linearPattern->Direction2.setValue(selObj, directions);
-                if (!wasInUse) {
-                    startSecondDirection(linearPattern);
-                }
+                onSecondDirectionFilled(wasInUse);
             }
         }
         else if (patternObj->isDerivedFrom<PartDesign::PolarPattern>()) {
