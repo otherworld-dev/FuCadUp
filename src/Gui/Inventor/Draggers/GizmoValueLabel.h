@@ -84,6 +84,8 @@ public:
 
     /// Puts value in the box, unless the box already holds it, so typed text is left alone
     void setValue(double value);
+    /// The values the box takes; one typed outside them is turned away
+    void setRange(double minimum, double maximum);
     void setShown(bool shown);
     bool isShown() const;
     void focus();

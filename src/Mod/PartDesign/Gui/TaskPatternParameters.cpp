@@ -945,9 +945,12 @@ void TaskPatternParameters::setupGizmos()
 
     const auto bindCount = [](Gui::Gizmo* gizmo, PartGui::PatternParametersWidget* widget) {
         Gui::UIntSpinBox* box = widget->countBox();
+        // The box in the view takes the panel box's range, capped the same way
         gizmo->setCountBinding(
             [box]() { return static_cast<int>(box->value()); },
-            [box](int count) { box->setValue(static_cast<uint>(count)); }
+            [box](int count) { box->setValue(static_cast<uint>(count)); },
+            static_cast<int>(box->minimum()),
+            static_cast<int>(box->maximum())
         );
     };
 

@@ -689,6 +689,19 @@ class TestCountBoxes(PatternPanelCase):
         needed = fm.horizontalAdvance(edit.text()) + icon_reserved
         self.assertGreaterEqual(box.width(), needed, "the x mark crops a 3-digit count")
 
+    def test_the_count_boxes_stop_at_a_thousand_copies(self):
+        """The panel caps each direction's copies, and the box in the view takes the same
+        range; the property itself is left uncapped for old documents and scripts.
+        Only the ranges are read here: a large count is never typed or set."""
+
+        for number in (1, 2):
+            count = self._direction_widget(number).findChild(QtWidgets.QSpinBox, "spinOccurrences")
+            # A Gui::UIntSpinBox keeps its range shifted by INT_MIN inside QSpinBox (see
+            # TestLinearArrows.test_the_preview_follows_a_change_within_a_quarter_second),
+            # and has no unsigned "maximum" property of its own for Python to read
+            self.assertEqual(count.maximum() + 2**31, 1000, f"Direction {number}'s count")
+        self.assertAlmostEqual(self._first_count_box().property("maximum"), 1000.0)
+
 
 class TestPolarHandle(PatternPanelCase):
     """A polar pattern's angle is turned with a handle, and its copies counted beside it."""

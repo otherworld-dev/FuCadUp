@@ -209,6 +209,13 @@ void GizmoValueLabel::setValue(double value)
     }
 }
 
+void GizmoValueLabel::setRange(double minimum, double maximum)
+{
+    if (QuantitySpinBox* box = label->getSpinBox()) {
+        box->setRange(minimum, maximum);
+    }
+}
+
 void GizmoValueLabel::setShown(bool shown)
 {
     if (this->shown == shown) {

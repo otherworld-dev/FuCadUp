@@ -194,10 +194,12 @@ void Gizmo::setValueLabel(GizmoValueLabel* label)
     updateValueLabel();
 }
 
-void Gizmo::setCountBinding(CountGetter getter, CountSetter setter)
+void Gizmo::setCountBinding(CountGetter getter, CountSetter setter, int minimum, int maximum)
 {
     countGetter = std::move(getter);
     countSetter = std::move(setter);
+    countMinimum = minimum;
+    countMaximum = std::max(minimum, maximum);
     if (container) {
         container->rebuildValueLabels();
     }
@@ -218,9 +220,17 @@ void Gizmo::setCountLabel(GizmoValueLabel* label)
     QObject::disconnect(countLabelConnection);
     countLabel = label;
     if (label) {
+        // The box turns away a count outside the range, and anything that still gets past
+        // it is brought back inside
+        label->setRange(countMinimum, countMaximum);
         countLabelConnection
             = QObject::connect(label, &GizmoValueLabel::valueEdited, label, [this](double value) {
-                  countSetter(std::max(1, static_cast<int>(std::lround(value))));
+                  const double count = std::clamp(
+                      std::round(value),
+                      static_cast<double>(countMinimum),
+                      static_cast<double>(countMaximum)
+                  );
+                  countSetter(static_cast<int>(count));
               });
     }
     updateCountLabel();

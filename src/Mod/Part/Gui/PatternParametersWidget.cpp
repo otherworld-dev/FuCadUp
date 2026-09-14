@@ -21,6 +21,8 @@
  *                                                                          *
  ***************************************************************************/
 
+#include <algorithm>
+
 #include <QDebug>
 #include <QTimer>
 #include <QHBoxLayout>
@@ -191,7 +193,11 @@ void PatternParametersWidget::bindProperties(
 
     ui->spinOccurrences->bind(*m_occurrencesProp);
     ui->spinOccurrences->blockSignals(true);
-    ui->spinOccurrences->setMaximum(m_occurrencesProp->getMaximum());
+    // Capped here and not on the property: a count typed a digit or two too long would
+    // take ages to recompute
+    ui->spinOccurrences->setMaximum(
+        static_cast<uint>(std::min<long>(m_occurrencesProp->getMaximum(), maxCopies))
+    );
     ui->spinOccurrences->setMinimum(m_occurrencesProp->getMinimum());
     ui->spinOccurrences->blockSignals(false);
 

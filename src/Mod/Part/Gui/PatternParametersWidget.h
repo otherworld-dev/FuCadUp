@@ -83,6 +83,10 @@ class PartGuiExport PatternParametersWidget: public QWidget
     Q_OBJECT
 
 public:
+    /// The most copies a direction takes in the panel and in the view. The property itself
+    /// takes more, so old documents and scripts are left as they were.
+    static constexpr unsigned maxCopies = 1000;
+
     explicit PatternParametersWidget(
         PatternType type,
         Gui::View3DInventorViewer* v,

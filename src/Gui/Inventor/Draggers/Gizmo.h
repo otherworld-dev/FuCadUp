@@ -98,8 +98,9 @@ public:
 
     using CountGetter = std::function<int()>;
     using CountSetter = std::function<void(int)>;
-    /// Gives the gizmo a box beside it for a number of copies, read and written through these
-    void setCountBinding(CountGetter getter, CountSetter setter);
+    /// Gives the gizmo a box beside it for a number of copies, read and written through these;
+    /// the box takes no count outside minimum..maximum
+    void setCountBinding(CountGetter getter, CountSetter setter, int minimum, int maximum);
     bool hasCountBinding() const;
     GizmoValueLabel* getCountLabel() const;
     void setCountLabel(GizmoValueLabel* label);
@@ -130,6 +131,8 @@ protected:
 
     CountGetter countGetter;
     CountSetter countSetter;
+    int countMinimum = 1;
+    int countMaximum = 1;
     GizmoValueLabel* countLabel = nullptr;
     QMetaObject::Connection countLabelConnection;
 };
