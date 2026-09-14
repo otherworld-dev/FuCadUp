@@ -185,8 +185,9 @@ public:
 
 Q_SIGNALS:
     /**
-     * @brief Emitted when the user selects the "Select reference..." option
-     *        in the direction combo box, indicating the need to enter selection mode.
+     * @brief Emitted when the direction field itself is clicked, asking the owner to make
+     *        it the field the next click in the 3D view goes to. Also emitted defensively
+     *        from onDirectionChanged() if the current link is ever empty.
      */
     void pickRequested();
 
