@@ -90,9 +90,14 @@ GizmoValueLabel::GizmoValueLabel(
             box->setObjectName(QString::fromLatin1(countBoxName));
             box->setDecimals(0);
             box->setToolTip(tr("Number of copies, the original included"));
+            // Reserve room for the leading "x" mark, the same way EditableDatumLabel's own
+            // lock icon does: sizeHintForDigits only widens the box for an icon when told to,
+            // and the mark would otherwise crop the digits instead of sitting beside them
+            box->addIconSpace(true);
             if (auto* edit = box->findChild<QLineEdit*>()) {
                 edit->addAction(timesMark(box), QLineEdit::LeadingPosition);
             }
+            label->updateGeometry();
         }
         else {
             box->setObjectName(QString::fromLatin1(boxName));
@@ -145,8 +150,12 @@ void GizmoValueLabel::showDistance(const SbVec3f& base, const SbVec3f& dir, floa
     label->setLabelDistance(0.0);
 
     if (std::abs(travel) < Base::Precision::Confusion()) {
-        // Nothing to draw yet: the box waits where the gizmo starts
-        label->clearPoints();
+        // Nothing to draw yet: the box waits where the gizmo starts. A degenerate pair
+        // (rather than no points at all, which SoDatumLabel::GLRender warns about on every
+        // redraw for a DISTANCE-type label - "Too few points to render distance label") still
+        // reads as zero-length, drawing no line, and keeps the box at this same point: showAngle
+        // below has set an identical pair unconditionally for as long as this class has existed.
+        label->setPoints(SbVec3f(0, 0, 0), SbVec3f(0, 0, 0));
         return;
     }
     label->setPoints(SbVec3f(0, 0, 0), SbVec3f(travel, 0, 0));

@@ -546,6 +546,7 @@ class TestCountBoxes(PatternPanelCase):
     _distance_boxes = TestLinearArrows._distance_boxes
     _wait_for_focus = gizmo_labels.GizmoLabelCase._wait_for_focus
     _value_labels_off = gizmo_labels.GizmoLabelCase._value_labels_off
+    _labels = gizmo_labels.GizmoLabelCase._labels
 
     def setUp(self):
         super().setUp()
@@ -622,3 +623,43 @@ class TestCountBoxes(PatternPanelCase):
         FreeCADGui.getDocument(self.doc.Name).setEdit(self.pattern.Name)
         self._process_events(300)
         self.assertEqual(self._count_boxes(), [])
+
+    def test_a_shown_labels_points_never_fall_short_for_its_type(self):
+        """SoDatumLabel::GLRender warns "Too few points to render distance label" once
+        a shown DISTANCE-type label has fewer than 2 points (SoDatumLabel.cpp). Coin's
+        own default handler prints that straight past FreeCAD's Console (the bridge in
+        Gui::Application.cpp's messageHandlerCoin is only installed when FC_DEBUG is
+        set, i.e. never in a release build), so this checks the state that would cause
+        it rather than the printed text. A count box sits at 0 mm of travel for as
+        long as it is shown, so this state is permanent for it, not transient."""
+
+        for label in self._labels():
+            if label.datumtype.getValue() == gizmo_labels.DISTANCE:
+                self.assertGreaterEqual(
+                    label.pnts.getNum(),
+                    2,
+                    "a shown distance label with fewer than 2 points warns on every redraw",
+                )
+
+    def test_a_three_digit_count_fits_beside_the_times_mark(self):
+        """QuantitySpinBox only widens for a leading action's icon when told to (see
+        QuantitySpinBox::sizeHintForDigits's addIconSpace guard: it adds iconHeight,
+        fontMetrics().height(), to the box only if addIconSpace was set) so a count
+        box that skips that opt-in is sized for its digits alone, and the "x" mark
+        (drawn in that same iconHeight square) crops them instead of sitting beside
+        them. QLineEdit::textMargins() does not reflect the space Qt reserves for a
+        leading action internally, so the box's own width is compared against the
+        digits plus that reservation directly, the same way the C++ side does."""
+
+        self.pattern.Occurrences = 100
+        self.doc.recompute()
+        self._close_editing()
+        FreeCADGui.getDocument(self.doc.Name).setEdit(self.pattern.Name)
+        self._process_events(300)
+        box = self._first_count_box()
+        self.assertEqual(box.text().strip(), "100")
+        edit = box.findChild(QtWidgets.QLineEdit)
+        fm = QtGui.QFontMetrics(edit.font())
+        icon_reserved = fm.height()  # Gui::QuantitySpinBox's iconHeight
+        needed = fm.horizontalAdvance(edit.text()) + icon_reserved
+        self.assertGreaterEqual(box.width(), needed, "the x mark crops a 3-digit count")

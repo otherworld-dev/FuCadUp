@@ -352,7 +352,11 @@ class TestGizmoValueLabels(GizmoLabelCase):
         self._type(box, "0")
         self._process_events(100)
         label = self._distance_labels()[0]
-        self.assertEqual(label.pnts.getNum(), 0)
+        # A degenerate pair, not no points at all: SoDatumLabel::GLRender warns "Too few
+        # points to render distance label" on every redraw of a shown DISTANCE-type label
+        # with fewer than 2 points, so a zero-length label still carries 2, coincident.
+        self.assertEqual(label.pnts.getNum(), 2)
+        self.assertAlmostEqual(label.pnts[1][0] - label.pnts[0][0], 0.0, places=4)
         base = self._screen_point(self.ARROW_BASE)
         self.assertLessEqual((self._box_centre_on_screen(box) - base).manhattanLength(), 12)
 
