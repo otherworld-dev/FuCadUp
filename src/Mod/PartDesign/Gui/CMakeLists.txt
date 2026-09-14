@@ -181,6 +181,8 @@ SET(PartDesignGuiTaskDlgs_SRCS
     TaskPatternParameters.ui
     TaskPatternParameters.cpp
     TaskPatternParameters.h
+    PatternDefaults.cpp
+    PatternDefaults.h
     TaskScaledParameters.ui
     TaskScaledParameters.cpp
     TaskScaledParameters.h

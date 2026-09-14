@@ -42,6 +42,7 @@ SET(Test_SRCS
     TestFusionShortcuts.py
     TestExtrudeFlip.py
     TestGizmoValueLabels.py
+    TestPatternPanel.py
     TestMeasureHover.py
     TestPartDesignLetters.py
     TestRibbon.py

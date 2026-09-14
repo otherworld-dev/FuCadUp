@@ -52,6 +52,7 @@
 #include <Mod/PartDesign/App/Body.h>
 #include <Mod/PartDesign/App/FeatureBoolean.h>
 #include <Mod/PartDesign/App/FeatureGroove.h>
+#include <Mod/PartDesign/App/FeatureLinearPattern.h>
 #include <Mod/PartDesign/App/FeatureMultiTransform.h>
 #include <Mod/PartDesign/App/FeatureRevolution.h>
 #include <Mod/PartDesign/App/FeatureTransformed.h>
@@ -64,6 +65,7 @@
 #include <Mod/PartDesign/App/PartDesignParameter.h>
 
 #include "DlgActiveBody.h"
+#include "PatternDefaults.h"
 #include "ReferenceSelection.h"
 #include "SketchWorkflow.h"
 #include "TaskFeaturePick.h"
@@ -2993,10 +2995,6 @@ void CmdPartDesignLinearPattern::activated(int iMsg)
                         Feat,
                         "Direction = (" << Gui::Command::getObjectCmd(sketch) << ", ['H_Axis'])"
                     );
-                    FCMD_OBJ_CMD(
-                        Feat,
-                        "Direction2 = (" << Gui::Command::getObjectCmd(sketch) << ", ['V_Axis'])"
-                    );
                     direction = true;
                 }
             }
@@ -3006,14 +3004,21 @@ void CmdPartDesignLinearPattern::activated(int iMsg)
                     "Direction = (" << Gui::Command::getObjectCmd(pcActiveBody->getOrigin()->getX())
                                     << ",[''])"
                 );
-                FCMD_OBJ_CMD(
-                    Feat,
-                    "Direction2 = ("
-                        << Gui::Command::getObjectCmd(pcActiveBody->getOrigin()->getY()) << ",[''])"
-                );
             }
-            FCMD_OBJ_CMD(Feat, "Length = 100");
-            FCMD_OBJ_CMD(Feat, "Occurrences = 2");
+            // Direction 2 stays empty until the user picks one in the panel.
+
+            // Copies start just clear of each other, or touching in a body that must stay
+            // one solid.
+            auto* pattern = static_cast<PartDesign::LinearPattern*>(Feat);
+            double spacing = PartDesignGui::suggestPatternSpacing(
+                features,
+                PartDesignGui::patternDirection(*pattern, pattern->Direction)
+                    .value_or(Base::Vector3d(1, 0, 0)),
+                pcActiveBody->AllowCompound.getValue()
+            );
+            FCMD_OBJ_CMD(Feat, "Mode = \"Spacing\"");
+            FCMD_OBJ_CMD(Feat, "Offset = " << spacing);
+            FCMD_OBJ_CMD(Feat, "Occurrences = 3");
 
             finishTransformed(cmd, Feat);
         };
@@ -3075,7 +3080,7 @@ void CmdPartDesignPolarPattern::activated(int iMsg)
         }
 
         FCMD_OBJ_CMD(Feat, "Angle = 360");
-        FCMD_OBJ_CMD(Feat, "Occurrences = 2");
+        FCMD_OBJ_CMD(Feat, "Occurrences = 4");
 
         finishTransformed(cmd, Feat);
     };
