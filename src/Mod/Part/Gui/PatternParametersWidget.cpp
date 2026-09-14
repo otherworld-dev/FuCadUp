@@ -31,6 +31,8 @@
 #include <QLabel>
 #include <QFormLayout>
 #include <QMenu>
+#include <QStyle>
+#include <QStyleOption>
 
 #include "ui_PatternParametersWidget.h"
 #include "PatternParametersWidget.h"
@@ -48,6 +50,29 @@
 #include <Base/Console.h>
 
 using namespace PartGui;
+
+namespace
+{
+/// The width a spin box needs to show so many digits beside its formula icon
+int spinBoxWidth(QAbstractSpinBox* box, int digits)
+{
+    box->ensurePolished();
+    const QFontMetrics metrics(box->fontMetrics());
+    // The digits, the formula icon (as tall as the text, see ExpressionWidget::makeLabel)
+    // and room for the cursor
+    const int text = metrics.horizontalAdvance(QString(digits, QLatin1Char('0')))
+        + metrics.height() + 4;
+    QStyleOptionSpinBox option;
+    option.initFrom(box);
+    option.buttonSymbols = box->buttonSymbols();
+    option.frame = box->hasFrame();
+    option.subControls = QStyle::SC_SpinBoxFrame | QStyle::SC_SpinBoxEditField
+        | QStyle::SC_SpinBoxUp | QStyle::SC_SpinBoxDown;
+    return box->style()
+        ->sizeFromContents(QStyle::CT_SpinBox, &option, QSize(text, metrics.height()), box)
+        .width();
+}
+}  // namespace
 
 PatternParametersWidget::PatternParametersWidget(
     PatternType type,
@@ -75,6 +100,13 @@ void PatternParametersWidget::setupUiElements()
     QIcon iconSpacing = Gui::BitmapFactory().iconFromTheme("Part_LinearPattern_spacing");
     ui->comboMode->setItemIcon(0, iconExtent);
     ui->comboMode->setItemIcon(1, iconSpacing);
+
+    // The values sit on two lines, the mode above the value and the count, so a narrow
+    // Tasks panel (which never scrolls sideways) cuts none of them off: the value gives
+    // way down to a few digits, and the count is only as wide as five digits need
+    ui->spinExtent->setMinimumWidth(spinBoxWidth(ui->spinExtent, 4));
+    ui->spinSpacing->setMinimumWidth(spinBoxWidth(ui->spinSpacing, 4));
+    ui->spinOccurrences->setFixedWidth(spinBoxWidth(ui->spinOccurrences, 5));
 
     directionField = new PickField(
         PickField::QuickPicks | PickField::Clear | PickField::Reverse,

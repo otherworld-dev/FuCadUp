@@ -11,6 +11,7 @@ To run tests:
     FreeCAD -t TestPatternPanel
 """
 
+import os
 import unittest
 
 import FreeCAD
@@ -161,6 +162,74 @@ class PatternPanelCase(unittest.TestCase):
     def _tr(context, text):
         return QtCore.QCoreApplication.translate(context, text)
 
+    # -- the task panel's width ----------------------------------------------
+
+    def _tasks_viewport(self, widget):
+        """The part of the task panel in sight: the viewport of the scroll area the
+        widget sits in, which never scrolls sideways (TaskPanel).
+
+        Taken from the widget's own parents rather than from
+        QAbstractScrollArea.viewport(): PySide ties the wrapper that hands out to the
+        scroll area's own wrapper, so it reads as deleted once that one is let go,
+        though the viewport itself lives on."""
+
+        child, parent = widget, widget.parentWidget()
+        while parent is not None:
+            if isinstance(parent, QtWidgets.QAbstractScrollArea):
+                return child
+            child, parent = parent, parent.parentWidget()
+        self.fail("the widget is not in a scroll area")
+
+    def _task_view(self, widget):
+        """The Tasks panel (Gui::TaskView::TaskView) the widget sits in."""
+
+        parent = widget.parentWidget()
+        while parent is not None:
+            if parent.metaObject().className() == "Gui::TaskView::TaskView":
+                return parent
+            parent = parent.parentWidget()
+        self.fail("the widget is not in the Tasks panel")
+
+    def _narrow_the_tasks_panel(self, widget):
+        """Makes the Tasks panel the widget sits in as narrow as it goes, and lets it
+        widen again after the test. The cap is put on the panel itself, so it holds
+        whether its dock is in the main window or in an overlay (where the main window's
+        resizeDocks() has no say)."""
+
+        tasks = self._task_view(widget)
+        narrowest = tasks.minimumWidth() or tasks.minimumSizeHint().width()
+        self.addCleanup(self._cap_width, tasks, tasks.maximumWidth())
+        self._cap_width(tasks, narrowest)
+
+    def _cap_width(self, widget, width):
+        widget.setMaximumWidth(width)
+        self._process_events(300)
+
+    @staticmethod
+    def _save_grab(widget, name):
+        """Keeps a picture of widget for a person to look at, when FUCAD_TEST_GRAB_DIR
+        names a folder for it."""
+
+        folder = os.environ.get("FUCAD_TEST_GRAB_DIR")
+        if folder:
+            widget.grab().save(os.path.join(folder, name))
+
+    def _assert_inside_the_panel(self, widgets):
+        """Each (name, widget) is shown and ends inside the part of the task panel in
+        sight; anything past its right edge is cut off, as the panel never scrolls
+        sideways."""
+
+        for name, widget in widgets:
+            self.assertIsNotNone(widget, f"there is no {name}")
+            self.assertTrue(widget.isVisible(), f"{name} is hidden")
+            viewport = self._tasks_viewport(widget)
+            right = widget.mapTo(viewport, QtCore.QPoint(widget.width(), 0)).x()
+            self.assertLessEqual(
+                right,
+                viewport.width(),
+                f"{name} ends at {right} px, past the panel's edge at {viewport.width()} px",
+            )
+
 
 class TestStartValues(PatternPanelCase):
     """What the tools start with when a feature is selected."""
@@ -294,6 +363,23 @@ class TestDirectionFields(PatternPanelCase):
         self._pick(self._edge_along(FreeCAD.Vector(0, 1, 0)))
         self.assertFalse(self._direction_field(2).property("active"))
         self.assertEqual((self.pattern.Visibility, self.pad.Visibility), before)
+
+    def test_nothing_runs_off_the_narrowest_tasks_panel(self):
+        self._click(self._direction_field(2))
+        self._pick(self._edge_along(FreeCAD.Vector(0, 1, 0)))
+        first, second = self._direction_widget(1), self._direction_widget(2)
+        self._narrow_the_tasks_panel(first)
+        self._save_grab(self._task_view(first), "pattern-panel-narrow-linear.png")
+        field = self._direction_field(2)
+        self._assert_inside_the_panel(
+            [
+                ("Direction 2's quick picks", field.findChild(QtWidgets.QToolButton, "pickFieldMenu")),
+                ("Direction 2's reverse button", field.findChild(QtWidgets.QToolButton, "pickFieldReverse")),
+                ("Direction 2's clear button", field.findChild(QtWidgets.QToolButton, "pickFieldClear")),
+                ("Direction 1's count", first.findChild(QtWidgets.QSpinBox, "spinOccurrences")),
+                ("Direction 2's count", second.findChild(QtWidgets.QSpinBox, "spinOccurrences")),
+            ]
+        )
 
 
 class TestFeaturesField(PatternPanelCase):
@@ -771,6 +857,20 @@ class TestPolarHandle(PatternPanelCase):
         self.assertTrue(self._wait(self._handle_shown))
         self._click(self._direction_field(1))
         self.assertFalse(self._handle_shown())
+
+    def test_nothing_runs_off_the_narrowest_tasks_panel(self):
+        axis = self._direction_widget(1)
+        self._narrow_the_tasks_panel(axis)
+        self._save_grab(self._task_view(axis), "pattern-panel-narrow-polar.png")
+        field = self._direction_field(1)
+        self._assert_inside_the_panel(
+            [
+                ("the axis's quick picks", field.findChild(QtWidgets.QToolButton, "pickFieldMenu")),
+                ("the axis's reverse button", field.findChild(QtWidgets.QToolButton, "pickFieldReverse")),
+                ("the times mark", axis.findChild(QtWidgets.QLabel, "labelTimes")),
+                ("the count", axis.findChild(QtWidgets.QSpinBox, "spinOccurrences")),
+            ]
+        )
 
     # -- dragging ----------------------------------------------------------
 

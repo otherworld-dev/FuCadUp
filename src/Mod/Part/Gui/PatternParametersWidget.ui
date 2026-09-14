@@ -19,7 +19,7 @@
       </item>
       <item>
        <widget class="QWidget" name="valuesRow" native="true">
-        <layout class="QHBoxLayout" name="valuesLayout">
+        <layout class="QVBoxLayout" name="valuesLayout">
          <property name="spacing"><number>3</number></property>
          <property name="leftMargin"><number>0</number></property>
          <property name="topMargin"><number>0</number></property>
@@ -27,54 +27,70 @@
          <property name="bottomMargin"><number>0</number></property>
          <item>
           <widget class="QComboBox" name="comboMode">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy>
+           </property>
            <property name="toolTip"><string>How the copies are spread out</string></property>
+           <property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum></property>
+           <property name="minimumContentsLength"><number>6</number></property>
            <item><property name="text"><string>Total length</string></property></item>
            <item><property name="text"><string>Spacing</string></property></item>
           </widget>
          </item>
          <item>
-          <widget class="Gui::QuantitySpinBox" name="spinExtent" native="true">
-           <property name="toolTip"><string>Distance from the first copy to the last</string></property>
-           <property name="keyboardTracking" stdset="0"><bool>false</bool></property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QWidget" name="spacingControlsWidget" native="true">
-           <layout class="QHBoxLayout" name="spacingControlsLayout">
-            <property name="spacing"><number>3</number></property>
-            <property name="leftMargin"><number>0</number></property>
-            <property name="topMargin"><number>0</number></property>
-            <property name="rightMargin"><number>0</number></property>
-            <property name="bottomMargin"><number>0</number></property>
-            <item>
-             <widget class="Gui::QuantitySpinBox" name="spinSpacing" native="true">
-              <property name="toolTip"><string>Distance between neighbouring copies</string></property>
-              <property name="keyboardTracking" stdset="0"><bool>false</bool></property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QToolButton" name="addSpacingButton">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy>
-              </property>
-              <property name="toolTip"><string>Add spacing to create spacing patterns.</string></property>
-              <property name="icon">
-               <iconset><normaloff>:/icons/list-add.svg</normaloff>:/icons/list-add.svg</iconset>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="labelTimes">
-           <property name="text"><string notr="true">×</string></property>
-          </widget>
-         </item>
-         <item>
-          <widget class="Gui::UIntSpinBox" name="spinOccurrences">
-           <property name="toolTip"><string>Number of copies, the original included</string></property>
-          </widget>
+          <layout class="QHBoxLayout" name="amountLayout" stretch="1,1,0,0">
+           <property name="spacing"><number>3</number></property>
+           <item>
+            <widget class="Gui::QuantitySpinBox" name="spinExtent" native="true">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Ignored" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy>
+             </property>
+             <property name="toolTip"><string>Distance from the first copy to the last</string></property>
+             <property name="keyboardTracking" stdset="0"><bool>false</bool></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QWidget" name="spacingControlsWidget" native="true">
+             <layout class="QHBoxLayout" name="spacingControlsLayout" stretch="1,0">
+              <property name="spacing"><number>3</number></property>
+              <property name="leftMargin"><number>0</number></property>
+              <property name="topMargin"><number>0</number></property>
+              <property name="rightMargin"><number>0</number></property>
+              <property name="bottomMargin"><number>0</number></property>
+              <item>
+               <widget class="Gui::QuantitySpinBox" name="spinSpacing" native="true">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Ignored" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy>
+                </property>
+                <property name="toolTip"><string>Distance between neighbouring copies</string></property>
+                <property name="keyboardTracking" stdset="0"><bool>false</bool></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="addSpacingButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Maximum" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy>
+                </property>
+                <property name="toolTip"><string>Add spacing to create spacing patterns.</string></property>
+                <property name="icon">
+                 <iconset><normaloff>:/icons/list-add.svg</normaloff>:/icons/list-add.svg</iconset>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="labelTimes">
+             <property name="text"><string notr="true">×</string></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="Gui::UIntSpinBox" name="spinOccurrences">
+             <property name="toolTip"><string>Number of copies, the original included</string></property>
+            </widget>
+           </item>
+          </layout>
          </item>
         </layout>
        </widget>
