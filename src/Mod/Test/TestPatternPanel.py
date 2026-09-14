@@ -890,3 +890,45 @@ class TestPolarHandle(PatternPanelCase):
 
         normal = self._handle_arc_normal()
         self.assertLess((normal - FreeCAD.Vector(0, 0, -1)).Length, 1e-4)
+
+
+class TestMultiTransformStep(PatternPanelCase):
+    """A pattern step inside a MultiTransform gets the new panel, but no handles."""
+
+    def setUp(self):
+        super().setUp()
+        self.multi = self.doc.addObject("PartDesign::MultiTransform", "MultiTransform")
+        self.multi.Originals = [self.pad]
+        self.step = self.doc.addObject("PartDesign::LinearPattern", "LinearPattern")
+        self.step.Direction = (self.sketch, ["H_Axis"])
+        self.step.Length = 30.0
+        self.step.Occurrences = 2
+        self.multi.Transformations = [self.step]
+        self.body.addObject(self.multi)
+        self.doc.recompute()
+        FreeCADGui.getDocument(self.doc.Name).setEdit(self.multi.Name)
+        self._process_events(300)
+        steps = self._find_widget("listTransformFeatures")
+        self.assertIsNotNone(steps, "the MultiTransform panel did not open")
+        steps.setCurrentRow(0)
+        steps.activated.emit(steps.model().index(0, 0))
+        self._process_events(300)
+
+    def test_the_step_shows_the_direction_field(self):
+        field = self._direction_field(1)
+        self.assertIsNotNone(field)
+        self.assertTrue(field.isVisible())
+
+    def test_the_step_has_no_features_field_of_its_own(self):
+        field = self._find_widget("pickFeatures")
+        self.assertTrue(field is None or not field.isVisible())
+
+    def test_the_step_has_no_handles(self):
+        from pivy import coin
+
+        search = coin.SoSearchAction()
+        search.setType(coin.SoType.fromName("SoLinearDraggerContainer"))
+        search.setInterest(coin.SoSearchAction.ALL)
+        search.setSearchingAll(True)
+        search.apply(self.viewer.getSoRenderManager().getSceneGraph())
+        self.assertEqual(search.getPaths().getLength(), 0)
