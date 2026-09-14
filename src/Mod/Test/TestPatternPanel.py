@@ -138,10 +138,18 @@ class PatternPanelCase(unittest.TestCase):
         self._process_events(300)
 
     def _escape(self):
-        for kind in (QtCore.QEvent.KeyPress, QtCore.QEvent.KeyRelease):
-            QtWidgets.QApplication.sendEvent(
-                self.viewport, QtGui.QKeyEvent(kind, QtCore.Qt.Key_Escape, QtCore.Qt.NoModifier)
-            )
+        """Press and release Escape in the 3D view, with a real gap between them
+        (a physical key stays down for roughly 100 ms), not back-to-back."""
+
+        QtWidgets.QApplication.sendEvent(
+            self.viewport,
+            QtGui.QKeyEvent(QtCore.QEvent.KeyPress, QtCore.Qt.Key_Escape, QtCore.Qt.NoModifier),
+        )
+        self._process_events(150)
+        QtWidgets.QApplication.sendEvent(
+            self.viewport,
+            QtGui.QKeyEvent(QtCore.QEvent.KeyRelease, QtCore.Qt.Key_Escape, QtCore.Qt.NoModifier),
+        )
         self._process_events(300)
 
     @staticmethod
@@ -299,6 +307,17 @@ class TestFeaturesField(PatternPanelCase):
         self._pick("Face1")
         self.assertEqual(self.pattern.Originals, [self.pad])
 
+    def test_a_feature_of_another_body_is_not_taken(self):
+        other_body = self.doc.addObject("PartDesign::Body", "OtherBody")
+        box = self.doc.addObject("PartDesign::AdditiveBox", "Box")
+        other_body.addObject(box)
+        self.doc.recompute()
+        self._run("PartDesign_LinearPattern")
+        self._click(self._features_field())
+        FreeCADGui.Selection.addSelection(self.doc.Name, box.Name, "Face1")
+        self._process_events(300)
+        self.assertEqual(self.pattern.Originals, [self.pad])
+
     def test_the_whole_body_option_copies_the_body(self):
         self._run("PartDesign_LinearPattern")
         self._find_widget("optionWholeBody").setChecked(True)
@@ -321,6 +340,14 @@ class TestFeaturesField(PatternPanelCase):
         self.assertFalse(field.property("active"))
         # Control.activeDialog() reports whether a dialog is active, as a bool.
         self.assertTrue(FreeCADGui.Control.activeDialog())
+
+    def test_escape_on_the_features_field_keeps_the_tool_open(self):
+        self._run("PartDesign_LinearPattern")
+        field = self._features_field()
+        self._click(field)
+        self._escape()
+        self.assertFalse(field.property("active"))
+        self.assertIsNotNone(FreeCADGui.Control.activeTaskDialog())
 
 
 class TestNothingSelected(PatternPanelCase):

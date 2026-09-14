@@ -25,27 +25,19 @@
 
 using namespace PartDesignGui;
 
+PatternFeatureGate::PatternFeatureGate(PartDesign::Body* body)
+    : Gui::SelectionFilterGate(nullPointer())
+    , body(body)
+{}
+
+bool PatternFeatureGate::allow(App::Document* document, App::DocumentObject* object, const char*)
+{
+    return object && body && document == body->getDocument()
+        && object->isDerivedFrom<PartDesign::FeatureAddSub>() && body->hasObject(object);
+}
+
 namespace
 {
-
-/// Lets through only features of the body that add or remove material
-class PatternFeatureGate: public Gui::SelectionFilterGate
-{
-public:
-    explicit PatternFeatureGate(PartDesign::Body* body)
-        : Gui::SelectionFilterGate(nullPointer())
-        , body(body)
-    {}
-
-    bool allow(App::Document* document, App::DocumentObject* object, const char*) override
-    {
-        return object && body && document == body->getDocument()
-            && object->isDerivedFrom<PartDesign::FeatureAddSub>() && body->hasObject(object);
-    }
-
-private:
-    PartDesign::Body* body;
-};
 
 Gui::View3DInventorViewer* viewerOf(App::Document* document)
 {

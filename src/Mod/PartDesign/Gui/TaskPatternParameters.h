@@ -124,6 +124,11 @@ private:
     QCheckBox* wholeBodyCheck = nullptr;
     QCheckBox* updateViewCheck = nullptr;
     PickTarget target = PickTarget::None;
+    /// An Esc press already turned the field off; the filter stays installed until
+    /// that same key's release has also been seen and eaten, so it never reaches the
+    /// view as Cancel too (a real release follows the press by ~100 ms, well after the
+    /// 0 ms timer below has already run)
+    bool eatEscapeRelease = false;
     static bool featuresPickingRequested;
 
     std::unique_ptr<Ui_TaskPatternParameters> ui;

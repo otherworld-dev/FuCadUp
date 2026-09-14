@@ -70,6 +70,7 @@
 #include "ui_TaskPatternParameters.h"
 #include "TaskPatternParameters.h"
 #include "PatternDefaults.h"
+#include "PatternFeaturePicker.h"
 #include "ReferenceSelection.h"
 #include "TaskMultiTransformParameters.h"
 
@@ -320,7 +321,10 @@ void TaskPatternParameters::setPickTarget(PickTarget next)
         hideBase();
         showObject();
         Gui::getMainWindow()->hideHints();
-        qApp->removeEventFilter(this);
+        // Esc's own release, still to come, must reach this filter too
+        if (!eatEscapeRelease) {
+            qApp->removeEventFilter(this);
+        }
     }
 
     target = next;
@@ -341,6 +345,18 @@ void TaskPatternParameters::setPickTarget(PickTarget next)
         Gui::Selection().clearSelection();
         if (target == PickTarget::Features) {
             selectionMode = SelectionMode::AddFeature;
+            // Only a feature of this body, and not one that already depends on this
+            // pattern (which would make a cycle) - the same combination
+            // addReferenceSelectionGate() builds for a direction reference
+            std::unique_ptr<Gui::SelectionFilterGate> featureGate(
+                new PatternFeatureGate(PartDesign::Body::findBodyOf(getObject()))
+            );
+            std::unique_ptr<Gui::SelectionFilterGate> dependentsGate(
+                new NoDependentsSelection(getTopTransformedObject())
+            );
+            Gui::Selection().addSelectionGate(
+                new CombineSelectionFilterGates(featureGate, dependentsGate)
+            );
         }
         else {
             selectionMode = SelectionMode::Reference;
@@ -382,17 +398,38 @@ bool TaskPatternParameters::eventFilter(QObject* watched, QEvent* event)
                          || event->type() == QEvent::KeyPress
                          || event->type() == QEvent::KeyRelease)
         && static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape;
-    if (target != PickTarget::None && escape && QApplication::mouseButtons() == Qt::NoButton) {
-        if (event->type() == QEvent::ShortcutOverride) {
-            // Taken as a plain key press, which comes back here next, not as a shortcut
-            event->accept();
+    if (!escape || QApplication::mouseButtons() != Qt::NoButton) {
+        return TaskTransformedParameters::eventFilter(watched, event);
+    }
+
+    if (event->type() == QEvent::KeyRelease) {
+        // A real release follows its press by roughly 100 ms - long after the press
+        // below has already turned the field off and its 0 ms timer has run. Without
+        // this flag the filter would already be gone by the time the release arrives,
+        // so it would reach the view instead and be taken there as Cancel.
+        if (!eatEscapeRelease) {
+            return TaskTransformedParameters::eventFilter(watched, event);
         }
-        else {
-            QTimer::singleShot(0, this, [this]() { setPickTarget(PickTarget::None); });
+        eatEscapeRelease = false;
+        if (target == PickTarget::None) {
+            qApp->removeEventFilter(this);
         }
         return true;
     }
-    return TaskTransformedParameters::eventFilter(watched, event);
+
+    if (target == PickTarget::None) {
+        return TaskTransformedParameters::eventFilter(watched, event);
+    }
+
+    if (event->type() == QEvent::ShortcutOverride) {
+        // Taken as a plain key press, which comes back here next, not as a shortcut
+        event->accept();
+    }
+    else {
+        eatEscapeRelease = true;
+        QTimer::singleShot(0, this, [this]() { setPickTarget(PickTarget::None); });
+    }
+    return true;
 }
 
 void TaskPatternParameters::setupFeaturesAndOptions()

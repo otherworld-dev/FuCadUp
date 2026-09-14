@@ -6,12 +6,14 @@
 #include <QPointer>
 
 #include <Gui/Selection/Selection.h>
+#include <Gui/Selection/SelectionFilter.h>
 #include <Gui/TaskView/TaskDialog.h>
 
 class SoEventCallback;
 
 namespace App
 {
+class Document;
 class DocumentObject;
 }
 namespace Gui
@@ -25,6 +27,19 @@ class Body;
 
 namespace PartDesignGui
 {
+
+/// Lets through only features of the body that add or remove material; shared by the
+/// picker below and by the pattern panel's own Features field.
+class PatternFeatureGate: public Gui::SelectionFilterGate
+{
+public:
+    explicit PatternFeatureGate(PartDesign::Body* body);
+
+    bool allow(App::Document* document, App::DocumentObject* object, const char*) override;
+
+private:
+    PartDesign::Body* body;
+};
 
 /**
  * Waits for one click on an additive or subtractive feature of the body, so a pattern
