@@ -444,7 +444,10 @@ bool TaskPatternParameters::eventFilter(QObject* watched, QEvent* event)
         return true;
     }
 
-    if (target == PickTarget::None) {
+    // A popup (the quick picks) or a dialog (the formula editor) closes on its own Esc, and
+    // that key's release is then left alone too, as eatEscapeRelease stays unset
+    if (target == PickTarget::None || QApplication::activePopupWidget()
+        || QApplication::activeModalWidget()) {
         return TaskTransformedParameters::eventFilter(watched, event);
     }
 
@@ -989,13 +992,17 @@ void TaskPatternParameters::setGizmoPositions()
 
     if (auto* polar = getObject<PartDesign::PolarPattern>()) {
         placePolarHandle(polar);
-        return;
     }
-    auto* pattern = getObject<PartDesign::LinearPattern>();
-    if (!pattern) {
-        return;
+    else if (auto* pattern = getObject<PartDesign::LinearPattern>()) {
+        placeLinearArrows(pattern);
     }
+    // A newly shown arrow, or one turned round by Reversed, is sized and faced for the
+    // camera now rather than at its next move, as on Extrude
+    gizmoContainer->calculateScaleAndOrientation();
+}
 
+void TaskPatternParameters::placeLinearArrows(PartDesign::LinearPattern* pattern)
+{
     const Base::Vector3d start = getStartPoint();
     const auto place = [&](Gui::LinearGizmo* arrow,
                            PartGui::PatternParametersWidget* widget,

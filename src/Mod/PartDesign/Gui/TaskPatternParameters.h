@@ -139,6 +139,7 @@ private:
     void setupGizmos();
     void setGizmoPositions();
     void placePolarHandle(PartDesign::PolarPattern* polar);
+    void placeLinearArrows(PartDesign::LinearPattern* pattern);
     static void arrowDragStarted(void* data, SoDragger* dragger);
     static void arrowDragFinished(void* data, SoDragger* dragger);
     static void handleDragStarted(void* data, SoDragger* dragger);
