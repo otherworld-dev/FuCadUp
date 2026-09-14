@@ -270,6 +270,16 @@ class TestDirectionFields(PatternPanelCase):
         self.assertIsNone(self.pattern.Direction2)
         self.assertEqual(self.pattern.Occurrences2, 1)
 
+    def test_a_pick_leaves_the_preview_showing_what_it_showed(self):
+        """The Preview panel's "Show final result" decides whether the pattern or the
+        feature before it is shown; a pick shows the originals only while it lasts."""
+
+        before = (self.pattern.Visibility, self.pad.Visibility)
+        self._click(self._direction_field(2))
+        self._pick(self._edge_along(FreeCAD.Vector(0, 1, 0)))
+        self.assertFalse(self._direction_field(2).property("active"))
+        self.assertEqual((self.pattern.Visibility, self.pad.Visibility), before)
+
 
 class TestFeaturesField(PatternPanelCase):
     """What is copied is picked in a field too, and can never become nothing."""

@@ -136,6 +136,10 @@ protected:
     /// Show the base transformation object (see getObject())
     void showBase();
 
+    /// Return the base object of the base transformed object (see getTopTransformedObject())
+    // Either through the ViewProvider or the currently active subFeature of the parentTask
+    App::DocumentObject* getBaseObject() const;
+
     void addReferenceSelectionGate(AllowSelectionFlags);
 
     /// Hides the feature list, the mode radios and the Update view checkbox, for panels
@@ -195,10 +199,6 @@ private:
     void removeObject(App::DocumentObject*);
     void clearButtons();
     void checkVisibility();
-
-    /// Return the base object of the base transformed object (see getTopTransformedObject())
-    // Either through the ViewProvider or the currently active subFeature of the parentTask
-    App::DocumentObject* getBaseObject() const;
 
     void changeEvent(QEvent* event) override;
 

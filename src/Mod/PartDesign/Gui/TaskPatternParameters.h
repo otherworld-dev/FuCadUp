@@ -165,6 +165,10 @@ private:
     /// view as Cancel too (a real release follows the press by ~100 ms, well after the
     /// 0 ms timer below has already run)
     bool eatEscapeRelease = false;
+    /// Whether the pattern (the MultiTransform, for a step) and the feature before it were
+    /// shown when a pick started - the Preview panel's choice, put back when it ends
+    bool objectShownBeforePick = true;
+    bool baseShownBeforePick = false;
     static bool featuresPickingRequested;
 
     std::unique_ptr<Ui_TaskPatternParameters> ui;

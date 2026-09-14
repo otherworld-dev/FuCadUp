@@ -335,8 +335,19 @@ void TaskPatternParameters::setPickTarget(PickTarget next)
 
     if (target != PickTarget::None) {
         exitSelectionMode();
-        hideBase();
-        showObject();
+        // Back to what showed before the pick, as the Preview panel had it
+        if (objectShownBeforePick) {
+            showObject();
+        }
+        else {
+            hideObject();
+        }
+        if (baseShownBeforePick) {
+            showBase();
+        }
+        else {
+            hideBase();
+        }
         Gui::getMainWindow()->hideHints();
         // Esc's own release, still to come, must reach this filter too
         if (!eatEscapeRelease) {
@@ -357,6 +368,11 @@ void TaskPatternParameters::setPickTarget(PickTarget next)
 
     if (target != PickTarget::None) {
         // The originals are what gets clicked, so they are shown instead of the result
+        // until the pick ends
+        App::DocumentObject* shown = getTopTransformedObject();
+        App::DocumentObject* base = getBaseObject();
+        objectShownBeforePick = shown && shown->Visibility.getValue();
+        baseShownBeforePick = base && base->Visibility.getValue();
         hideObject();
         showBase();
         Gui::Selection().clearSelection();
