@@ -82,6 +82,10 @@ private:
     void showOriginAxes(bool show);
     void enterReferenceSelectionMode();
     void exitReferenceSelectionMode();  // Ensure this clears gates etc.
+    /// Makes widget's field the one the next click goes to; a second click turns it off
+    void startPicking(PartGui::PatternParametersWidget* widget);
+    /// Gives a newly picked second direction the same kind of start as the first
+    void startSecondDirection(PartDesign::LinearPattern* pattern);
 
     Base::Vector3d getStartPoint() const;
 

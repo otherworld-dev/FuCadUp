@@ -58,6 +58,7 @@
 
 #include "ui_TaskPatternParameters.h"
 #include "TaskPatternParameters.h"
+#include "PatternDefaults.h"
 #include "ReferenceSelection.h"
 #include "TaskMultiTransformParameters.h"
 
@@ -103,6 +104,7 @@ void TaskPatternParameters::setupParameterUI(QWidget* widget)
     // Set first direction widget
     auto* viewer = getTopTransformedView()->getViewer();
     parametersWidget = new PartGui::PatternParametersWidget(type, viewer, widget);
+    parametersWidget->setObjectName(QStringLiteral("patternDirection1"));
 
     auto* placeholderLayout = new QVBoxLayout(ui->parametersWidgetPlaceholder);
     placeholderLayout->setContentsMargins(0, 0, 0, 0);
@@ -113,7 +115,7 @@ void TaskPatternParameters::setupParameterUI(QWidget* widget)
     this->fillAxisCombo(parametersWidget->dirLinks, sketch);
     connect(
         parametersWidget,
-        &PartGui::PatternParametersWidget::requestReferenceSelection,
+        &PartGui::PatternParametersWidget::pickRequested,
         this,
         &TaskPatternParameters::onParameterWidgetRequestReferenceSelection
     );
@@ -127,6 +129,7 @@ void TaskPatternParameters::setupParameterUI(QWidget* widget)
     // Add second direction widget if necessary
     if (type == PartGui::PatternType::Linear) {
         parametersWidget2 = new PartGui::PatternParametersWidget(type, viewer, widget);
+        parametersWidget2->setObjectName(QStringLiteral("patternDirection2"));
         auto* placeholderLayout2 = new QVBoxLayout(ui->parametersWidgetPlaceholder2);
         placeholderLayout2->setContentsMargins(0, 0, 0, 0);
         placeholderLayout2->addWidget(parametersWidget2);
@@ -135,7 +138,7 @@ void TaskPatternParameters::setupParameterUI(QWidget* widget)
         this->fillAxisCombo(parametersWidget2->dirLinks, sketch);
         connect(
             parametersWidget2,
-            &PartGui::PatternParametersWidget::requestReferenceSelection,
+            &PartGui::PatternParametersWidget::pickRequested,
             this,
             &TaskPatternParameters::onParameterWidgetRequestReferenceSelection2
         );
@@ -146,7 +149,8 @@ void TaskPatternParameters::setupParameterUI(QWidget* widget)
             &TaskPatternParameters::onParameterWidgetParametersChanged
         );
         parametersWidget2->setTitle(tr("Direction 2"));
-        parametersWidget2->setCheckable(true);
+        parametersWidget2->setClearable(true);
+        parametersWidget2->setPlaceholder(tr("Click an edge to add"));
     }
 
     bindProperties();
@@ -257,6 +261,9 @@ void TaskPatternParameters::enterReferenceSelectionMode()
     if (selectionMode == SelectionMode::Reference) {
         return;
     }
+    if (activeDirectionWidget) {
+        activeDirectionWidget->setPicking(true);
+    }
 
     hideObject();  // Hide the pattern feature itself
     showBase();    // Show the base features/body
@@ -279,6 +286,9 @@ void TaskPatternParameters::exitReferenceSelectionMode()
 
     hideBase();
     Gui::getMainWindow()->showMessage(QString());
+    if (activeDirectionWidget) {
+        activeDirectionWidget->setPicking(false);
+    }
     activeDirectionWidget = nullptr;
 }
 
@@ -298,18 +308,40 @@ void TaskPatternParameters::onUpdateViewTimer()
 
 void TaskPatternParameters::onParameterWidgetRequestReferenceSelection()
 {
-    // The embedded widget wants to enter reference selection mode
-    activeDirectionWidget = parametersWidget;
-    enterReferenceSelectionMode();
-    selectionMode = SelectionMode::Reference;
+    startPicking(parametersWidget);
 }
 
 void TaskPatternParameters::onParameterWidgetRequestReferenceSelection2()
 {
-    // The embedded widget wants to enter reference selection mode
-    activeDirectionWidget = parametersWidget2;
+    startPicking(parametersWidget2);
+}
+
+void TaskPatternParameters::startPicking(PartGui::PatternParametersWidget* widget)
+{
+    const bool again = selectionMode == SelectionMode::Reference && activeDirectionWidget == widget;
+    if (selectionMode == SelectionMode::Reference) {
+        exitReferenceSelectionMode();
+    }
+    if (again) {
+        return;
+    }
+    activeDirectionWidget = widget;
     enterReferenceSelectionMode();
     selectionMode = SelectionMode::Reference;
+}
+
+void TaskPatternParameters::startSecondDirection(PartDesign::LinearPattern* pattern)
+{
+    pattern->Mode2.setValue(static_cast<long>(Part::LinearPatternMode::Spacing));
+    auto* body = PartDesign::Body::findBodyOf(pattern);
+    pattern->Offset2.setValue(PartDesignGui::suggestPatternSpacing(
+        pattern->getOriginals(),
+        PartDesignGui::patternDirection(*pattern, pattern->Direction2).value_or(Base::Vector3d(0, 1, 0)),
+        !body || body->AllowCompound.getValue()
+    ));
+    if (pattern->Occurrences2.getValue() < 2) {
+        pattern->Occurrences2.setValue(2);
+    }
 }
 
 void TaskPatternParameters::onParameterWidgetParametersChanged()
@@ -372,7 +404,11 @@ void TaskPatternParameters::onSelectionChanged(const Gui::SelectionChanges& msg)
                 linearPattern->Direction.setValue(selObj, directions);
             }
             else {
+                const bool wasInUse = parametersWidget2->isInUse();
                 linearPattern->Direction2.setValue(selObj, directions);
+                if (!wasInUse) {
+                    startSecondDirection(linearPattern);
+                }
             }
         }
         else if (patternObj->isDerivedFrom<PartDesign::PolarPattern>()) {
@@ -417,9 +453,13 @@ void TaskPatternParameters::apply()
 
     if (parametersWidget2) {
         parametersWidget2->getAxis(obj, dirs);
-        direction = buildLinkSingleSubPythonStr(obj, dirs);
-
-        FCMD_OBJ_CMD(pattern, "Direction2 = " << direction.c_str());
+        if (obj) {
+            direction = buildLinkSingleSubPythonStr(obj, dirs);
+            FCMD_OBJ_CMD(pattern, "Direction2 = " << direction.c_str());
+        }
+        else {
+            FCMD_OBJ_CMD(pattern, "Direction2 = None");
+        }
         FCMD_OBJ_CMD(pattern, "Reversed2 = " << parametersWidget2->getReverse());
         FCMD_OBJ_CMD(pattern, "Mode2 = " << parametersWidget2->getMode());
         parametersWidget2->applyQuantitySpinboxes();

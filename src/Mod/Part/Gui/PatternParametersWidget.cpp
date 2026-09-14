@@ -24,6 +24,7 @@
 #include <QDebug>
 #include <QTimer>
 #include <QHBoxLayout>
+#include <QVBoxLayout>
 #include <QToolButton>
 #include <QLabel>
 #include <QFormLayout>
@@ -31,6 +32,7 @@
 
 #include "ui_PatternParametersWidget.h"
 #include "PatternParametersWidget.h"
+#include "PickField.h"
 
 #include <App/Application.h>
 #include <App/DocumentObject.h>
@@ -67,41 +69,52 @@ PatternParametersWidget::~PatternParametersWidget()
 
 void PatternParametersWidget::setupUiElements()
 {
-    // Configure UI elements if needed (e.g., icons for mode)
     QIcon iconExtent = Gui::BitmapFactory().iconFromTheme("Part_LinearPattern_extent");
     QIcon iconSpacing = Gui::BitmapFactory().iconFromTheme("Part_LinearPattern_spacing");
-
     ui->comboMode->setItemIcon(0, iconExtent);
     ui->comboMode->setItemIcon(1, iconSpacing);
 
+    directionField = new PickField(
+        PickField::QuickPicks | PickField::Clear | PickField::Reverse,
+        ui->pickFieldHolder
+    );
+    directionField->setObjectName(QStringLiteral("pickDirection"));
+    directionField->setClearVisible(false);
+    directionField->setPlaceholder(tr("Click an edge to pick the direction"));
+    auto* holderLayout = new QVBoxLayout(ui->pickFieldHolder);
+    holderLayout->setContentsMargins(0, 0, 0, 0);
+    holderLayout->addWidget(directionField);
+
     if (type == PatternType::Polar) {
         setTitle(tr("Axis"));
-        ui->comboMode->setItemText(0, tr("Total Angle"));
-        ui->comboMode->setItemText(1, tr("Angular Spacing"));
-        ui->labelLength->setText(tr("Total Angle"));
-        ui->labelOffset->setText(tr("Angular Spacing"));
+        ui->comboMode->setItemText(0, tr("Total angle"));
+        ui->comboMode->setItemText(1, tr("Angle between"));
+        ui->spinExtent->setToolTip(tr("Angle from the first copy to the last"));
+        ui->spinSpacing->setToolTip(tr("Angle between neighbouring copies"));
+        directionField->setPlaceholder(tr("Click a circular edge or an axis"));
     }
 
-    // Set combo box helper
+    // The combo is only the list the quick picks come from
     dirLinks.setCombo(ui->comboDirection);
+    ui->comboDirection->hide();
 
     ParameterGrp::handle hPart = App::GetApplication().GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Mod/Part"
     );
     ui->addSpacingButton->setVisible(hPart->GetBool("ExperimentalFeatures", false));
-
-    ui->enableCheckbox->setVisible(false);
 }
 
 void PatternParametersWidget::connectSignals()
 {
-    connect(
-        ui->comboDirection,
-        qOverload<int>(&QComboBox::activated),
-        this,
-        &PatternParametersWidget::onDirectionChanged
-    );
-    connect(ui->PushButtonReverse, &QToolButton::pressed, this, &PatternParametersWidget::onReversePressed);
+    connect(directionField, &PickField::activationRequested, this, &PatternParametersWidget::pickRequested);
+    connect(directionField, &PickField::quickPicked, this, [this](int index) {
+        ui->comboDirection->setCurrentIndex(index);
+        onDirectionChanged(index);
+        refreshPickField();
+    });
+    connect(directionField, &PickField::reverseClicked, this, &PatternParametersWidget::onReversePressed);
+    connect(directionField, &PickField::cleared, this, &PatternParametersWidget::onCleared);
+
     connect(
         ui->comboMode,
         qOverload<int>(&QComboBox::activated),
@@ -136,13 +149,6 @@ void PatternParametersWidget::connectSignals()
         &PatternParametersWidget::onAddSpacingButtonClicked
     );
 
-    connect(ui->groupBox, &QGroupBox::toggled, this, &PatternParametersWidget::onGroupBoxToggled);
-    connect(
-        ui->enableCheckbox,
-        &QCheckBox::clicked,
-        this,
-        &PatternParametersWidget::onEnableCheckBoxToggled
-    );
     // Note: Connections for dynamic rows are done in addSpacingRow()
 }
 
@@ -187,10 +193,6 @@ void PatternParametersWidget::bindProperties(
     ui->spinOccurrences->setMinimum(m_occurrencesProp->getMinimum());
     ui->spinOccurrences->blockSignals(false);
 
-    if (ui->groupBox->isCheckable()) {
-        setChecked(m_occurrencesProp->getValue() > 1);
-    }
-
     // Initial UI update from properties
     updateUI();
 }
@@ -225,6 +227,7 @@ void PatternParametersWidget::updateUI()
             dirLinks.setCurrentLink(*m_directionProp);
         }
     }
+    refreshPickField();
 
     // Update other controls directly from properties
     ui->comboMode->setCurrentIndex(m_modeProp->getValue());
@@ -237,54 +240,13 @@ void PatternParametersWidget::updateUI()
     adaptVisibilityToMode();
 }
 
-void PatternParametersWidget::onGroupBoxToggled(bool checked)
-{
-    if (blockUpdate || !m_occurrencesProp) {
-        return;
-    }
-
-    if (!checked) {
-        // When unchecked, the pattern in this direction is disabled.
-        // Set occurrences to 1, which effectively removes the pattern effect.
-        if (m_occurrencesProp->getValue() != 1) {
-            ui->spinOccurrences->setValue(1);
-        }
-
-        ui->groupBox->setVisible(false);
-        ui->enableCheckbox->setVisible(true);
-        ui->enableCheckbox->setChecked(false);
-    }
-}
-
-void PatternParametersWidget::onEnableCheckBoxToggled(bool checked)
-{
-    if (blockUpdate || !m_occurrencesProp) {
-        return;
-    }
-
-    if (checked) {
-        ui->groupBox->setChecked(true);
-        ui->groupBox->setVisible(true);
-        ui->enableCheckbox->setVisible(false);
-
-        if (m_occurrencesProp->getValue() < 2) {
-            ui->spinOccurrences->setValue(2);
-        }
-    }
-}
-
 void PatternParametersWidget::adaptVisibilityToMode()
 {
     if (!m_modeProp) {
         return;
     }
-    // Use the enum names defined in FeatureLinearPattern.h
     auto mode = static_cast<PartGui::PatternMode>(m_modeProp->getValue());
-
-    ui->formLayout->labelForField(ui->spinExtent)->setVisible(mode == PartGui::PatternMode::Extent);
     ui->spinExtent->setVisible(mode == PartGui::PatternMode::Extent);
-    ui->formLayout->labelForField(ui->spacingControlsWidget)
-        ->setVisible(mode == PartGui::PatternMode::Spacing);
     ui->spacingControlsWidget->setVisible(mode == PartGui::PatternMode::Spacing);
 }
 
@@ -303,15 +265,60 @@ void PatternParametersWidget::setTitle(const QString& title)
     ui->groupBox->setTitle(title);
 }
 
-void PatternParametersWidget::setCheckable(bool on)
+PickField* PatternParametersWidget::pickField() const
 {
-    ui->groupBox->setCheckable(on);
+    return directionField;
 }
 
-void PatternParametersWidget::setChecked(bool on)
+void PatternParametersWidget::setPicking(bool picking)
 {
-    ui->groupBox->setChecked(on);
-    ui->enableCheckbox->setChecked(on);
+    directionField->setActive(picking);
+}
+
+void PatternParametersWidget::setClearable(bool on)
+{
+    clearable = on;
+    refreshPickField();
+}
+
+void PatternParametersWidget::setPlaceholder(const QString& text)
+{
+    directionField->setPlaceholder(text);
+}
+
+bool PatternParametersWidget::isInUse() const
+{
+    if (!m_directionProp || !m_directionProp->getValue()) {
+        return false;
+    }
+    // Patterns made before the rework carry a second direction with a single copy
+    return !clearable || (m_occurrencesProp && m_occurrencesProp->getValue() > 1);
+}
+
+void PatternParametersWidget::refreshPickField()
+{
+    directionField->clearQuickPicks();
+    for (int index = 0; index < dirLinks.count(); ++index) {
+        if (dirLinks.getLink(index).getValue()) {
+            directionField->addQuickPick(ui->comboDirection->itemText(index), index);
+        }
+    }
+
+    const bool inUse = isInUse();
+    directionField->setSummary(inUse ? ui->comboDirection->currentText() : QString());
+    directionField->setClearVisible(clearable && inUse);
+    ui->valuesRow->setVisible(inUse);
+}
+
+void PatternParametersWidget::onCleared()
+{
+    if (blockUpdate || !m_directionProp || !m_occurrencesProp) {
+        return;
+    }
+    m_occurrencesProp->setValue(1);
+    m_directionProp->setValue(nullptr);
+    Q_EMIT parametersChanged();
+    updateUI();
 }
 
 // --- Slots ---
@@ -324,7 +331,7 @@ void PatternParametersWidget::onDirectionChanged(int /*index*/)
 
     if (isSelectReferenceMode()) {
         // Emit signal for the task panel to handle reference selection
-        requestReferenceSelection();
+        Q_EMIT pickRequested();
     }
     else {
         m_directionProp->Paste(dirLinks.getCurrentLink());  // Update the property
@@ -413,13 +420,8 @@ void PatternParametersWidget::addSpacingRow(double value)
         return;  // Need context for units
     }
 
-    // Find position to insert before "Occurrences"
-    int insertPos = -1;
-    QFormLayout::ItemRole role;
-    ui->formLayout->getWidgetPosition(ui->spinOccurrences, &insertPos, &role);
-    if (insertPos == -1) {
-        insertPos = ui->formLayout->rowCount();  // Fallback to appending
-    }
+    // The form below the values row holds only these extra spacings
+    int insertPos = ui->formLayout->rowCount();
 
     int newIndex = dynamicSpacingRows.count();
     QLabel* label = new QLabel(tr("Spacing %1").arg(newIndex + 2), this);

@@ -56,6 +56,8 @@ class QToolButton;
 namespace PartGui
 {
 
+class PickField;
+
 enum class PatternType
 {
     Linear,
@@ -156,8 +158,16 @@ public:
     std::string getSpacingPatternsAsString() const;
 
     void setTitle(const QString& title);
-    void setCheckable(bool on);
-    void setChecked(bool on);
+    /// The field the direction (or axis) is picked in
+    PickField* pickField() const;
+    /// Shows the field as the one the next click in the 3D view goes to
+    void setPicking(bool picking);
+    /// A direction that can be turned off (Direction 2): it gets a ✕, and it counts as
+    /// in use only with more than one copy
+    void setClearable(bool clearable);
+    void setPlaceholder(const QString& text);
+    /// Whether this direction takes part in the pattern
+    bool isInUse() const;
 
     void applyQuantitySpinboxes() const;
 
@@ -178,7 +188,7 @@ Q_SIGNALS:
      * @brief Emitted when the user selects the "Select reference..." option
      *        in the direction combo box, indicating the need to enter selection mode.
      */
-    void requestReferenceSelection();
+    void pickRequested();
 
     /**
      * @brief Emitted when any parameter value controlled by this widget changes
@@ -198,9 +208,6 @@ private Q_SLOTS:
     void onOffsetChanged(double value);
     void onOccurrencesChanged(unsigned int value);
 
-    void onGroupBoxToggled(bool checked);
-    void onEnableCheckBoxToggled(bool checked);
-
     // Slots for dynamic spacing
     void onAddSpacingButtonClicked();
     void onDynamicSpacingChanged();  // Simplified slot
@@ -217,6 +224,8 @@ private:
 
     // UI Update and state management
     void adaptVisibilityToMode();
+    void refreshPickField();
+    void onCleared();
 
     // Dynamic spacing helpers
     void addSpacingRow(double value);
@@ -248,6 +257,9 @@ private:
     std::vector<std::unique_ptr<Gui::EditableDatumLabel>> spacingLabels;
 
     PatternType type;
+
+    PickField* directionField = nullptr;
+    bool clearable = false;
 };
 
 }  // namespace PartGui

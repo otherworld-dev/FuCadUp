@@ -145,6 +145,8 @@ SET(PartGui_SRCS
     PatternParametersWidget.cpp
     PatternParametersWidget.h
     PatternParametersWidget.ui
+    PickField.cpp
+    PickField.h
     Resources/Part.qrc
     PreCompiled.h
     PreviewUpdateScheduler.cpp
