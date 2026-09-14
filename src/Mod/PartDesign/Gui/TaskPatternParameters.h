@@ -28,12 +28,14 @@
 #include "ViewProviderTransformed.h"
 #include <Mod/PartDesign/App/FeatureLinearPattern.h>
 
+class QCheckBox;
 class QTimer;
 class Ui_TaskPatternParameters;
 
 namespace PartGui
 {
 class PatternParametersWidget;
+class PickField;
 }
 
 namespace PartDesignGui
@@ -46,6 +48,30 @@ class TaskPatternParameters: public TaskTransformedParameters
     Q_OBJECT
 
 public:
+    /// Which field the next click in the 3D view goes to
+    enum class PickTarget
+    {
+        None,
+        Features,
+        Direction1,  ///< the axis, for a polar pattern
+        Direction2
+    };
+
+    /// The next standalone pattern panel opens with its Features field active; the
+    /// "click the feature to copy" start uses it so further clicks add more features
+    static void startWithFeaturesPicking();
+
+    /// The one place a pick field is turned on or off
+    void setPickTarget(PickTarget next);
+    PickTarget pickTarget() const
+    {
+        return target;
+    }
+
+Q_SIGNALS:
+    void pickTargetChanged();
+
+public:
     /// Constructor for task with ViewProvider
     explicit TaskPatternParameters(ViewProviderTransformed* TransformedView, QWidget* parent = nullptr);
     /// Constructor for task with parent task (MultiTransform mode)
@@ -56,6 +82,7 @@ public:
 
 protected:
     void onSelectionChanged(const Gui::SelectionChanges& msg) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private Q_SLOTS:
     void onUpdateViewTimer();
@@ -80,19 +107,24 @@ private:
 
     // Task-specific logic remains
     void showOriginAxes(bool show);
-    void enterReferenceSelectionMode();
-    void exitReferenceSelectionMode();  // Ensure this clears gates etc.
-    /// Makes widget's field the one the next click goes to; a second click turns it off
-    void startPicking(PartGui::PatternParametersWidget* widget);
     /// Gives a newly picked second direction the same kind of start as the first
     void startSecondDirection(PartDesign::LinearPattern* pattern);
+
+    void setupFeaturesAndOptions();
+    void updateFeaturesField();
+    void toggleFeature(const Gui::SelectionChanges& msg);
+    void showPickHints();
 
     Base::Vector3d getStartPoint() const;
 
     PartGui::PatternParametersWidget* parametersWidget = nullptr;
     PartGui::PatternParametersWidget* parametersWidget2 = nullptr;
 
-    PartGui::PatternParametersWidget* activeDirectionWidget = nullptr;
+    PartGui::PickField* featuresField = nullptr;
+    QCheckBox* wholeBodyCheck = nullptr;
+    QCheckBox* updateViewCheck = nullptr;
+    PickTarget target = PickTarget::None;
+    static bool featuresPickingRequested;
 
     std::unique_ptr<Ui_TaskPatternParameters> ui;
     QTimer* updateViewTimer = nullptr;

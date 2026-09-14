@@ -22,8 +22,17 @@
  *                                                                            *
  ******************************************************************************/
 
+#include <algorithm>
+#include <cstring>
+
+#include <QApplication>
+#include <QCheckBox>
+#include <QKeyEvent>
+#include <QLabel>
 #include <QMessageBox>
+#include <QSignalBlocker>
 #include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
@@ -42,6 +51,7 @@
 #include <Gui/Application.h>
 #include <Gui/MainWindow.h>
 #include <Gui/BitmapFactory.h>
+#include <Gui/InputHint.h>
 #include <Gui/Selection/Selection.h>
 #include <Gui/Command.h>
 #include <Gui/View3DInventor.h>
@@ -54,6 +64,7 @@
 #include <Mod/PartDesign/App/FeaturePolarPattern.h>
 #include <Mod/PartDesign/App/FeatureAddSub.h>
 #include <Mod/Part/Gui/PatternParametersWidget.h>
+#include <Mod/Part/Gui/PickField.h>
 #include <Mod/Part/App/Tools.h>
 
 #include "ui_TaskPatternParameters.h"
@@ -68,12 +79,27 @@ using namespace Gui;
 
 /* TRANSLATOR PartDesignGui::TaskPatternParameters */
 
+bool TaskPatternParameters::featuresPickingRequested = false;
+
+void TaskPatternParameters::startWithFeaturesPicking()
+{
+    featuresPickingRequested = true;
+}
+
 TaskPatternParameters::TaskPatternParameters(ViewProviderTransformed* TransformedView, QWidget* parent)
     : TaskTransformedParameters(TransformedView, parent)
     , ui(new Ui_TaskPatternParameters)
 {
     setupUI();
+    hideFeatureListControls();
+    setupFeaturesAndOptions();
     updateSpacingLabels();
+
+    if (featuresPickingRequested) {
+        featuresPickingRequested = false;
+        // Once the dialog is up, so the hint row is not overwritten by the dialog's own
+        QTimer::singleShot(0, this, [this]() { setPickTarget(PickTarget::Features); });
+    }
 }
 
 TaskPatternParameters::TaskPatternParameters(
@@ -90,6 +116,10 @@ TaskPatternParameters::TaskPatternParameters(
 void TaskPatternParameters::setupParameterUI(QWidget* widget)
 {
     ui->setupUi(widget);  // Setup the Task's own minimal UI (placeholder)
+    // Only a standalone pattern picks its own features and has options; MultiTransform
+    // owns both for its steps
+    ui->featuresPlaceholder->hide();
+    ui->optionsPlaceholder->hide();
     QMetaObject::connectSlotsByName(this);
 
     // --- Create and Embed the Parameter Widget ---
@@ -256,43 +286,6 @@ void TaskPatternParameters::showOriginAxes(bool show)
     }
 }
 
-void TaskPatternParameters::enterReferenceSelectionMode()
-{
-    if (selectionMode == SelectionMode::Reference) {
-        return;
-    }
-    if (activeDirectionWidget) {
-        activeDirectionWidget->setPicking(true);
-    }
-
-    hideObject();  // Hide the pattern feature itself
-    showBase();    // Show the base features/body
-    Gui::Selection().clearSelection();
-
-    bool isPolar = getObject<PartDesign::PolarPattern>();
-
-    AllowSelectionFlags commonReferences = AllowSelection::EDGE | AllowSelection::PLANAR;
-    addReferenceSelectionGate(
-        commonReferences | (isPolar ? AllowSelection::CIRCLE : AllowSelection::FACE)
-    );
-    Gui::getMainWindow()->showMessage(
-        tr("Select a direction reference (edge, face, datum line)")
-    );  // User feedback
-}
-
-void TaskPatternParameters::exitReferenceSelectionMode()
-{
-    exitSelectionMode();
-
-    hideBase();
-    Gui::getMainWindow()->showMessage(QString());
-    if (activeDirectionWidget) {
-        activeDirectionWidget->setPicking(false);
-    }
-    activeDirectionWidget = nullptr;
-}
-
-
 // --- SLOTS ---
 
 void TaskPatternParameters::onUpdateViewTimer()
@@ -308,26 +301,224 @@ void TaskPatternParameters::onUpdateViewTimer()
 
 void TaskPatternParameters::onParameterWidgetRequestReferenceSelection()
 {
-    startPicking(parametersWidget);
+    setPickTarget(target == PickTarget::Direction1 ? PickTarget::None : PickTarget::Direction1);
 }
 
 void TaskPatternParameters::onParameterWidgetRequestReferenceSelection2()
 {
-    startPicking(parametersWidget2);
+    setPickTarget(target == PickTarget::Direction2 ? PickTarget::None : PickTarget::Direction2);
 }
 
-void TaskPatternParameters::startPicking(PartGui::PatternParametersWidget* widget)
+void TaskPatternParameters::setPickTarget(PickTarget next)
 {
-    const bool again = selectionMode == SelectionMode::Reference && activeDirectionWidget == widget;
-    if (selectionMode == SelectionMode::Reference) {
-        exitReferenceSelectionMode();
-    }
-    if (again) {
+    if (next == target) {
         return;
     }
-    activeDirectionWidget = widget;
-    enterReferenceSelectionMode();
-    selectionMode = SelectionMode::Reference;
+
+    if (target != PickTarget::None) {
+        exitSelectionMode();
+        hideBase();
+        showObject();
+        Gui::getMainWindow()->hideHints();
+        qApp->removeEventFilter(this);
+    }
+
+    target = next;
+    if (featuresField) {
+        featuresField->setActive(target == PickTarget::Features);
+    }
+    if (parametersWidget) {
+        parametersWidget->setPicking(target == PickTarget::Direction1);
+    }
+    if (parametersWidget2) {
+        parametersWidget2->setPicking(target == PickTarget::Direction2);
+    }
+
+    if (target != PickTarget::None) {
+        // The originals are what gets clicked, so they are shown instead of the result
+        hideObject();
+        showBase();
+        Gui::Selection().clearSelection();
+        if (target == PickTarget::Features) {
+            selectionMode = SelectionMode::AddFeature;
+        }
+        else {
+            selectionMode = SelectionMode::Reference;
+            const bool isPolar = getObject<PartDesign::PolarPattern>();
+            addReferenceSelectionGate(
+                AllowSelection::EDGE | AllowSelection::PLANAR
+                | (isPolar ? AllowSelection::CIRCLE : AllowSelection::FACE)
+            );
+        }
+        showPickHints();
+        // Esc turns the field off wherever the keyboard is, before the task panel or the
+        // view can take it as Cancel
+        qApp->installEventFilter(this);
+    }
+
+    updateFeaturesField();
+    Q_EMIT pickTargetChanged();
+}
+
+void TaskPatternParameters::showPickHints()
+{
+    using enum Gui::InputHint::UserInput;
+    QString what = tr("%1 pick an edge or face for the direction");
+    if (target == PickTarget::Features) {
+        what = tr("%1 add or remove a feature");
+    }
+    else if (getObject<PartDesign::PolarPattern>()) {
+        what = tr("%1 pick the axis");
+    }
+    Gui::getMainWindow()->showHints({
+        {.message = what, .sequences = {MouseLeft}},
+        {.message = tr("%1 stop picking"), .sequences = {KeyEscape}},
+    });
+}
+
+bool TaskPatternParameters::eventFilter(QObject* watched, QEvent* event)
+{
+    const bool escape = (event->type() == QEvent::ShortcutOverride
+                         || event->type() == QEvent::KeyPress
+                         || event->type() == QEvent::KeyRelease)
+        && static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape;
+    if (target != PickTarget::None && escape && QApplication::mouseButtons() == Qt::NoButton) {
+        if (event->type() == QEvent::ShortcutOverride) {
+            // Taken as a plain key press, which comes back here next, not as a shortcut
+            event->accept();
+        }
+        else {
+            QTimer::singleShot(0, this, [this]() { setPickTarget(PickTarget::None); });
+        }
+        return true;
+    }
+    return TaskTransformedParameters::eventFilter(watched, event);
+}
+
+void TaskPatternParameters::setupFeaturesAndOptions()
+{
+    using Mode = PartDesign::Transformed::Mode;
+
+    featuresField = new PartGui::PickField({}, ui->featuresPlaceholder);
+    featuresField->setObjectName(QStringLiteral("pickFeatures"));
+    featuresField->setPlaceholder(tr("Pick the features to copy"));
+    auto* featuresLayout = new QVBoxLayout(ui->featuresPlaceholder);
+    featuresLayout->setContentsMargins(0, 0, 0, 0);
+    featuresLayout->addWidget(new QLabel(tr("Features"), ui->featuresPlaceholder));
+    featuresLayout->addWidget(featuresField);
+    ui->featuresPlaceholder->show();
+    connect(featuresField, &PartGui::PickField::activationRequested, this, [this]() {
+        setPickTarget(target == PickTarget::Features ? PickTarget::None : PickTarget::Features);
+    });
+
+    auto* toggle = new QToolButton(ui->optionsPlaceholder);
+    toggle->setObjectName(QStringLiteral("optionsToggle"));
+    toggle->setText(tr("Options"));
+    toggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    toggle->setArrowType(Qt::RightArrow);
+    toggle->setCheckable(true);
+    toggle->setAutoRaise(true);
+    auto* box = new QWidget(ui->optionsPlaceholder);
+    auto* boxLayout = new QVBoxLayout(box);
+    boxLayout->setContentsMargins(12, 0, 0, 0);
+    wholeBodyCheck = new QCheckBox(tr("Copy the whole body"), box);
+    wholeBodyCheck->setObjectName(QStringLiteral("optionWholeBody"));
+    updateViewCheck = new QCheckBox(tr("Recompute on change"), box);
+    updateViewCheck->setObjectName(QStringLiteral("optionUpdateView"));
+    updateViewCheck->setChecked(true);
+    boxLayout->addWidget(wholeBodyCheck);
+    boxLayout->addWidget(updateViewCheck);
+    box->hide();
+    auto* optionsLayout = new QVBoxLayout(ui->optionsPlaceholder);
+    optionsLayout->setContentsMargins(0, 0, 0, 0);
+    optionsLayout->addWidget(toggle);
+    optionsLayout->addWidget(box);
+    ui->optionsPlaceholder->show();
+    connect(toggle, &QToolButton::toggled, box, [toggle, box](bool open) {
+        box->setVisible(open);
+        toggle->setArrowType(open ? Qt::DownArrow : Qt::RightArrow);
+    });
+
+    const bool whole = static_cast<Mode>(getObject()->TransformMode.getValue()) == Mode::WholeShape;
+    wholeBodyCheck->setChecked(whole);
+    // A choice other than the default stays in sight
+    toggle->setChecked(whole);
+
+    connect(wholeBodyCheck, &QCheckBox::toggled, this, [this](bool wholeBody) {
+        if (!wholeBody && getObject()->Originals.getValues().empty()) {
+            // Nothing to copy yet: stay on the body until a feature has been picked
+            QSignalBlocker blocker(wholeBodyCheck);
+            wholeBodyCheck->setChecked(true);
+            setPickTarget(PickTarget::Features);
+            return;
+        }
+        setPickTarget(PickTarget::None);
+        setTransformMode(wholeBody ? Mode::WholeShape : Mode::Features);
+        updateFeaturesField();
+    });
+    connect(updateViewCheck, &QCheckBox::toggled, this, &TaskPatternParameters::onUpdateView);
+
+    updateFeaturesField();
+}
+
+void TaskPatternParameters::updateFeaturesField()
+{
+    if (!featuresField) {
+        return;
+    }
+    using Mode = PartDesign::Transformed::Mode;
+    auto* pattern = getObject();
+    const bool whole = static_cast<Mode>(pattern->TransformMode.getValue()) == Mode::WholeShape;
+
+    QStringList labels;
+    for (App::DocumentObject* obj : pattern->Originals.getValues()) {
+        labels << QString::fromUtf8(obj->Label.getValue());
+    }
+    featuresField->setSummary(whole ? tr("The whole body") : labels.join(QStringLiteral(", ")));
+    featuresField->setEnabled(!whole || target == PickTarget::Features);
+}
+
+void TaskPatternParameters::toggleFeature(const Gui::SelectionChanges& msg)
+{
+    using Mode = PartDesign::Transformed::Mode;
+    auto* pattern = getObject();
+    if (!pattern || std::strcmp(msg.pDocName, pattern->getDocument()->getName()) != 0) {
+        return;
+    }
+    App::DocumentObject* picked = pattern->getDocument()->getObject(msg.pObjectName);
+    if (!picked || !picked->isDerivedFrom<PartDesign::FeatureAddSub>()) {
+        return;
+    }
+
+    const bool whole = static_cast<Mode>(pattern->TransformMode.getValue()) == Mode::WholeShape;
+    std::vector<App::DocumentObject*> originals = pattern->Originals.getValues();
+    auto found = std::ranges::find(originals, picked);
+    if (found == originals.end()) {
+        originals.push_back(picked);
+    }
+    else if (!whole) {
+        if (originals.size() == 1) {
+            // With nothing to copy the pattern would be taken for a MultiTransform step
+            Gui::getMainWindow()->showMessage(
+                tr("A pattern needs at least one feature. To copy the whole body, use Options."),
+                4000
+            );
+            return;
+        }
+        originals.erase(found);
+    }
+
+    setupTransaction();
+    pattern->Originals.setValues(originals);
+    if (whole) {
+        setTransformMode(Mode::Features);
+        QSignalBlocker blocker(wholeBodyCheck);
+        wholeBodyCheck->setChecked(false);
+    }
+    recomputeFeature();
+    updateFeaturesField();
+    // Cleared once this notification is over, so the same feature can be clicked again
+    QTimer::singleShot(0, this, []() { Gui::Selection().clearSelection(); });
 }
 
 void TaskPatternParameters::startSecondDirection(PartDesign::LinearPattern* pattern)
@@ -369,13 +560,11 @@ void TaskPatternParameters::kickUpdateViewTimer() const
 
 void TaskPatternParameters::onSelectionChanged(const Gui::SelectionChanges& msg)
 {
-    // Handle selection ONLY when in reference selection mode
-    if (selectionMode == SelectionMode::None || msg.Type != Gui::SelectionChanges::AddSelection) {
+    if (target == PickTarget::None || msg.Type != Gui::SelectionChanges::AddSelection) {
         return;
     }
-
-    if (originalSelected(msg)) {
-        exitSelectionMode();
+    if (target == PickTarget::Features) {
+        toggleFeature(msg);
         return;
     }
 
@@ -400,7 +589,7 @@ void TaskPatternParameters::onSelectionChanged(const Gui::SelectionChanges& msg)
 
         if (patternObj->isDerivedFrom<PartDesign::LinearPattern>()) {
             auto* linearPattern = static_cast<PartDesign::LinearPattern*>(patternObj);
-            if (activeDirectionWidget == parametersWidget) {
+            if (target == PickTarget::Direction1) {
                 linearPattern->Direction.setValue(selObj, directions);
             }
             else {
@@ -418,15 +607,19 @@ void TaskPatternParameters::onSelectionChanged(const Gui::SelectionChanges& msg)
         recomputeFeature();
         updateUI();
     }
-    exitReferenceSelectionMode();
+    setPickTarget(PickTarget::None);
 }
 
 TaskPatternParameters::~TaskPatternParameters()
 {
-    showOriginAxes(false);         // Clean up temporary visibility
-    exitReferenceSelectionMode();  // Ensure gates are removed etc.
-    // ui unique_ptr handles deletion
-    // parametersWidget is deleted by Qt parent mechanism if added to layout correctly
+    qApp->removeEventFilter(this);
+    if (target != PickTarget::None) {
+        Gui::Selection().rmvSelectionGate();
+        if (auto* mainWindow = Gui::getMainWindow()) {
+            mainWindow->hideHints();
+        }
+    }
+    showOriginAxes(false);
 }
 
 void TaskPatternParameters::apply()

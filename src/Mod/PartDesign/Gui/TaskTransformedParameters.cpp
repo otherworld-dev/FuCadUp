@@ -25,6 +25,7 @@
 
 #include <QAction>
 #include <QListWidget>
+#include <QSignalBlocker>
 
 
 #include <App/Application.h>
@@ -578,6 +579,22 @@ void TaskTransformedParameters::addReferenceSelectionGate(AllowSelectionFlags al
         new NoDependentsSelection(getTopTransformedObject())
     );
     Gui::Selection().addSelectionGate(new CombineSelectionFilterGates(gateRefPtr, gateDepPtr));
+}
+
+void TaskTransformedParameters::hideFeatureListControls()
+{
+    ui->widget->hide();
+    ui->groupFeatureList->hide();
+    ui->checkBoxUpdateView->hide();
+}
+
+void TaskTransformedParameters::setTransformMode(PartDesign::Transformed::Mode mode)
+{
+    QSignalBlocker blocker(ui->buttonGroupMode);
+    (mode == PartDesign::Transformed::Mode::WholeShape ? ui->radioTransformBody
+                                                       : ui->radioTransformToolShapes)
+        ->setChecked(true);
+    onModeChanged(static_cast<int>(mode));
 }
 
 //**************************************************************************

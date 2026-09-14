@@ -30,6 +30,7 @@
 #include <Gui/Selection/Selection.h>
 #include <Gui/TaskView/TaskView.h>
 #include <Mod/Part/App/Part2DObject.h>
+#include <Mod/PartDesign/App/FeatureTransformed.h>
 #include <Mod/PartDesign/Gui/EnumFlags.h>
 
 #include "TaskFeatureParameters.h"
@@ -136,6 +137,12 @@ protected:
     void showBase();
 
     void addReferenceSelectionGate(AllowSelectionFlags);
+
+    /// Hides the feature list, the mode radios and the Update view checkbox, for panels
+    /// that offer these their own way (the pattern panels)
+    void hideFeatureListControls();
+    /// Switches between copying the listed features and copying the whole body
+    void setTransformMode(PartDesign::Transformed::Mode mode);
 
     int getUpdateViewTimeout() const;
 

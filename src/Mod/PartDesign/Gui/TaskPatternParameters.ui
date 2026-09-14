@@ -3,35 +3,18 @@
  <class>PartDesignGui::TaskPatternParameters</class>
  <widget class="QWidget" name="PartDesignGui::TaskPatternParameters">
   <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>270</width>
-    <height>200</height>
-   </rect>
+   <rect><x>0</x><y>0</y><width>270</width><height>200</height></rect>
   </property>
-  <property name="windowTitle">
-   <string notr="true">Form</string>
-  </property>
+  <property name="windowTitle"><string notr="true">Form</string></property>
   <layout class="QVBoxLayout" name="verticalLayout">
-   <property name="leftMargin">
-    <number>0</number>
-   </property>
-   <property name="topMargin">
-    <number>0</number>
-   </property>
-   <property name="rightMargin">
-    <number>0</number>
-   </property>
-   <property name="bottomMargin">
-    <number>0</number>
-   </property>
-   <item>
-    <widget class="QWidget" name="parametersWidgetPlaceholder" native="true"/>
-   </item>
-   <item>
-    <widget class="QWidget" name="parametersWidgetPlaceholder2" native="true"/>
-   </item>
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item><widget class="QWidget" name="featuresPlaceholder" native="true"/></item>
+   <item><widget class="QWidget" name="parametersWidgetPlaceholder" native="true"/></item>
+   <item><widget class="QWidget" name="parametersWidgetPlaceholder2" native="true"/></item>
+   <item><widget class="QWidget" name="optionsPlaceholder" native="true"/></item>
   </layout>
  </widget>
  <resources/>

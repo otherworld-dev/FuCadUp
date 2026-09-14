@@ -66,9 +66,11 @@
 
 #include "DlgActiveBody.h"
 #include "PatternDefaults.h"
+#include "PatternFeaturePicker.h"
 #include "ReferenceSelection.h"
 #include "SketchWorkflow.h"
 #include "TaskFeaturePick.h"
+#include "TaskPatternParameters.h"
 #include "Utils.h"
 #include "WorkflowManager.h"
 #include "ViewProvider.h"
@@ -2888,6 +2890,26 @@ void prepareTransformed(
             );
             return;
         }
+    }
+    // A pattern needs something to copy. With nothing selected it waits for a click on a
+    // feature, and only then is made, sized to it, with its Features field still active so
+    // further clicks add more.
+    if (features.empty() && (which == "LinearPattern" || which == "PolarPattern")) {
+        const QString title = which == "LinearPattern" ? QObject::tr("Linear Pattern")
+                                                       : QObject::tr("Polar Pattern");
+        const std::string icon = "PartDesign_" + which;
+        Gui::Control().showDialog(new PartDesignGui::TaskDlgPatternFeaturePick(
+            pcActiveBody,
+            title,
+            icon.c_str(),
+            [worker](App::DocumentObject* feature) {
+                if (feature) {
+                    PartDesignGui::TaskPatternParameters::startWithFeaturesPicking();
+                    worker({feature});
+                }
+            }
+        ));
+        return;
     }
     worker(features);
 }

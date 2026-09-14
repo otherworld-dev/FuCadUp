@@ -15,7 +15,7 @@ import unittest
 
 import FreeCAD
 import FreeCADGui
-from PySide import QtCore, QtWidgets
+from PySide import QtCore, QtGui, QtWidgets
 
 import TestExtrudeFlip as extrude
 import TestGizmoValueLabels as gizmo_labels
@@ -131,10 +131,17 @@ class PatternPanelCase(unittest.TestCase):
                 return f"Edge{index + 1}"
         self.fail(f"the Pad has no edge along {axis}")
 
-    def _pick(self, subname):
-        """What a click on the Pad's element in the view does to the selection."""
+    def _pick(self, subname, obj=None):
+        """What a click on an element in the view does to the selection."""
 
-        FreeCADGui.Selection.addSelection(self.doc.Name, self.pad.Name, subname)
+        FreeCADGui.Selection.addSelection(self.doc.Name, (obj or self.pad).Name, subname)
+        self._process_events(300)
+
+    def _escape(self):
+        for kind in (QtCore.QEvent.KeyPress, QtCore.QEvent.KeyRelease):
+            QtWidgets.QApplication.sendEvent(
+                self.viewport, QtGui.QKeyEvent(kind, QtCore.Qt.Key_Escape, QtCore.Qt.NoModifier)
+            )
         self._process_events(300)
 
     @staticmethod
@@ -249,3 +256,101 @@ class TestDirectionFields(PatternPanelCase):
         self._click(self._direction_field(2).findChild(QtWidgets.QToolButton, "pickFieldClear"))
         self.assertIsNone(self.pattern.Direction2)
         self.assertEqual(self.pattern.Occurrences2, 1)
+
+
+class TestFeaturesField(PatternPanelCase):
+    """What is copied is picked in a field too, and can never become nothing."""
+
+    def _features_field(self):
+        return self._find_widget("pickFeatures")
+
+    def _add_cylinder(self):
+        cylinder = self.doc.addObject("PartDesign::AdditiveCylinder", "Cylinder")
+        self.body.addObject(cylinder)
+        cylinder.Radius = 2.0
+        cylinder.Height = 4.0
+        cylinder.Placement.Base = FreeCAD.Vector(30.0, 3.0, 0.0)
+        self.doc.recompute()
+        return cylinder
+
+    def test_the_field_names_the_features_being_copied(self):
+        self._run("PartDesign_LinearPattern")
+        self.assertEqual(self._features_field().property("summary"), self.pad.Label)
+
+    def test_the_old_feature_list_is_gone(self):
+        self._run("PartDesign_LinearPattern")
+        self.assertFalse(self._find_widget("listWidgetFeatures").isVisible())
+
+    def test_clicks_add_and_remove_features(self):
+        cylinder = self._add_cylinder()
+        self._run("PartDesign_LinearPattern")
+        field = self._features_field()
+        self._click(field)
+        self.assertTrue(field.property("active"))
+        self._pick("Face1", cylinder)
+        self.assertEqual(self.pattern.Originals, [self.pad, cylinder])
+        self._pick("Face1", self.pad)
+        self.assertEqual(self.pattern.Originals, [cylinder])
+        self.assertTrue(field.property("active"), "the Features field stays on for more clicks")
+
+    def test_the_last_feature_stays(self):
+        self._run("PartDesign_LinearPattern")
+        self._click(self._features_field())
+        self._pick("Face1")
+        self.assertEqual(self.pattern.Originals, [self.pad])
+
+    def test_the_whole_body_option_copies_the_body(self):
+        self._run("PartDesign_LinearPattern")
+        self._find_widget("optionWholeBody").setChecked(True)
+        self._process_events(300)
+        self.assertEqual(self.pattern.TransformMode, "Whole shape")
+        self.assertFalse(self._features_field().isEnabled())
+
+    def test_only_one_field_is_active_at_a_time(self):
+        self._run("PartDesign_LinearPattern")
+        self._click(self._features_field())
+        self._click(self._direction_field(1))
+        self.assertFalse(self._features_field().property("active"))
+        self.assertTrue(self._direction_field(1).property("active"))
+
+    def test_escape_turns_a_field_off_and_keeps_the_tool_open(self):
+        self._run("PartDesign_LinearPattern")
+        field = self._direction_field(1)
+        self._click(field)
+        self._escape()
+        self.assertFalse(field.property("active"))
+        # Control.activeDialog() reports whether a dialog is active, as a bool.
+        self.assertTrue(FreeCADGui.Control.activeDialog())
+
+
+class TestNothingSelected(PatternPanelCase):
+    """With nothing selected the tool asks for the feature to copy before it makes anything."""
+
+    PICK_PANEL = "PartDesignGui__TaskPatternFeaturePick"
+
+    def test_the_tool_asks_for_a_feature_first(self):
+        self._run("PartDesign_LinearPattern", select_pad=False)
+        self.assertIs(self.body.Tip, self.pad, "a pattern was made before anything was picked")
+        self.assertIsNotNone(self._find_widget(self.PICK_PANEL))
+
+    def test_clicking_a_feature_starts_the_pattern_with_it(self):
+        self._run("PartDesign_LinearPattern", select_pad=False)
+        self._pick("Face1")
+        self.assertTrue(self._wait(lambda: self.body.Tip is not self.pad), "no pattern was made")
+        pattern = self.body.Tip
+        self.assertEqual(pattern.TypeId, "PartDesign::LinearPattern")
+        self.assertEqual(pattern.Originals, [self.pad])
+        self.assertAlmostEqual(self._value(pattern.Offset), 15.0)
+        self.assertTrue(self._wait(lambda: self._find_widget("pickFeatures") is not None))
+        self.assertTrue(self._find_widget("pickFeatures").property("active"))
+
+    def test_escape_before_picking_makes_nothing(self):
+        self._run("PartDesign_PolarPattern", select_pad=False)
+        self._escape()
+        # Control.activeDialog() reports whether a dialog is active, as a bool,
+        # not the dialog itself (that's activeTaskDialog()).
+        self.assertTrue(self._wait(lambda: not FreeCADGui.Control.activeDialog()))
+        self.assertIs(self.body.Tip, self.pad)
+        self.assertEqual(
+            [obj for obj in self.doc.Objects if obj.TypeId == "PartDesign::PolarPattern"], []
+        )
