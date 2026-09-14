@@ -55,6 +55,7 @@
 #include <Gui/BitmapFactory.h>
 #include <Gui/InputHint.h>
 #include <Gui/Inventor/Draggers/Gizmo.h>
+#include <Gui/Inventor/Draggers/SoLinearDragger.h>
 #include <Gui/Selection/Selection.h>
 #include <Gui/Command.h>
 #include <Gui/View3DInventor.h>
@@ -667,6 +668,14 @@ void TaskPatternParameters::onSelectionChanged(const Gui::SelectionChanges& msg)
 
 TaskPatternParameters::~TaskPatternParameters()
 {
+    // The drag callbacks carry this panel, so they go before anything here does
+    for (Gui::LinearGizmo* arrow : {arrow1, arrow2}) {
+        if (arrow) {
+            SoLinearDragger* dragger = arrow->getDraggerContainer()->getDragger();
+            dragger->removeStartCallback(arrowDragStarted, this);
+            dragger->removeFinishCallback(arrowDragFinished, this);
+        }
+    }
     qApp->removeEventFilter(this);
     if (target != PickTarget::None) {
         Gui::Selection().rmvSelectionGate();
@@ -726,6 +735,24 @@ void TaskPatternParameters::apply()
 }
 
 void TaskPatternParameters::updateSpacingLabels()
+{
+    // A broken pattern (its spacing dragged down to zero, say) has nothing to measure,
+    // and asking it for its steps throws; that must not escape into Qt and cut short the
+    // update that hides a broken pattern's gizmos
+    try {
+        placeSpacingLabels();
+    }
+    catch (const Base::Exception&) {
+        if (parametersWidget) {
+            parametersWidget->clearAllSpacingLabels();
+        }
+        if (parametersWidget2) {
+            parametersWidget2->clearAllSpacingLabels();
+        }
+    }
+}
+
+void TaskPatternParameters::placeSpacingLabels()
 {
     Base::Vector3d startPoint = getStartPoint();
 
@@ -872,6 +899,14 @@ void TaskPatternParameters::setupGizmos()
     arrow2->setClickCallback(toggleReversed(parametersWidget2));
     gizmoContainer = Gui::GizmoContainer::create({arrow1, arrow2}, TransformedView);
 
+    // Both ends of a drag are reported, so an arrow keeps its footing while it is
+    // dragged, see setGizmoPositions
+    for (Gui::LinearGizmo* arrow : {arrow1, arrow2}) {
+        SoLinearDragger* dragger = arrow->getDraggerContainer()->getDragger();
+        dragger->addStartCallback(arrowDragStarted, this);
+        dragger->addFinishCallback(arrowDragFinished, this);
+    }
+
     const bool covered = Gui::GizmoContainer::isValueLabelsEnabled();
     parametersWidget->setGizmoCoversFirstLabel(covered);
     parametersWidget2->setGizmoCoversFirstLabel(covered);
@@ -883,6 +918,13 @@ void TaskPatternParameters::setupGizmos()
 void TaskPatternParameters::setGizmoPositions()
 {
     if (!gizmoContainer) {
+        return;
+    }
+    // An arrow being dragged is left alone, even when the pattern breaks under it (its
+    // spacing pulled down to zero): the dragger holds the mouse from inside the
+    // container's switch, and closing that switch cuts the drag's path short, as on
+    // Extrude. Letting go puts everything right, see arrowDragFinished
+    if (draggingArrow) {
         return;
     }
     auto* pattern = getObject<PartDesign::LinearPattern>();
@@ -918,6 +960,20 @@ void TaskPatternParameters::setGizmoPositions()
     };
     place(arrow1, parametersWidget, pattern->Direction, pattern->Reversed.getValue());
     place(arrow2, parametersWidget2, pattern->Direction2, pattern->Reversed2.getValue());
+}
+
+void TaskPatternParameters::arrowDragStarted(void* data, SoDragger*)
+{
+    static_cast<TaskPatternParameters*>(data)->draggingArrow = true;
+}
+
+void TaskPatternParameters::arrowDragFinished(void* data, SoDragger*)
+{
+    auto* self = static_cast<TaskPatternParameters*>(data);
+    self->draggingArrow = false;
+    // The arrows stayed where the drag found them: put them where the pattern ended
+    // up, or away if it broke
+    self->setGizmoPositions();
 }
 
 //**************************************************************************

@@ -430,9 +430,12 @@ class TestLinearArrows(PatternPanelCase):
                         return self._qt_pos(pixels)
         self.fail("the arrow is not under any of the points tried")
 
-    def _drag_arrow_by(self, millimetres):
-        """Press on the arrow and pull it along X by millimetres, then let go."""
+    def _drag_arrow_by(self, millimetres, hold_ms=0):
+        """Press on the arrow and pull it along X by millimetres, keep the button down
+        for hold_ms, then let go. Returns whether the arrow was hidden after each move
+        (and after the hold), while the button was still down."""
 
+        switches = self._switches_above_arrow()
         grip = self._arrow_grip()
         start = self._qt_pos(self._pixels(self.BASE))
         end = self._qt_pos(self._pixels(self.BASE + FreeCAD.Vector(10.0, 0.0, 0.0)))
@@ -442,14 +445,20 @@ class TestLinearArrows(PatternPanelCase):
         self._mouse(QtCore.QEvent.MouseButtonPress, grip, QtCore.Qt.LeftButton, QtCore.Qt.LeftButton)
         self._process_events(100)
         pos = grip
+        hidden = []
         try:
             for step in range(1, 6):
                 pos = grip + per_mm * (millimetres * step / 5.0)
                 self._mouse(QtCore.QEvent.MouseMove, pos, QtCore.Qt.NoButton, QtCore.Qt.LeftButton)
                 self._process_events(60)
+                hidden.append(self._arrow_hidden(switches))
+            if hold_ms:
+                self._process_events(hold_ms)
+                hidden.append(self._arrow_hidden(switches))
         finally:
             self._mouse(QtCore.QEvent.MouseButtonRelease, pos, QtCore.Qt.LeftButton, QtCore.Qt.NoButton)
             self._process_events(300)
+        return hidden
 
     def test_the_arrow_carries_the_spacing_in_a_box(self):
         self.assertTrue(self._wait(lambda: len(self._distance_boxes()) == 1))
@@ -458,6 +467,18 @@ class TestLinearArrows(PatternPanelCase):
     def test_dragging_the_arrow_changes_the_spacing(self):
         self._drag_arrow_by(-5.0)
         self.assertLess(abs(self._value(self.pattern.Offset) - 10.0), 1.0)
+
+    def test_dragging_the_arrow_to_its_base_keeps_it_under_the_pointer(self):
+        """Pulled back past its base, the spacing reaches zero and the pattern breaks;
+        the arrow stays under the pointer until it is let go, as on Extrude."""
+
+        # Held long enough at the end for the preview to recompute under the drag
+        hidden = self._drag_arrow_by(-16.0, hold_ms=400)
+        self.assertFalse(any(hidden), f"the arrow was hidden while dragged: {hidden}")
+        offset = self._value(self.pattern.Offset)
+        self.assertTrue(0.0 <= offset <= 15.0, f"the spacing ended at {offset}")
+        if not self.pattern.isValid():
+            self.assertTrue(self._arrow_hidden(self._switches_above_arrow()))
 
     def test_clicking_the_arrow_turns_the_pattern_round(self):
         grip = self._arrow_grip()

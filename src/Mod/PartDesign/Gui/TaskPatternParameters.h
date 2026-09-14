@@ -32,6 +32,7 @@
 
 class QCheckBox;
 class QTimer;
+class SoDragger;
 class Ui_TaskPatternParameters;
 
 namespace PartGui
@@ -110,6 +111,7 @@ private:
     void updateUI();
     void kickUpdateViewTimer() const;
     void updateSpacingLabels();
+    void placeSpacingLabels();
 
     void bindProperties();
 
@@ -127,6 +129,8 @@ private:
 
     void setupGizmos();
     void setGizmoPositions();
+    static void arrowDragStarted(void* data, SoDragger* dragger);
+    static void arrowDragFinished(void* data, SoDragger* dragger);
 
     PartGui::PatternParametersWidget* parametersWidget = nullptr;
     PartGui::PatternParametersWidget* parametersWidget2 = nullptr;
@@ -138,6 +142,8 @@ private:
     std::unique_ptr<Gui::GizmoContainer> gizmoContainer;
     Gui::LinearGizmo* arrow1 = nullptr;
     Gui::LinearGizmo* arrow2 = nullptr;
+    /// An arrow is being dragged: its gizmos are left alone until it is let go
+    bool draggingArrow = false;
     static constexpr int previewDelayMs = 100;
     /// An Esc press already turned the field off; the filter stays installed until
     /// that same key's release has also been seen and eaten, so it never reaches the
