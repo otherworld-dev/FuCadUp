@@ -536,3 +536,89 @@ class TestLinearArrows(PatternPanelCase):
         self.assertEqual(self.pattern.Occurrences, 4)
         self._process_events(250)
         self.assertAlmostEqual(self.pattern.Shape.Volume, 4 * PAD_VOLUME, places=3)
+
+
+class TestCountBoxes(PatternPanelCase):
+    """The number of copies sits in a box just past each arrow."""
+
+    BASE = TestLinearArrows.BASE
+    _tip = TestLinearArrows._tip
+    _distance_boxes = TestLinearArrows._distance_boxes
+    _wait_for_focus = gizmo_labels.GizmoLabelCase._wait_for_focus
+    _value_labels_off = gizmo_labels.GizmoLabelCase._value_labels_off
+
+    def setUp(self):
+        super().setUp()
+        self._run("PartDesign_LinearPattern")
+        self._refresh_view_widgets()
+        self.view.viewIsometric()
+        self.view.fitAll()
+        self._process_events(300)
+
+    def _count_boxes(self):
+        main = FreeCADGui.getMainWindow()
+        return [
+            box
+            for box in main.findChildren(QtWidgets.QAbstractSpinBox, COUNT_BOX_NAME)
+            if box.isVisible()
+        ]
+
+    def _first_count_box(self):
+        self.assertTrue(self._wait(lambda: len(self._count_boxes()) == 1), "no count box")
+        return self._count_boxes()[0]
+
+    def test_the_arrow_has_a_box_with_the_number_of_copies(self):
+        self.assertAlmostEqual(self._first_count_box().property("rawValue"), 3.0)
+
+    def test_the_count_reads_as_a_whole_number(self):
+        self.assertEqual(self._first_count_box().text().strip(), "3")
+
+    def test_typing_in_the_count_box_sets_the_number_of_copies(self):
+        box = self._first_count_box()
+        box.setFocus(QtCore.Qt.OtherFocusReason)
+        self._wait_for_focus(box)
+        self._select_all(box)
+        self._type(box, "5")
+        self._process_events(300)
+        self.assertEqual(self.pattern.Occurrences, 5)
+
+    def test_enter_in_the_count_box_finishes_the_pattern(self):
+        box = self._first_count_box()
+        box.setFocus(QtCore.Qt.OtherFocusReason)
+        self._wait_for_focus(box)
+        self._select_all(box)
+        self._type(box, "4")
+        self._press(box, QtCore.Qt.Key_Return)
+        self.assertTrue(self._wait(lambda: FreeCADGui.Control.activeTaskDialog() is None))
+        self.assertEqual(self.pattern.Occurrences, 4)
+
+    def test_the_count_box_leaves_the_arrow_free(self):
+        self.assertFalse(self._dragger_under(self._first_count_box(), "SoLinearDraggerContainer"))
+
+    def test_tab_runs_distance_then_count_for_each_direction(self):
+        self._click(self._direction_field(2))
+        self._pick(self._edge_along(FreeCAD.Vector(0, 1, 0)))
+        self.assertTrue(self._wait(lambda: len(self._count_boxes()) == 2))
+        distances = self._distance_boxes()
+        counts = self._count_boxes()
+        by_value = lambda boxes, value: next(
+            box for box in boxes if abs(box.property("rawValue") - value) < 1e-6
+        )
+        order = [
+            by_value(distances, 15.0),  # Direction 1's spacing
+            by_value(counts, 3.0),      # Direction 1's copies
+            by_value(distances, 9.0),   # Direction 2's spacing
+            by_value(counts, 2.0),      # Direction 2's copies
+        ]
+        order[0].setFocus(QtCore.Qt.OtherFocusReason)
+        self._wait_for_focus(order[0])
+        for current, following in zip(order, order[1:] + order[:1]):
+            self._press(current, QtCore.Qt.Key_Tab)
+            self._wait_for_focus(following)
+
+    def test_no_count_boxes_when_values_in_the_view_are_off(self):
+        self._value_labels_off()
+        self._close_editing()
+        FreeCADGui.getDocument(self.doc.Name).setEdit(self.pattern.Name)
+        self._process_events(300)
+        self.assertEqual(self._count_boxes(), [])

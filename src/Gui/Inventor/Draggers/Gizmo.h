@@ -26,6 +26,7 @@
 #include <functional>
 #include <initializer_list>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include <QtCore/Qt>
@@ -94,6 +95,18 @@ public:
     /// Brings the value label in line with the gizmo's place and value
     virtual void updateValueLabel()
     {}
+
+    using CountGetter = std::function<int()>;
+    using CountSetter = std::function<void(int)>;
+    /// Gives the gizmo a box beside it for a number of copies, read and written through these
+    void setCountBinding(CountGetter getter, CountSetter setter);
+    bool hasCountBinding() const;
+    GizmoValueLabel* getCountLabel() const;
+    void setCountLabel(GizmoValueLabel* label);
+    /// Brings the count box in line with the gizmo's place and the current count
+    virtual void updateCountLabel()
+    {}
+
     /// Whether the gizmo is drawn: set visible and not driven by a formula
     bool isShownInView();
     void setContainer(GizmoContainer* container);
@@ -114,6 +127,11 @@ protected:
     GizmoValueLabel* valueLabel = nullptr;
     GizmoContainer* container = nullptr;
     QMetaObject::Connection valueLabelConnection;
+
+    CountGetter countGetter;
+    CountSetter countSetter;
+    GizmoValueLabel* countLabel = nullptr;
+    QMetaObject::Connection countLabelConnection;
 };
 
 enum class LinearDraggerStyle
@@ -151,6 +169,7 @@ public:
     void setClickCallback(ClickCallback callback);
     void setVisibility(bool visible);
     void updateValueLabel() override;
+    void updateCountLabel() override;
 
 protected:
     void showGuideGeometry(bool show) override;
@@ -209,6 +228,7 @@ public:
     void setClickCallback(ClickCallback callback);
     void setVisibility(bool visible);
     void updateValueLabel() override;
+    void updateCountLabel() override;
 
 protected:
     void showGuideGeometry(bool show) override;
@@ -341,6 +361,9 @@ private:
     void addGizmo(Gizmo* gizmo);
     void createValueLabels();
     void removeValueLabels();
+    /// Every shown gizmo's boxes in Tab order: its value, then its count
+    std::vector<std::pair<Gizmo*, GizmoValueLabel*>> labelsInOrder() const;
+    void connectLabel(GizmoValueLabel* label);
     void focusFirstValueLabel();
     void focusNextValueLabel(GizmoValueLabel* from, bool backwards);
     bool isKeyboardOnView() const;

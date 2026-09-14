@@ -47,6 +47,15 @@ class GuiExport GizmoValueLabel: public QObject
     Q_OBJECT
 
 public:
+    /// A value on a dimension, or a number of copies in a box of its own
+    enum class Kind
+    {
+        Value,
+        Count
+    };
+    /// The object name every count box carries
+    static constexpr const char* countBoxName = "GizmoCountBox";
+
     /// The Coin node name every gizmo value label carries
     static constexpr const char* nodeName = "GizmoValueLabel";
     /// The object name every gizmo value box carries
@@ -55,7 +64,8 @@ public:
     GizmoValueLabel(
         View3DInventorViewer* viewer,
         const Base::Placement& editPlacement,
-        const Base::Unit& unit
+        const Base::Unit& unit,
+        Kind kind = Kind::Value
     );
     ~GizmoValueLabel() override;
 
@@ -69,6 +79,8 @@ public:
         float sweep,
         float radius
     );
+    /// Just the box, at point, with no dimension line
+    void showBoxAt(const SbVec3f& point, const SbVec3f& dir);
 
     /// Puts value in the box, unless the box already holds it, so typed text is left alone
     void setValue(double value);
@@ -95,6 +107,7 @@ private:
     QPointer<View3DInventorViewer> viewer;
     Base::Placement editPlacement;
     Base::Unit unit;
+    Kind kind;
     std::unique_ptr<EditableDatumLabel> label;
     bool shown = false;
 };

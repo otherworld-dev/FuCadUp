@@ -58,6 +58,7 @@
 #include <Gui/Inventor/Draggers/SoLinearDragger.h>
 #include <Gui/Selection/Selection.h>
 #include <Gui/Command.h>
+#include <Gui/SpinBox.h>
 #include <Gui/View3DInventor.h>
 #include <Gui/View3DInventorViewer.h>
 #include <Gui/ViewProviderCoordinateSystem.h>
@@ -899,6 +900,16 @@ void TaskPatternParameters::setupGizmos()
     arrow2->setClickCallback(toggleReversed(parametersWidget2));
     gizmoContainer = Gui::GizmoContainer::create({arrow1, arrow2}, TransformedView);
 
+    const auto bindCount = [](Gui::Gizmo* gizmo, PartGui::PatternParametersWidget* widget) {
+        Gui::UIntSpinBox* box = widget->countBox();
+        gizmo->setCountBinding(
+            [box]() { return static_cast<int>(box->value()); },
+            [box](int count) { box->setValue(static_cast<uint>(count)); }
+        );
+    };
+    bindCount(arrow1, parametersWidget);
+    bindCount(arrow2, parametersWidget2);
+
     // Both ends of a drag are reported, so an arrow keeps its footing while it is
     // dragged, see setGizmoPositions
     for (Gui::LinearGizmo* arrow : {arrow1, arrow2}) {
@@ -957,6 +968,7 @@ void TaskPatternParameters::setGizmoPositions()
         if (!now.pos.equals(pos, 1e-6F) || !now.dir.equals(vec, 1e-6F)) {
             arrow->Gizmo::setDraggerPlacement(start, along);
         }
+        arrow->updateValueLabel();
     };
     place(arrow1, parametersWidget, pattern->Direction, pattern->Reversed.getValue());
     place(arrow2, parametersWidget2, pattern->Direction2, pattern->Reversed2.getValue());

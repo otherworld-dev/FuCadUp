@@ -25,6 +25,9 @@
 
 #include <QEvent>
 #include <QKeyEvent>
+#include <QLineEdit>
+#include <QPainter>
+#include <QPixmap>
 #include <QString>
 
 #include <Inventor/nodes/SoCamera.h>
@@ -41,14 +44,34 @@
 
 using namespace Gui;
 
+namespace
+{
+/// The "×" drawn at the front of a count box
+QIcon timesMark(const QWidget* box)
+{
+    const int side = box->fontMetrics().height();
+    const qreal ratio = box->devicePixelRatioF();
+    QPixmap pixmap(QSize(side, side) * ratio);
+    pixmap.setDevicePixelRatio(ratio);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setPen(box->palette().color(QPalette::Text));
+    painter.setFont(box->font());
+    painter.drawText(QRect(0, 0, side, side), Qt::AlignCenter, QStringLiteral("×"));
+    return QIcon(pixmap);
+}
+}  // namespace
+
 GizmoValueLabel::GizmoValueLabel(
     View3DInventorViewer* viewer,
     const Base::Placement& editPlacement,
-    const Base::Unit& unit
+    const Base::Unit& unit,
+    Kind kind
 )
     : viewer(viewer)
     , editPlacement(editPlacement)
     , unit(unit)
+    , kind(kind)
     , label(std::make_unique<EditableDatumLabel>(viewer, editPlacement))
 {
     label->label->setName(nodeName);
@@ -63,7 +86,17 @@ GizmoValueLabel::GizmoValueLabel(
     // which box has the keyboard, so it never takes focus by itself.
     label->startEdit(0.0, this, true, false);
     if (QuantitySpinBox* box = label->getSpinBox()) {
-        box->setObjectName(QString::fromLatin1(boxName));
+        if (kind == Kind::Count) {
+            box->setObjectName(QString::fromLatin1(countBoxName));
+            box->setDecimals(0);
+            box->setToolTip(tr("Number of copies, the original included"));
+            if (auto* edit = box->findChild<QLineEdit*>()) {
+                edit->addAction(timesMark(box), QLineEdit::LeadingPosition);
+            }
+        }
+        else {
+            box->setObjectName(QString::fromLatin1(boxName));
+        }
     }
     label->setSpinboxValue(0.0, unit);
 
@@ -146,6 +179,12 @@ void GizmoValueLabel::showAngle(
     label->setPoints(SbVec3f(0, 0, 0), SbVec3f(0, 0, 0));
 }
 
+void GizmoValueLabel::showBoxAt(const SbVec3f& point, const SbVec3f& dir)
+{
+    // A distance of nothing draws no line and leaves the box where it starts
+    showDistance(point, dir, 0.0F);
+}
+
 void GizmoValueLabel::setValue(double value)
 {
     QuantitySpinBox* box = label->getSpinBox();
@@ -154,6 +193,11 @@ void GizmoValueLabel::setValue(double value)
         return;
     }
     label->setSpinboxValue(value, unit);
+    // setSpinboxValue replaces the box's whole Base::Quantity, format and all, so a count
+    // box's whole-number precision has to be put back every time the value changes
+    if (kind == Kind::Count && box) {
+        box->setDecimals(0);
+    }
 }
 
 void GizmoValueLabel::setShown(bool shown)
