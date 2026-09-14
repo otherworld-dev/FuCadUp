@@ -45,6 +45,11 @@ class PatternPanelCase(unittest.TestCase):
     _screen_point = gizmo_labels.GizmoLabelCase._screen_point
     _box_centre_on_screen = gizmo_labels.GizmoLabelCase._box_centre_on_screen
     _dragger_under = gizmo_labels.TestGizmoValueLabels._dragger_under
+    SO_SWITCH_NONE = extrude.TestExtrudeDrag.SO_SWITCH_NONE
+    _switches_above_arrow = extrude.TestExtrudeDrag._switches_above_arrow
+    _arrow_hidden = extrude.TestExtrudeDrag._arrow_hidden
+    _boxes = gizmo_labels.GizmoLabelCase._boxes
+    _path_is_on = staticmethod(gizmo_labels.GizmoLabelCase._path_is_on)
 
     def setUp(self):
         try:
@@ -381,3 +386,132 @@ class TestNothingSelected(PatternPanelCase):
         self.assertEqual(
             [obj for obj in self.doc.Objects if obj.TypeId == "PartDesign::PolarPattern"], []
         )
+
+
+class TestLinearArrows(PatternPanelCase):
+    """Each direction of a linear pattern has an arrow to drag, with its value on it."""
+
+    # The Pad's bounding box centre, where the arrows start; the first copy is 15 mm along X.
+    BASE = FreeCAD.Vector(5.0, 3.0, 5.0)
+
+    def setUp(self):
+        super().setUp()
+        self._run("PartDesign_LinearPattern")
+        self._refresh_view_widgets()
+        self.view.viewIsometric()
+        self.view.fitAll()
+        self._process_events(300)
+
+    def _tip(self):
+        return self.BASE + FreeCAD.Vector(self._value(self.pattern.Offset), 0.0, 0.0)
+
+    def _distance_boxes(self):
+        return [box for box in self._boxes() if "°" not in box.text()]
+
+    def _arrow_grip(self):
+        """A point on the arrow near its tip, found by asking the scene what is under it."""
+
+        from pivy import coin
+
+        manager = self.viewer.getSoRenderManager()
+        tip, base = self._pixels(self._tip()), self._pixels(self.BASE)
+        for along in (0.0, 0.03, 0.06, 0.1, 0.15, 0.2):
+            pixels = (tip[0] + (base[0] - tip[0]) * along, tip[1] + (base[1] - tip[1]) * along)
+            pick = coin.SoRayPickAction(manager.getViewportRegion())
+            pick.setPoint(coin.SbVec2s(int(pixels[0]), int(pixels[1])))
+            pick.setRadius(6)
+            pick.setPickAll(True)
+            pick.apply(manager.getSceneGraph())
+            picked = pick.getPickedPointList()
+            for index in range(picked.getLength()):
+                path = picked[index].getPath()
+                for depth in range(path.getLength()):
+                    if path.getNode(depth).getTypeId().getName().getString() == "SoLinearDraggerContainer":
+                        return self._qt_pos(pixels)
+        self.fail("the arrow is not under any of the points tried")
+
+    def _drag_arrow_by(self, millimetres):
+        """Press on the arrow and pull it along X by millimetres, then let go."""
+
+        grip = self._arrow_grip()
+        start = self._qt_pos(self._pixels(self.BASE))
+        end = self._qt_pos(self._pixels(self.BASE + FreeCAD.Vector(10.0, 0.0, 0.0)))
+        per_mm = (end - start) / 10.0
+        self._mouse(QtCore.QEvent.MouseMove, grip, QtCore.Qt.NoButton, QtCore.Qt.NoButton)
+        self._process_events()
+        self._mouse(QtCore.QEvent.MouseButtonPress, grip, QtCore.Qt.LeftButton, QtCore.Qt.LeftButton)
+        self._process_events(100)
+        pos = grip
+        try:
+            for step in range(1, 6):
+                pos = grip + per_mm * (millimetres * step / 5.0)
+                self._mouse(QtCore.QEvent.MouseMove, pos, QtCore.Qt.NoButton, QtCore.Qt.LeftButton)
+                self._process_events(60)
+        finally:
+            self._mouse(QtCore.QEvent.MouseButtonRelease, pos, QtCore.Qt.LeftButton, QtCore.Qt.NoButton)
+            self._process_events(300)
+
+    def test_the_arrow_carries_the_spacing_in_a_box(self):
+        self.assertTrue(self._wait(lambda: len(self._distance_boxes()) == 1))
+        self.assertAlmostEqual(self._distance_boxes()[0].property("rawValue"), 15.0)
+
+    def test_dragging_the_arrow_changes_the_spacing(self):
+        self._drag_arrow_by(-5.0)
+        self.assertLess(abs(self._value(self.pattern.Offset) - 10.0), 1.0)
+
+    def test_clicking_the_arrow_turns_the_pattern_round(self):
+        grip = self._arrow_grip()
+        self._mouse(QtCore.QEvent.MouseButtonPress, grip, QtCore.Qt.LeftButton, QtCore.Qt.LeftButton)
+        self._process_events(100)
+        self._mouse(QtCore.QEvent.MouseButtonRelease, grip, QtCore.Qt.LeftButton, QtCore.Qt.NoButton)
+        self._process_events(300)
+        self.assertTrue(self.pattern.Reversed)
+
+    def test_in_total_length_mode_the_box_holds_the_total_length(self):
+        combo = self._direction_widget(1).findChild(QtWidgets.QComboBox, "comboMode")
+        combo.setCurrentIndex(0)
+        combo.activated.emit(0)
+        self._process_events(300)
+        self.assertTrue(self._wait(lambda: len(self._distance_boxes()) == 1))
+        self.assertAlmostEqual(self._distance_boxes()[0].property("rawValue"), 30.0)
+
+    def test_the_arrows_hide_while_a_field_is_being_picked_in(self):
+        switches = self._switches_above_arrow()
+        self._click(self._direction_field(1))
+        self.assertTrue(self._arrow_hidden(switches))
+        self.assertEqual(self._distance_boxes(), [])
+
+    def test_direction_2_has_no_arrow_until_it_is_picked(self):
+        self.assertEqual(len(self._distance_boxes()), 1)
+        self._click(self._direction_field(2))
+        self._pick(self._edge_along(FreeCAD.Vector(0, 1, 0)))
+        self.assertTrue(self._wait(lambda: len(self._distance_boxes()) == 2))
+
+    def test_the_gaps_after_the_first_keep_their_own_labels(self):
+        """Only the first gap's label is replaced by the arrow's box."""
+
+        from pivy import coin
+
+        search = coin.SoSearchAction()
+        search.setType(coin.SoType.fromName("SoDatumLabel"))
+        search.setInterest(coin.SoSearchAction.ALL)
+        search.setSearchingAll(True)
+        search.apply(self.viewer.getSoRenderManager().getSceneGraph())
+        paths = search.getPaths()
+        gap_labels = [
+            paths[index]
+            for index in range(paths.getLength())
+            if paths[index].getTail().getName() != "GizmoValueLabel" and self._path_is_on(paths[index])
+        ]
+        # Three copies make two gaps; the first is the arrow's.
+        self.assertEqual(len(gap_labels), 1)
+
+    def test_the_preview_follows_a_change_within_a_quarter_second(self):
+        count = self._direction_widget(1).findChild(QtWidgets.QSpinBox, "spinOccurrences")
+        # One click on the up arrow. The box is a Gui::UIntSpinBox, which keeps its count
+        # shifted by INT_MIN inside QSpinBox; Python only reaches QSpinBox::setValue(int),
+        # so setValue(4) would clamp to the top and ask for 2147483647 copies.
+        count.stepUp()
+        self.assertEqual(self.pattern.Occurrences, 4)
+        self._process_events(250)
+        self.assertAlmostEqual(self.pattern.Shape.Volume, 4 * PAD_VOLUME, places=3)

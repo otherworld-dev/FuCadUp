@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "TaskTransformedParameters.h"
 #include "ViewProviderTransformed.h"
 #include <Mod/PartDesign/App/FeatureLinearPattern.h>
@@ -36,6 +38,12 @@ namespace PartGui
 {
 class PatternParametersWidget;
 class PickField;
+}
+
+namespace Gui
+{
+class GizmoContainer;
+class LinearGizmo;
 }
 
 namespace PartDesignGui
@@ -117,6 +125,9 @@ private:
 
     Base::Vector3d getStartPoint() const;
 
+    void setupGizmos();
+    void setGizmoPositions();
+
     PartGui::PatternParametersWidget* parametersWidget = nullptr;
     PartGui::PatternParametersWidget* parametersWidget2 = nullptr;
 
@@ -124,6 +135,10 @@ private:
     QCheckBox* wholeBodyCheck = nullptr;
     QCheckBox* updateViewCheck = nullptr;
     PickTarget target = PickTarget::None;
+    std::unique_ptr<Gui::GizmoContainer> gizmoContainer;
+    Gui::LinearGizmo* arrow1 = nullptr;
+    Gui::LinearGizmo* arrow2 = nullptr;
+    static constexpr int previewDelayMs = 100;
     /// An Esc press already turned the field off; the filter stays installed until
     /// that same key's release has also been seen and eaten, so it never reaches the
     /// view as Cancel too (a real release follows the press by ~100 ms, well after the

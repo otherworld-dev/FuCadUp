@@ -295,6 +295,23 @@ bool PatternParametersWidget::isInUse() const
     return !clearable || (m_occurrencesProp && m_occurrencesProp->getValue() > 1);
 }
 
+Gui::QuantitySpinBox* PatternParametersWidget::activeValueBox() const
+{
+    const bool extent = m_modeProp
+        && static_cast<PatternMode>(m_modeProp->getValue()) == PatternMode::Extent;
+    return extent ? ui->spinExtent : ui->spinSpacing;
+}
+
+Gui::UIntSpinBox* PatternParametersWidget::countBox() const
+{
+    return ui->spinOccurrences;
+}
+
+void PatternParametersWidget::setGizmoCoversFirstLabel(bool covered)
+{
+    gizmoCoversFirstLabel = covered;
+}
+
 void PatternParametersWidget::refreshPickField()
 {
     directionField->clearQuickPicks();
@@ -661,6 +678,9 @@ void PatternParametersWidget::updateSpacingLabels(
         }
 
         if (mode == PatternMode::Extent) {
+            if (gizmoCoversFirstLabel) {
+                return;
+            }
             auto& label = spacingLabels[0];
             if (!label->isActive()) {
                 label->activate();
@@ -686,15 +706,23 @@ void PatternParametersWidget::updateSpacingLabels(
             Base::Vector3d currentPoint(0.0, 0.0, 0.0);
             for (size_t i = 0; i < requiredLabels; ++i) {
                 auto& label = spacingLabels[i];
-                if (!label->isActive()) {
-                    label->activate();
-                }
 
                 Base::Vector3d p1 = currentPoint;
                 double spacingOverride = spacings.at(i);
                 double currentSpacing = (spacingOverride == -1.0) ? globalOffset : spacingOverride;
-
                 Base::Vector3d p2 = p1 + Base::Vector3d(currentSpacing, 0.0, 0.0);
+
+                if (gizmoCoversFirstLabel && i == 0) {
+                    // The arrow's own box shows this gap; the label stays, switched off,
+                    // so the indices still match the per-gap overrides
+                    label->deactivate();
+                    currentPoint = p2;
+                    continue;
+                }
+
+                if (!label->isActive()) {
+                    label->activate();
+                }
 
                 label->setPoints(p1, p2);
 
@@ -773,6 +801,9 @@ void PatternParametersWidget::updateSpacingLabels(
         }
 
         if (mode == PatternMode::Extent) {
+            if (gizmoCoversFirstLabel) {
+                return;
+            }
             auto& label = spacingLabels[0];
             if (!label->isActive()) {
                 label->activate();
@@ -797,13 +828,22 @@ void PatternParametersWidget::updateSpacingLabels(
 
             for (size_t i = 0; i < requiredLabels; ++i) {
                 auto& label = spacingLabels[i];
-                if (!label->isActive()) {
-                    label->activate();
-                }
 
                 double spacingOverride = spacings.at(i);
                 double currentAngle_deg = (spacingOverride == -1.0) ? globalOffset : spacingOverride;
                 double currentAngle_rad = Base::toRadians(currentAngle_deg);
+
+                if (gizmoCoversFirstLabel && i == 0) {
+                    // The arrow's own box shows this gap; the label stays, switched off,
+                    // so the indices still match the per-gap overrides
+                    label->deactivate();
+                    cumulativeAngle += currentAngle_rad;
+                    continue;
+                }
+
+                if (!label->isActive()) {
+                    label->activate();
+                }
 
                 label->setPoints(Base::Vector3d(), Base::Vector3d());
                 label->setLabelDistance(radius);

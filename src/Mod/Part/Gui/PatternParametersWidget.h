@@ -49,6 +49,7 @@ class DocumentObject;
 namespace Gui
 {
 class QuantitySpinBox;
+class UIntSpinBox;
 class View3DInventorViewer;
 }  // namespace Gui
 class QToolButton;
@@ -168,6 +169,14 @@ public:
     void setPlaceholder(const QString& text);
     /// Whether this direction takes part in the pattern
     bool isInUse() const;
+    /// The box the distance (or angle) arrow drives: the total in Extent mode, the spacing
+    /// in Spacing mode
+    Gui::QuantitySpinBox* activeValueBox() const;
+    /// The box holding the number of copies
+    Gui::UIntSpinBox* countBox() const;
+    /// Gizmos show the total, or the first gap, in their own box, so this widget's labels
+    /// leave those out
+    void setGizmoCoversFirstLabel(bool covered);
 
     void applyQuantitySpinboxes() const;
 
@@ -261,6 +270,7 @@ private:
 
     PickField* directionField = nullptr;
     bool clearable = false;
+    bool gizmoCoversFirstLabel = false;
 };
 
 }  // namespace PartGui

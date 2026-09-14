@@ -44,6 +44,8 @@
 #include <BRep_Builder.hxx>
 #include <TopoDS_Compound.hxx>
 
+#include <Inventor/SbVec3f.h>
+
 #include <App/Document.h>
 #include <App/DocumentObject.h>
 #include <App/Origin.h>
@@ -52,6 +54,7 @@
 #include <Gui/MainWindow.h>
 #include <Gui/BitmapFactory.h>
 #include <Gui/InputHint.h>
+#include <Gui/Inventor/Draggers/Gizmo.h>
 #include <Gui/Selection/Selection.h>
 #include <Gui/Command.h>
 #include <Gui/View3DInventor.h>
@@ -94,6 +97,7 @@ TaskPatternParameters::TaskPatternParameters(ViewProviderTransformed* Transforme
     setupUI();
     hideFeatureListControls();
     setupFeaturesAndOptions();
+    setupGizmos();
     updateSpacingLabels();
 
     if (featuresPickingRequested) {
@@ -191,7 +195,8 @@ void TaskPatternParameters::setupParameterUI(QWidget* widget)
 
     updateViewTimer = new QTimer(this);
     updateViewTimer->setSingleShot(true);
-    updateViewTimer->setInterval(getUpdateViewTimeout());
+    // Quick enough that the preview keeps up with typing and dragging
+    updateViewTimer->setInterval(previewDelayMs);
     connect(updateViewTimer, &QTimer::timeout, this, &TaskPatternParameters::onUpdateViewTimer);
 }
 
@@ -298,6 +303,7 @@ void TaskPatternParameters::onUpdateViewTimer()
     updateSpacingLabels();
 
     updateUI();
+    setGizmoPositions();
 }
 
 void TaskPatternParameters::onParameterWidgetRequestReferenceSelection()
@@ -366,6 +372,15 @@ void TaskPatternParameters::setPickTarget(PickTarget next)
                 | (isPolar ? AllowSelection::CIRCLE : AllowSelection::FACE)
             );
         }
+        // The field takes the keyboard, so an arrow's value box that had it lets go and
+        // hides with the arrows (a box with the keyboard stays on screen)
+        PartGui::PickField* field = target == PickTarget::Features ? featuresField
+            : target == PickTarget::Direction1                     ? parametersWidget->pickField()
+            : parametersWidget2                                    ? parametersWidget2->pickField()
+                                                                   : nullptr;
+        if (field) {
+            field->setFocus(Qt::OtherFocusReason);
+        }
         showPickHints();
         // Esc turns the field off wherever the keyboard is, before the task panel or the
         // view can take it as Cancel
@@ -373,6 +388,7 @@ void TaskPatternParameters::setPickTarget(PickTarget next)
     }
 
     updateFeaturesField();
+    setGizmoPositions();
     Q_EMIT pickTargetChanged();
 }
 
@@ -553,6 +569,7 @@ void TaskPatternParameters::toggleFeature(const Gui::SelectionChanges& msg)
         wholeBodyCheck->setChecked(false);
     }
     recomputeFeature();
+    setGizmoPositions();
     updateFeaturesField();
     // Cleared once this notification is over, so the same feature can be clicked again
     QTimer::singleShot(0, this, []() { Gui::Selection().clearSelection(); });
@@ -643,6 +660,7 @@ void TaskPatternParameters::onSelectionChanged(const Gui::SelectionChanges& msg)
         }
         recomputeFeature();
         updateUI();
+        setGizmoPositions();
     }
     setPickTarget(PickTarget::None);
 }
@@ -785,47 +803,121 @@ Base::Vector3d TaskPatternParameters::getStartPoint() const
     }
 
     std::vector<App::DocumentObject*> originals = pattern->getOriginals();
-    if (!originals.empty()) {
-        BRep_Builder builder;
-        TopoDS_Compound compoundShape;
-        builder.MakeCompound(compoundShape);
-
-        // 2. Collect the "delta" shapes from each original feature.
-        for (App::DocumentObject* obj : originals) {
-            // We are only interested in additive/subtractive features.
-            if (auto* addSubFeature = dynamic_cast<PartDesign::FeatureAddSub*>(obj)) {
-                const Part::TopoShape& deltaShape = addSubFeature->AddSubShape.getShape();
-                if (!deltaShape.getShape().IsNull()) {
-                    TopoDS_Shape shape = deltaShape.getShape();
-                    shape.Move(addSubFeature->getLocation());
-                    builder.Add(compoundShape, shape);
-                }
-            }
-        }
-
-        // 3. If we collected any shapes, calculate the center of their combined bounding box.
-        if (!compoundShape.IsNull()) {
-            try {
-                Bnd_Box bndBox;
-                BRepBndLib::Add(compoundShape, bndBox);
-                if (!bndBox.IsVoid()) {
-                    double xmin, ymin, zmin, xmax, ymax, zmax;
-                    bndBox.Get(xmin, ymin, zmin, xmax, ymax, zmax);
-                    startPoint.x = (xmin + xmax) / 2.0;
-                    startPoint.y = (ymin + ymax) / 2.0;
-                    startPoint.z = (zmin + zmax) / 2.0;
-                }
-            }
-            catch (const Base::Exception& e) {
-                Base::Console().warning(
-                    "Could not calculate center of patterned features: %s\n",
-                    e.what()
-                );
-                // startPoint remains (0,0,0) as a fallback.
+    BRep_Builder builder;
+    TopoDS_Compound compoundShape;
+    builder.MakeCompound(compoundShape);
+    bool any = false;
+    for (App::DocumentObject* obj : originals) {
+        // We are only interested in additive/subtractive features.
+        if (auto* addSubFeature = dynamic_cast<PartDesign::FeatureAddSub*>(obj)) {
+            TopoDS_Shape shape = addSubFeature->AddSubShape.getShape().getShape();
+            if (!shape.IsNull()) {
+                shape.Move(addSubFeature->getLocation());
+                builder.Add(compoundShape, shape);
+                any = true;
             }
         }
     }
+    if (!any) {
+        // The whole body: its shape before this pattern
+        if (auto* base = pattern->getBaseObject(/* silent = */ true)) {
+            TopoDS_Shape shape = base->Shape.getShape().getShape();
+            if (!shape.IsNull()) {
+                builder.Add(compoundShape, shape);
+                any = true;
+            }
+        }
+    }
+    if (any) {
+        // Calculate the center of the combined bounding box.
+        try {
+            Bnd_Box bndBox;
+            BRepBndLib::Add(compoundShape, bndBox);
+            if (!bndBox.IsVoid()) {
+                double xmin, ymin, zmin, xmax, ymax, zmax;
+                bndBox.Get(xmin, ymin, zmin, xmax, ymax, zmax);
+                startPoint.x = (xmin + xmax) / 2.0;
+                startPoint.y = (ymin + ymax) / 2.0;
+                startPoint.z = (zmin + zmax) / 2.0;
+            }
+        }
+        catch (const Base::Exception& e) {
+            Base::Console().warning(
+                "Could not calculate center of patterned features: %s\n",
+                e.what()
+            );
+            // startPoint remains (0,0,0) as a fallback.
+        }
+    }
     return startPoint;
+}
+
+void TaskPatternParameters::setupGizmos()
+{
+    if (!Gui::GizmoContainer::isEnabled() || !getObject<PartDesign::LinearPattern>()) {
+        return;  // Polar gets its handle in the next task
+    }
+
+    const auto toggleReversed = [](PartGui::PatternParametersWidget* widget) {
+        return [widget]() {
+            if (auto* field = widget->pickField()) {
+                Q_EMIT field->reverseClicked();
+            }
+        };
+    };
+
+    arrow1 = new Gui::LinearGizmo(parametersWidget->activeValueBox());
+    arrow1->setClickCallback(toggleReversed(parametersWidget));
+    arrow2 = new Gui::LinearGizmo(parametersWidget2->activeValueBox());
+    arrow2->setClickCallback(toggleReversed(parametersWidget2));
+    gizmoContainer = Gui::GizmoContainer::create({arrow1, arrow2}, TransformedView);
+
+    const bool covered = Gui::GizmoContainer::isValueLabelsEnabled();
+    parametersWidget->setGizmoCoversFirstLabel(covered);
+    parametersWidget2->setGizmoCoversFirstLabel(covered);
+    updateSpacingLabels();
+
+    setGizmoPositions();
+}
+
+void TaskPatternParameters::setGizmoPositions()
+{
+    if (!gizmoContainer) {
+        return;
+    }
+    auto* pattern = getObject<PartDesign::LinearPattern>();
+    if (!pattern || pattern->isError() || target != PickTarget::None) {
+        gizmoContainer->visible = false;
+        return;
+    }
+    gizmoContainer->visible = true;
+
+    const Base::Vector3d start = getStartPoint();
+    const auto place = [&](Gui::LinearGizmo* arrow,
+                           PartGui::PatternParametersWidget* widget,
+                           const App::PropertyLinkSub& link,
+                           bool reversed) {
+        // The arrow drives whichever value the mode shows, and a drag in progress is
+        // never moved under the pointer: its base and direction only change on a new pick
+        if (arrow->getProperty() != widget->activeValueBox()) {
+            arrow->setProperty(widget->activeValueBox());
+        }
+        std::optional<Base::Vector3d> dir = PartDesignGui::patternDirection(*pattern, link);
+        const bool shown = dir.has_value() && widget->isInUse();
+        arrow->setVisibility(shown);
+        if (!shown) {
+            return;
+        }
+        Base::Vector3d along = reversed ? -*dir : *dir;
+        Gui::GizmoPlacement now = arrow->getDraggerPlacement();
+        const SbVec3f pos(start.x, start.y, start.z);
+        const SbVec3f vec(along.x, along.y, along.z);
+        if (!now.pos.equals(pos, 1e-6F) || !now.dir.equals(vec, 1e-6F)) {
+            arrow->Gizmo::setDraggerPlacement(start, along);
+        }
+    };
+    place(arrow1, parametersWidget, pattern->Direction, pattern->Reversed.getValue());
+    place(arrow2, parametersWidget2, pattern->Direction2, pattern->Reversed2.getValue());
 }
 
 //**************************************************************************
