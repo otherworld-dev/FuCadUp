@@ -40,6 +40,7 @@
 #include <gp_Dir.hxx>
 #include <gp_Vec.hxx>
 #include <gp_Pnt.hxx>
+#include <Standard_Failure.hxx>
 
 #include <BRep_Builder.hxx>
 #include <TopoDS_Compound.hxx>
@@ -50,15 +51,18 @@
 #include <App/DocumentObject.h>
 #include <App/Origin.h>
 #include <Base/Console.h>
+#include <Base/Converter.h>
 #include <Gui/Application.h>
 #include <Gui/MainWindow.h>
 #include <Gui/BitmapFactory.h>
 #include <Gui/InputHint.h>
 #include <Gui/Inventor/Draggers/Gizmo.h>
 #include <Gui/Inventor/Draggers/SoLinearDragger.h>
+#include <Gui/Inventor/Draggers/SoRotationDragger.h>
 #include <Gui/Selection/Selection.h>
 #include <Gui/Command.h>
 #include <Gui/SpinBox.h>
+#include <Gui/Utilities.h>
 #include <Gui/View3DInventor.h>
 #include <Gui/View3DInventorViewer.h>
 #include <Gui/ViewProviderCoordinateSystem.h>
@@ -677,6 +681,11 @@ TaskPatternParameters::~TaskPatternParameters()
             dragger->removeFinishCallback(arrowDragFinished, this);
         }
     }
+    if (handle) {
+        SoRotationDragger* dragger = handle->getDraggerContainer()->getDragger();
+        dragger->removeStartCallback(handleDragStarted, this);
+        dragger->removeFinishCallback(handleDragFinished, this);
+    }
     qApp->removeEventFilter(this);
     if (target != PickTarget::None) {
         Gui::Selection().rmvSelectionGate();
@@ -882,8 +891,8 @@ Base::Vector3d TaskPatternParameters::getStartPoint() const
 
 void TaskPatternParameters::setupGizmos()
 {
-    if (!Gui::GizmoContainer::isEnabled() || !getObject<PartDesign::LinearPattern>()) {
-        return;  // Polar gets its handle in the next task
+    if (!Gui::GizmoContainer::isEnabled()) {
+        return;
     }
 
     const auto toggleReversed = [](PartGui::PatternParametersWidget* widget) {
@@ -894,12 +903,6 @@ void TaskPatternParameters::setupGizmos()
         };
     };
 
-    arrow1 = new Gui::LinearGizmo(parametersWidget->activeValueBox());
-    arrow1->setClickCallback(toggleReversed(parametersWidget));
-    arrow2 = new Gui::LinearGizmo(parametersWidget2->activeValueBox());
-    arrow2->setClickCallback(toggleReversed(parametersWidget2));
-    gizmoContainer = Gui::GizmoContainer::create({arrow1, arrow2}, TransformedView);
-
     const auto bindCount = [](Gui::Gizmo* gizmo, PartGui::PatternParametersWidget* widget) {
         Gui::UIntSpinBox* box = widget->countBox();
         gizmo->setCountBinding(
@@ -907,6 +910,39 @@ void TaskPatternParameters::setupGizmos()
             [box](int count) { box->setValue(static_cast<uint>(count)); }
         );
     };
+
+    if (getObject<PartDesign::PolarPattern>()) {
+        handle = new Gui::RadialGizmo(parametersWidget->activeValueBox());
+        handle->setClickCallback(toggleReversed(parametersWidget));
+        gizmoContainer = Gui::GizmoContainer::create({handle}, TransformedView);
+        // The arrow points the way the copies go, as on Revolve
+        handle->flipArrow();
+        bindCount(handle, parametersWidget);
+        parametersWidget->setGizmoCoversFirstLabel(Gui::GizmoContainer::isValueLabelsEnabled());
+        updateSpacingLabels();
+
+        // Both ends of a drag are reported, so the handle keeps its footing while it is
+        // dragged, see setGizmoPositions - the same guard the arrows have, since turning
+        // the angle to 0 makes the pattern throw and the 100 ms recompute must not hide
+        // the handle out from under the drag
+        SoRotationDragger* dragger = handle->getDraggerContainer()->getDragger();
+        dragger->addStartCallback(handleDragStarted, this);
+        dragger->addFinishCallback(handleDragFinished, this);
+
+        setGizmoPositions();
+        return;
+    }
+
+    if (!getObject<PartDesign::LinearPattern>()) {
+        return;
+    }
+
+    arrow1 = new Gui::LinearGizmo(parametersWidget->activeValueBox());
+    arrow1->setClickCallback(toggleReversed(parametersWidget));
+    arrow2 = new Gui::LinearGizmo(parametersWidget2->activeValueBox());
+    arrow2->setClickCallback(toggleReversed(parametersWidget2));
+    gizmoContainer = Gui::GizmoContainer::create({arrow1, arrow2}, TransformedView);
+
     bindCount(arrow1, parametersWidget);
     bindCount(arrow2, parametersWidget2);
 
@@ -931,19 +967,29 @@ void TaskPatternParameters::setGizmoPositions()
     if (!gizmoContainer) {
         return;
     }
-    // An arrow being dragged is left alone, even when the pattern breaks under it (its
-    // spacing pulled down to zero): the dragger holds the mouse from inside the
-    // container's switch, and closing that switch cuts the drag's path short, as on
-    // Extrude. Letting go puts everything right, see arrowDragFinished
-    if (draggingArrow) {
+    // An arrow or the handle being dragged is left alone, even when the pattern breaks
+    // under it (its spacing or angle pulled down to zero): the dragger holds the mouse
+    // from inside the container's switch, and closing that switch cuts the drag's path
+    // short, as on Extrude. Letting go puts everything right, see arrowDragFinished and
+    // handleDragFinished
+    if (draggingGizmo) {
         return;
     }
-    auto* pattern = getObject<PartDesign::LinearPattern>();
-    if (!pattern || pattern->isError() || target != PickTarget::None) {
+    auto* feature = getObject();
+    if (!feature || feature->isError() || target != PickTarget::None) {
         gizmoContainer->visible = false;
         return;
     }
     gizmoContainer->visible = true;
+
+    if (auto* polar = getObject<PartDesign::PolarPattern>()) {
+        placePolarHandle(polar);
+        return;
+    }
+    auto* pattern = getObject<PartDesign::LinearPattern>();
+    if (!pattern) {
+        return;
+    }
 
     const Base::Vector3d start = getStartPoint();
     const auto place = [&](Gui::LinearGizmo* arrow,
@@ -974,17 +1020,80 @@ void TaskPatternParameters::setGizmoPositions()
     place(arrow2, parametersWidget2, pattern->Direction2, pattern->Reversed2.getValue());
 }
 
+void TaskPatternParameters::placePolarHandle(PartDesign::PolarPattern* polar)
+{
+    if (handle->getProperty() != parametersWidget->activeValueBox()) {
+        handle->setProperty(parametersWidget->activeValueBox());
+    }
+
+    Base::Vector3d centre;
+    Base::Vector3d axis;
+    try {
+        gp_Ax2 axisDef = polar->getRotation();
+        axisDef.Transform(polar->getLocation().Transformation());
+        centre = Base::Vector3d(axisDef.Location().X(), axisDef.Location().Y(), axisDef.Location().Z());
+        axis = Base::Vector3d(axisDef.Direction().X(), axisDef.Direction().Y(), axisDef.Direction().Z());
+    }
+    catch (const Base::Exception&) {
+        handle->setVisibility(false);
+        return;
+    }
+    catch (const Standard_Failure&) {
+        handle->setVisibility(false);
+        return;
+    }
+    if (polar->Reversed.getValue()) {
+        axis = -axis;
+    }
+
+    // The handle turns about the axis, level with the features and out at their distance
+    const Base::Vector3d offset = getStartPoint() - centre;
+    const Base::Vector3d along = axis * offset.Dot(axis);
+    const Base::Vector3d radial = offset - along;
+    if (radial.Length() < Precision::Confusion()) {
+        // Features centred on the axis: there is no side to put the handle on
+        handle->setVisibility(false);
+        return;
+    }
+    handle->setVisibility(true);
+
+    const Base::Vector3d pivot = centre + along;
+    Gui::GizmoPlacement now = handle->getDraggerPlacement();
+    const SbVec3f pos = Base::convertTo<SbVec3f>(pivot);
+    const SbVec3f dir = Base::convertTo<SbVec3f>(radial);
+    if (!now.pos.equals(pos, 1e-6F) || !now.dir.equals(dir, 1e-6F)) {
+        handle->setRadius(static_cast<float>(radial.Length()));
+        handle->Gizmo::setDraggerPlacement(pivot, radial);
+        handle->getDraggerContainer()->setArcNormalDirection(Base::convertTo<SbVec3f>(axis));
+    }
+    handle->updateValueLabel();
+}
+
 void TaskPatternParameters::arrowDragStarted(void* data, SoDragger*)
 {
-    static_cast<TaskPatternParameters*>(data)->draggingArrow = true;
+    static_cast<TaskPatternParameters*>(data)->draggingGizmo = true;
 }
 
 void TaskPatternParameters::arrowDragFinished(void* data, SoDragger*)
 {
     auto* self = static_cast<TaskPatternParameters*>(data);
-    self->draggingArrow = false;
+    self->draggingGizmo = false;
     // The arrows stayed where the drag found them: put them where the pattern ended
     // up, or away if it broke
+    self->setGizmoPositions();
+}
+
+void TaskPatternParameters::handleDragStarted(void* data, SoDragger*)
+{
+    static_cast<TaskPatternParameters*>(data)->draggingGizmo = true;
+}
+
+void TaskPatternParameters::handleDragFinished(void* data, SoDragger*)
+{
+    auto* self = static_cast<TaskPatternParameters*>(data);
+    self->draggingGizmo = false;
+    // The handle stayed where the drag found it: put it where the pattern ended up,
+    // or away if it broke (turning the angle to 0 throws, see setGizmoPositions)
     self->setGizmoPositions();
 }
 

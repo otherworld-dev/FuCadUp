@@ -663,3 +663,187 @@ class TestCountBoxes(PatternPanelCase):
         icon_reserved = fm.height()  # Gui::QuantitySpinBox's iconHeight
         needed = fm.horizontalAdvance(edit.text()) + icon_reserved
         self.assertGreaterEqual(box.width(), needed, "the x mark crops a 3-digit count")
+
+
+class TestPolarHandle(PatternPanelCase):
+    """A polar pattern's angle is turned with a handle, and its copies counted beside it."""
+
+    _count_boxes = TestCountBoxes._count_boxes
+    _wait_for_focus = gizmo_labels.GizmoLabelCase._wait_for_focus
+
+    # The handle turns about the point level with the Pad's bounding box centre
+    # (TestLinearArrows.BASE) on the sketch's N_Axis (straight up through the origin);
+    # RADIAL is the vector from there out to the start point, where the handle's arm
+    # sits at 0 (and 360) degrees.
+    PIVOT = FreeCAD.Vector(0.0, 0.0, 5.0)
+    RADIAL = TestLinearArrows.BASE - PIVOT
+
+    def setUp(self):
+        super().setUp()
+        self._run("PartDesign_PolarPattern")
+        self._refresh_view_widgets()
+        self.view.viewIsometric()
+        self.view.fitAll()
+        self._process_events(300)
+
+    def _angle_boxes(self):
+        return [box for box in self._boxes() if "°" in box.text()]
+
+    def _handle_shown(self):
+        from pivy import coin
+
+        search = coin.SoSearchAction()
+        search.setType(coin.SoType.fromName("SoRotationDraggerContainer"))
+        search.setInterest(coin.SoSearchAction.ALL)
+        search.setSearchingAll(True)
+        search.apply(self.viewer.getSoRenderManager().getSceneGraph())
+        paths = search.getPaths()
+        return any(self._path_is_on(paths[index]) for index in range(paths.getLength()))
+
+    def test_a_polar_pattern_has_a_rotation_handle(self):
+        self.assertTrue(self._wait(self._handle_shown), "no rotation handle in the view")
+
+    def test_the_handle_carries_the_total_angle_in_a_box(self):
+        self.assertTrue(self._wait(lambda: len(self._angle_boxes()) == 1))
+        self.assertAlmostEqual(self._angle_boxes()[0].property("rawValue"), 360.0)
+
+    def test_the_handle_has_a_count_box(self):
+        self.assertTrue(self._wait(lambda: len(self._count_boxes()) == 1))
+        self.assertAlmostEqual(self._count_boxes()[0].property("rawValue"), 4.0)
+
+    def test_typing_an_angle_turns_the_pattern(self):
+        self.assertTrue(self._wait(lambda: len(self._angle_boxes()) == 1))
+        box = self._angle_boxes()[0]
+        box.setFocus(QtCore.Qt.OtherFocusReason)
+        self._wait_for_focus(box)
+        self._select_all(box)
+        self._type(box, "90")
+        self._process_events(300)
+        self.assertAlmostEqual(self._value(self.pattern.Angle), 90.0)
+
+    def test_tab_goes_from_the_angle_to_the_count(self):
+        self.assertTrue(self._wait(lambda: len(self._count_boxes()) == 1))
+        angle, count = self._angle_boxes()[0], self._count_boxes()[0]
+        angle.setFocus(QtCore.Qt.OtherFocusReason)
+        self._wait_for_focus(angle)
+        self._press(angle, QtCore.Qt.Key_Tab)
+        self._wait_for_focus(count)
+
+    def test_the_handle_hides_while_the_axis_is_being_picked(self):
+        self.assertTrue(self._wait(self._handle_shown))
+        self._click(self._direction_field(1))
+        self.assertFalse(self._handle_shown())
+
+    # -- dragging ----------------------------------------------------------
+
+    def _rendered_arm_length(self):
+        """The handle arm's actual on-screen length, in document units.
+
+        The rotator arm sits at ``max(minRadius, radius / geometryScale)`` in its own
+        pre-scale local frame (SoRotatorArrow::notify, Gizmo.cpp), so at typical view
+        distances the ``minRadius`` floor (8 local units, RadialGizmo's default) wins
+        over the pattern's own geometric radius (here, RADIAL's length, under 6 mm) -
+        the rendered arm is longer than RADIAL, by the view's own auto-scale. Reading
+        pivotPosition and geometryScale back from the scene, rather than assuming
+        RADIAL's own length, keeps this independent of that (view-dependent) scale.
+        """
+
+        container = self._handle_container()
+        dragger = container.getPart("dragger", False)
+        rotator = dragger.getPart("rotator", False)
+        pivot_y = rotator.getField("pivotPosition").getValue().getValue()[1]
+        scale_y = rotator.getField("geometryScale").getValue().getValue()[1]
+        return pivot_y * scale_y
+
+    def _handle_container(self):
+        from pivy import coin
+
+        search = coin.SoSearchAction()
+        search.setType(coin.SoType.fromName("SoRotationDraggerContainer"))
+        search.setInterest(coin.SoSearchAction.FIRST)
+        search.setSearchingAll(True)
+        search.apply(self.viewer.getSoRenderManager().getSceneGraph())
+        path = search.getPath()
+        self.assertIsNotNone(path, "the handle is not in the scene")
+        return path.getTail()
+
+    def _handle_grip(self, value, arm_length):
+        """A point on the handle's arm at the given angle, found by asking the scene
+        what is under it, the way _arrow_grip does for the linear arrows."""
+
+        from pivy import coin
+
+        manager = self.viewer.getSoRenderManager()
+        direction = FreeCAD.Rotation(FreeCAD.Vector(0, 0, 1), value).multVec(self.RADIAL)
+        direction.normalize()
+        tip, base = self._pixels(self.PIVOT + direction * arm_length), self._pixels(self.PIVOT)
+        for along in (0.0, 0.03, 0.06, 0.1, 0.15, 0.2):
+            pixels = (tip[0] + (base[0] - tip[0]) * along, tip[1] + (base[1] - tip[1]) * along)
+            pick = coin.SoRayPickAction(manager.getViewportRegion())
+            pick.setPoint(coin.SbVec2s(int(pixels[0]), int(pixels[1])))
+            pick.setRadius(6)
+            pick.setPickAll(True)
+            pick.apply(manager.getSceneGraph())
+            picked = pick.getPickedPointList()
+            for index in range(picked.getLength()):
+                path = picked[index].getPath()
+                for depth in range(path.getLength()):
+                    name = path.getNode(depth).getTypeId().getName().getString()
+                    if name == "SoRotationDraggerContainer":
+                        return self._qt_pos(pixels)
+        self.fail("the handle is not under any of the points tried")
+
+    def _drag_handle_towards(self, start_value, target_value, steps=6, hold_ms=0):
+        """Press on the handle at start_value and pull it, in small steps, to
+        target_value. Returns whether the handle was hidden after each step (and
+        after the hold), while the button was still down."""
+
+        axis = FreeCAD.Vector(0, 0, 1)
+        arm_length = self._rendered_arm_length()
+
+        def screen_for(value):
+            direction = FreeCAD.Rotation(axis, value).multVec(self.RADIAL)
+            direction.normalize()
+            return self._qt_pos(self._pixels(self.PIVOT + direction * arm_length))
+
+        grip = self._handle_grip(start_value, arm_length)
+        self._mouse(QtCore.QEvent.MouseMove, grip, QtCore.Qt.NoButton, QtCore.Qt.NoButton)
+        self._process_events()
+        self._mouse(QtCore.QEvent.MouseButtonPress, grip, QtCore.Qt.LeftButton, QtCore.Qt.LeftButton)
+        self._process_events(100)
+        pos = grip
+        hidden = []
+        try:
+            for step in range(1, steps + 1):
+                value = start_value + (target_value - start_value) * step / steps
+                pos = screen_for(value)
+                self._mouse(QtCore.QEvent.MouseMove, pos, QtCore.Qt.NoButton, QtCore.Qt.LeftButton)
+                self._process_events(60)
+                hidden.append(not self._handle_shown())
+            if hold_ms:
+                self._process_events(hold_ms)
+                hidden.append(not self._handle_shown())
+        finally:
+            self._mouse(QtCore.QEvent.MouseButtonRelease, pos, QtCore.Qt.LeftButton, QtCore.Qt.NoButton)
+            self._process_events(300)
+        return hidden
+
+    def test_dragging_the_handle_towards_zero_keeps_it_under_the_pointer(self):
+        """Dragging the angle down to 0 makes the pattern throw ("Pattern angle can't
+        be null"); the 100 ms recompute must not hide the handle out from under a drag
+        still holding it, the same guard the linear arrows have (TestLinearArrows).
+        Started from a smaller angle than the pattern's default 360 degrees, so the
+        drag only has to cover a small, unambiguous arc: SoRotationDragger measures
+        each move as the shortest arc from the press point, so a turn approaching a
+        full 360 degrees (as dragging down from the default would need) cannot be
+        driven reliably this way."""
+
+        self.pattern.Angle = 20.0
+        self.doc.recompute()
+        self._close_editing()
+        FreeCADGui.getDocument(self.doc.Name).setEdit(self.pattern.Name)
+        self._process_events(300)
+        self.assertTrue(self._wait(self._handle_shown))
+
+        hidden = self._drag_handle_towards(20.0, -10.0, hold_ms=400)
+        self.assertFalse(any(hidden), f"the handle was hidden while dragged: {hidden}")

@@ -45,6 +45,12 @@ namespace Gui
 {
 class GizmoContainer;
 class LinearGizmo;
+class RadialGizmo;
+}
+
+namespace PartDesign
+{
+class PolarPattern;
 }
 
 namespace PartDesignGui
@@ -129,8 +135,11 @@ private:
 
     void setupGizmos();
     void setGizmoPositions();
+    void placePolarHandle(PartDesign::PolarPattern* polar);
     static void arrowDragStarted(void* data, SoDragger* dragger);
     static void arrowDragFinished(void* data, SoDragger* dragger);
+    static void handleDragStarted(void* data, SoDragger* dragger);
+    static void handleDragFinished(void* data, SoDragger* dragger);
 
     PartGui::PatternParametersWidget* parametersWidget = nullptr;
     PartGui::PatternParametersWidget* parametersWidget2 = nullptr;
@@ -142,8 +151,10 @@ private:
     std::unique_ptr<Gui::GizmoContainer> gizmoContainer;
     Gui::LinearGizmo* arrow1 = nullptr;
     Gui::LinearGizmo* arrow2 = nullptr;
-    /// An arrow is being dragged: its gizmos are left alone until it is let go
-    bool draggingArrow = false;
+    Gui::RadialGizmo* handle = nullptr;
+    /// An arrow or the polar handle is being dragged: its gizmos are left alone until
+    /// it is let go
+    bool draggingGizmo = false;
     static constexpr int previewDelayMs = 100;
     /// An Esc press already turned the field off; the filter stays installed until
     /// that same key's release has also been seen and eaten, so it never reaches the
