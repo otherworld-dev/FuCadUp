@@ -96,6 +96,11 @@ void TaskPatternParameters::startWithFeaturesPicking()
     featuresPickingRequested = true;
 }
 
+void TaskPatternParameters::cancelFeaturesPicking()
+{
+    featuresPickingRequested = false;
+}
+
 TaskPatternParameters::TaskPatternParameters(ViewProviderTransformed* TransformedView, QWidget* parent)
     : TaskTransformedParameters(TransformedView, parent)
     , ui(new Ui_TaskPatternParameters)

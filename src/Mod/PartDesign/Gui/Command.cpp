@@ -2903,10 +2903,21 @@ void prepareTransformed(
             title,
             icon.c_str(),
             [worker](App::DocumentObject* feature) {
-                if (feature) {
-                    PartDesignGui::TaskPatternParameters::startWithFeaturesPicking();
-                    worker({feature});
+                if (!feature) {
+                    return;
                 }
+                // Taken back however the worker ends: a panel it opened has used the
+                // request already, and one that never opened (the worker threw, say)
+                // must not leave it to the next pattern panel
+                struct Withdraw
+                {
+                    ~Withdraw()
+                    {
+                        PartDesignGui::TaskPatternParameters::cancelFeaturesPicking();
+                    }
+                } withdraw;
+                PartDesignGui::TaskPatternParameters::startWithFeaturesPicking();
+                worker({feature});
             }
         ));
         return;

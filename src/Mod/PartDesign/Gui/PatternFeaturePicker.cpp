@@ -9,6 +9,7 @@
 #include <Inventor/nodes/SoEventCallback.h>
 
 #include <App/Document.h>
+#include <Base/Exception.h>
 #include <Gui/Application.h>
 #include <Gui/BitmapFactory.h>
 #include <Gui/Control.h>
@@ -91,9 +92,17 @@ TaskDlgPatternFeaturePick::~TaskDlgPatternFeaturePick()
             mainWindow->hideHints();
         }
     }
-    // The dialog has left the task panel, so the pattern's own panel is free to open
+    // The dialog has left the task panel, so the pattern's own panel is free to open.
+    // Nothing may leave a destructor: an exception here would end FuCadUp outright.
     if (onDone && !documentClosing) {
-        onDone(feature);
+        try {
+            onDone(feature);
+        }
+        catch (const Base::Exception& e) {
+            e.reportException();
+        }
+        catch (...) {
+        }
     }
 }
 

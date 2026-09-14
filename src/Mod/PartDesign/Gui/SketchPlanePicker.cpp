@@ -33,6 +33,7 @@
 #include <App/Application.h>
 #include <App/Datums.h>
 #include <App/Document.h>
+#include <Base/Exception.h>
 #include <Gui/Application.h>
 #include <Gui/BitmapFactory.h>
 #include <Gui/Control.h>
@@ -155,8 +156,16 @@ TaskDlgSketchPlanePick::~TaskDlgSketchPlanePick()
     // Like TaskDlgAttacher, the follow-up runs from here: the dialog has already left
     // the task panel, so the sketch's own editor is free to take it. A document on
     // its way out takes its pending command with it, so there is nothing to do then.
+    // Nothing may leave a destructor: an exception here would end FuCadUp outright.
     if (onDone && !documentClosing) {
-        onDone(sketch);
+        try {
+            onDone(sketch);
+        }
+        catch (const Base::Exception& e) {
+            e.reportException();
+        }
+        catch (...) {
+        }
     }
 }
 

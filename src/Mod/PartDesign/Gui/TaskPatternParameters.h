@@ -75,6 +75,9 @@ public:
     /// The next standalone pattern panel opens with its Features field active; the
     /// "click the feature to copy" start uses it so further clicks add more features
     static void startWithFeaturesPicking();
+    /// Takes back startWithFeaturesPicking() when no panel came of it, so a later one
+    /// does not open picking
+    static void cancelFeaturesPicking();
 
     /// The one place a pick field is turned on or off
     void setPickTarget(PickTarget next);
