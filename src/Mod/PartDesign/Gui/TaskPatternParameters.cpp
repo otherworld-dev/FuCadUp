@@ -1042,9 +1042,9 @@ void TaskPatternParameters::placePolarHandle(PartDesign::PolarPattern* polar)
         handle->setVisibility(false);
         return;
     }
-    if (polar->Reversed.getValue()) {
-        axis = -axis;
-    }
+    // getRotation() already reverses the axis when Reversed is set
+    // (PolarPatternExtension::getRotation), the same direction updateSpacingLabels
+    // uses - reversing it again here would point the handle away from the copies
 
     // The handle turns about the axis, level with the features and out at their distance
     const Base::Vector3d offset = getStartPoint() - centre;
@@ -1057,15 +1057,15 @@ void TaskPatternParameters::placePolarHandle(PartDesign::PolarPattern* polar)
     }
     handle->setVisibility(true);
 
+    // Always re-placed (unlike the linear arrows' place() lambda): the dragger's own
+    // pointer direction is not a unit vector, so it can never be compared against
+    // radial directly, and doing so would also miss an axis-only change (Reversed
+    // toggled with the features' position unchanged) - Revolve's setGizmoPositions
+    // re-places its own RadialGizmos unconditionally for the same reason
     const Base::Vector3d pivot = centre + along;
-    Gui::GizmoPlacement now = handle->getDraggerPlacement();
-    const SbVec3f pos = Base::convertTo<SbVec3f>(pivot);
-    const SbVec3f dir = Base::convertTo<SbVec3f>(radial);
-    if (!now.pos.equals(pos, 1e-6F) || !now.dir.equals(dir, 1e-6F)) {
-        handle->setRadius(static_cast<float>(radial.Length()));
-        handle->Gizmo::setDraggerPlacement(pivot, radial);
-        handle->getDraggerContainer()->setArcNormalDirection(Base::convertTo<SbVec3f>(axis));
-    }
+    handle->setRadius(static_cast<float>(radial.Length()));
+    handle->Gizmo::setDraggerPlacement(pivot, radial);
+    handle->getDraggerContainer()->setArcNormalDirection(Base::convertTo<SbVec3f>(axis));
     handle->updateValueLabel();
 }
 

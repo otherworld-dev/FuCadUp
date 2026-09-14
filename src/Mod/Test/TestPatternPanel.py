@@ -847,3 +847,46 @@ class TestPolarHandle(PatternPanelCase):
 
         hidden = self._drag_handle_towards(20.0, -10.0, hold_ms=400)
         self.assertFalse(any(hidden), f"the handle was hidden while dragged: {hidden}")
+
+    # -- reversed ------------------------------------------------------------
+
+    def _handle_arc_normal(self):
+        """The handle's current arc-normal direction, in world space (the direction
+        SoRotationDraggerContainer.rotation carries local Z to)."""
+
+        container = self._handle_container()
+        quat = container.getField("rotation").getValue().getValue()
+        return FreeCAD.Rotation(*quat).multVec(FreeCAD.Vector(0, 0, 1))
+
+    def test_a_reversed_pattern_turns_its_handle_the_other_way(self):
+        """PolarPatternExtension::getRotation() already reverses the axis when
+        Reversed is set, the same direction updateSpacingLabels uses - the handle's
+        arc normal should follow that, unreversed a second time."""
+
+        self.pattern.Reversed = True
+        self.doc.recompute()
+        self._close_editing()
+        FreeCADGui.getDocument(self.doc.Name).setEdit(self.pattern.Name)
+        self._process_events(300)
+        self.assertTrue(self._wait(self._handle_shown))
+
+        normal = self._handle_arc_normal()
+        self.assertLess((normal - FreeCAD.Vector(0, 0, -1)).Length, 1e-4)
+
+    def test_clicking_the_handle_turns_the_pattern_round(self):
+        """As on the linear arrows (TestLinearArrows.
+        test_clicking_the_arrow_turns_the_pattern_round), letting go without moving
+        toggles Reversed rather than dragging - and the handle's own arc normal must
+        follow suit in the same panel, not just after a reopen."""
+
+        self.assertTrue(self._wait(self._handle_shown))
+        arm_length = self._rendered_arm_length()
+        grip = self._handle_grip(0.0, arm_length)
+        self._mouse(QtCore.QEvent.MouseButtonPress, grip, QtCore.Qt.LeftButton, QtCore.Qt.LeftButton)
+        self._process_events(100)
+        self._mouse(QtCore.QEvent.MouseButtonRelease, grip, QtCore.Qt.LeftButton, QtCore.Qt.NoButton)
+        self._process_events(300)
+        self.assertTrue(self.pattern.Reversed)
+
+        normal = self._handle_arc_normal()
+        self.assertLess((normal - FreeCAD.Vector(0, 0, -1)).Length, 1e-4)
