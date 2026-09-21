@@ -1096,7 +1096,7 @@ void TaskPatternParameters::refreshGizmoCountRanges()
     // silently clamps that on its way into the property, the same wrong-ceiling shape
     // as the bug the panel box itself was fixed for, by the other box this time.
     const auto refresh = [](Gui::Gizmo* gizmo, PartGui::PatternParametersWidget* widget) {
-        if (!gizmo || !gizmo->hasCountBinding()) {
+        if (!gizmo || !widget || !gizmo->hasCountBinding()) {
             return;
         }
         Gui::UIntSpinBox* box = widget->countBox();
