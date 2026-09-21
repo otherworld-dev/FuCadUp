@@ -503,6 +503,39 @@ class TestNothingSelected(PatternPanelCase):
 
     PICK_PANEL = "PartDesignGui__TaskPatternFeaturePick"
 
+    def _panel_title(self):
+        """The pattern panel widget's own title, once one is open. It carries no object
+        name of its own, so this walks up from a known child (present for both Linear
+        and Polar) by its Qt class name."""
+
+        widget = self._direction_widget(1)
+        while widget is not None:
+            if widget.metaObject().className() == "PartDesignGui::TaskPatternParameters":
+                return widget.windowTitle()
+            widget = widget.parentWidget()
+        self.fail("could not find the pattern panel")
+
+    def test_the_linear_pickers_title_matches_the_panel_that_follows(self):
+        """The picker shown with nothing selected used to say "Linear Pattern" while the
+        panel that follows a pick is titled "Rectangular Pattern": title the picker from
+        the same source as the panel, not a name of its own that can drift from it."""
+
+        self._run("PartDesign_LinearPattern", select_pad=False)
+        pick_title = self._find_widget(self.PICK_PANEL).windowTitle()
+        self._pick("Face1")
+        self.assertTrue(self._wait(lambda: self.body.Tip is not self.pad), "no pattern was made")
+        self.assertEqual(self._panel_title(), pick_title)
+
+    def test_the_polar_pickers_title_matches_the_panel_that_follows(self):
+        """Polar said "Polar Pattern" in the picker and "Polar Pattern Parameters" in
+        the panel that follows a pick; same fix and same check as the Linear case."""
+
+        self._run("PartDesign_PolarPattern", select_pad=False)
+        pick_title = self._find_widget(self.PICK_PANEL).windowTitle()
+        self._pick("Face1")
+        self.assertTrue(self._wait(lambda: self.body.Tip is not self.pad), "no pattern was made")
+        self.assertEqual(self._panel_title(), pick_title)
+
     def test_the_tool_asks_for_a_feature_first(self):
         self._run("PartDesign_LinearPattern", select_pad=False)
         self.assertIs(self.body.Tip, self.pad, "a pattern was made before anything was picked")

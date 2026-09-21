@@ -38,8 +38,16 @@ class PartDesignGuiExport ViewProviderPolarPattern: public ViewProviderTransform
 public:
     ViewProviderPolarPattern()
     {
-        menuName = tr("Polar Pattern Parameters");
+        menuName = patternMenuName();
         sPixmap = "PartDesign_PolarPattern.svg";
+    }
+
+    /// The panel's title, and the source for the picker shown before a pattern exists
+    /// (Command.cpp's prepareTransformed): a static method so that one, too, can use it
+    /// without a ViewProvider instance to hand.
+    static QString patternMenuName()
+    {
+        return tr("Polar Pattern Parameters");
     }
 
     const std::string& featureName() const override;

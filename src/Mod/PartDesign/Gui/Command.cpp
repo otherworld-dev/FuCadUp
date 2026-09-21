@@ -75,6 +75,8 @@
 #include "WorkflowManager.h"
 #include "ViewProvider.h"
 #include "ViewProviderBody.h"
+#include "ViewProviderLinearPattern.h"
+#include "ViewProviderPolarPattern.h"
 
 
 // TODO Remove this header after fixing code so it won;t be needed here (2015-10-20, Fat-Zer)
@@ -2895,8 +2897,11 @@ void prepareTransformed(
     // feature, and only then is made, sized to it, with its Features field still active so
     // further clicks add more.
     if (features.empty() && (which == "LinearPattern" || which == "PolarPattern")) {
-        const QString title = which == "LinearPattern" ? QObject::tr("Linear Pattern")
-                                                       : QObject::tr("Polar Pattern");
+        // The same source as the panel's own title (ViewProviderLinearPattern /
+        // ViewProviderPolarPattern), not a name of its own that can drift from it
+        const QString title = which == "LinearPattern"
+            ? PartDesignGui::ViewProviderLinearPattern::patternMenuName()
+            : PartDesignGui::ViewProviderPolarPattern::patternMenuName();
         const std::string icon = "PartDesign_" + which;
         Gui::Control().showDialog(new PartDesignGui::TaskDlgPatternFeaturePick(
             pcActiveBody,

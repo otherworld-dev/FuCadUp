@@ -70,6 +70,10 @@ TaskTransformedParameters::TaskTransformedParameters(
     , TransformedView(TransformedView)
     , ui(new Ui_TaskTransformedParameters)
 {
+    // Queryable the same way the feature picker's own panel is (PatternFeaturePicker.cpp),
+    // so the two can be compared without either side hard-coding the other's text
+    setWindowTitle(TransformedView->menuName);
+
     Gui::Document* doc = TransformedView->getDocument();
     this->attachDocument(doc);
 }
