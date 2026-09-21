@@ -43,6 +43,7 @@ class PickField;
 
 namespace Gui
 {
+class Gizmo;
 class GizmoContainer;
 class LinearGizmo;
 class RadialGizmo;
@@ -144,6 +145,8 @@ private:
     Base::Vector3d getStartPoint() const;
 
     void setupGizmos();
+    /// Binds one gizmo's count box to a panel's count box, range included
+    void bindGizmoCount(Gui::Gizmo* gizmo, PartGui::PatternParametersWidget* widget);
     void setGizmoPositions();
     void placePolarHandle(PartDesign::PolarPattern* polar);
     void placeLinearArrows(PartDesign::LinearPattern* pattern);

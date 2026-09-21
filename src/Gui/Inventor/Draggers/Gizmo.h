@@ -98,10 +98,21 @@ public:
 
     using CountGetter = std::function<int()>;
     using CountSetter = std::function<void(int)>;
+    /// Reports whether the count's own source (not the value box's) is driven by a formula
+    using CountExpressionGetter = std::function<bool()>;
     /// Gives the gizmo a box beside it for a number of copies, read and written through these;
-    /// the box takes no count outside minimum..maximum
-    void setCountBinding(CountGetter getter, CountSetter setter, int minimum, int maximum);
+    /// the box takes no count outside minimum..maximum. hasExpression, when given, is asked
+    /// whether the count box hides for a formula, the same way the value box does for its own
+    void setCountBinding(
+        CountGetter getter,
+        CountSetter setter,
+        int minimum,
+        int maximum,
+        CountExpressionGetter hasExpression = {}
+    );
     bool hasCountBinding() const;
+    /// Whether the count's own source is a formula, if setCountBinding was given a way to ask
+    bool hasCountExpression() const;
     GizmoValueLabel* getCountLabel() const;
     void setCountLabel(GizmoValueLabel* label);
     /// Brings the count box in line with the gizmo's place and the current count
@@ -131,6 +142,7 @@ protected:
 
     CountGetter countGetter;
     CountSetter countSetter;
+    CountExpressionGetter countExpressionGetter;
     int countMinimum = 1;
     int countMaximum = 1;
     GizmoValueLabel* countLabel = nullptr;

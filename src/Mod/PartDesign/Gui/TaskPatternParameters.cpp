@@ -1003,24 +1003,13 @@ void TaskPatternParameters::setupGizmos()
         };
     };
 
-    const auto bindCount = [](Gui::Gizmo* gizmo, PartGui::PatternParametersWidget* widget) {
-        Gui::UIntSpinBox* box = widget->countBox();
-        // The box in the view takes the panel box's range, capped the same way
-        gizmo->setCountBinding(
-            [box]() { return static_cast<int>(box->value()); },
-            [box](int count) { box->setValue(static_cast<uint>(count)); },
-            static_cast<int>(box->minimum()),
-            static_cast<int>(box->maximum())
-        );
-    };
-
     if (getObject<PartDesign::PolarPattern>()) {
         handle = new Gui::RadialGizmo(parametersWidget->activeValueBox());
         handle->setClickCallback(toggleReversed(parametersWidget));
         gizmoContainer = Gui::GizmoContainer::create({handle}, TransformedView);
         // The arrow points the way the copies go, as on Revolve
         handle->flipArrow();
-        bindCount(handle, parametersWidget);
+        bindGizmoCount(handle, parametersWidget);
         parametersWidget->setGizmoCoversFirstLabel(Gui::GizmoContainer::isValueLabelsEnabled());
         updateSpacingLabels();
 
@@ -1046,8 +1035,8 @@ void TaskPatternParameters::setupGizmos()
     arrow2->setClickCallback(toggleReversed(parametersWidget2));
     gizmoContainer = Gui::GizmoContainer::create({arrow1, arrow2}, TransformedView);
 
-    bindCount(arrow1, parametersWidget);
-    bindCount(arrow2, parametersWidget2);
+    bindGizmoCount(arrow1, parametersWidget);
+    bindGizmoCount(arrow2, parametersWidget2);
 
     // Both ends of a drag are reported, so an arrow keeps its footing while it is
     // dragged, see setGizmoPositions
@@ -1063,6 +1052,20 @@ void TaskPatternParameters::setupGizmos()
     updateSpacingLabels();
 
     setGizmoPositions();
+}
+
+void TaskPatternParameters::bindGizmoCount(Gui::Gizmo* gizmo, PartGui::PatternParametersWidget* widget)
+{
+    Gui::UIntSpinBox* box = widget->countBox();
+    // The box in the view takes the panel box's range, capped the same way, and hides for
+    // the same reason a value box does: an expression bound straight to the count
+    gizmo->setCountBinding(
+        [box]() { return static_cast<int>(box->value()); },
+        [box](int count) { box->setValue(static_cast<uint>(count)); },
+        static_cast<int>(box->minimum()),
+        static_cast<int>(box->maximum()),
+        [box]() { return box->hasExpression(); }
+    );
 }
 
 void TaskPatternParameters::setGizmoPositions()

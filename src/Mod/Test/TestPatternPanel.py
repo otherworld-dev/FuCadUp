@@ -857,6 +857,19 @@ class TestCountBoxes(PatternPanelCase):
         self._process_events(300)
         self.assertEqual(self._count_boxes(), [])
 
+    def test_the_count_box_hides_for_an_expression(self):
+        """The value box already hides when its own property carries a formula
+        (Gizmo::isShownInView); the count box must do the same for its own, which is
+        independent - a value box with no formula must not hide it, and vice versa.
+        2 + 1 keeps this a three-copy pattern, so nothing expensive is computed."""
+
+        self.pattern.setExpression("Occurrences", "2 + 1")
+        self.doc.recompute()
+        self._close_editing()
+        FreeCADGui.getDocument(self.doc.Name).setEdit(self.pattern.Name)
+        self._process_events(300)
+        self.assertEqual(self._count_boxes(), [])
+
     def test_a_shown_labels_points_never_fall_short_for_its_type(self):
         """SoDatumLabel::GLRender warns "Too few points to render distance label" once
         a shown DISTANCE-type label has fewer than 2 points (SoDatumLabel.cpp). Coin's

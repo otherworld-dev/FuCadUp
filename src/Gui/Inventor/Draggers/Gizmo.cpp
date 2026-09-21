@@ -194,10 +194,17 @@ void Gizmo::setValueLabel(GizmoValueLabel* label)
     updateValueLabel();
 }
 
-void Gizmo::setCountBinding(CountGetter getter, CountSetter setter, int minimum, int maximum)
+void Gizmo::setCountBinding(
+    CountGetter getter,
+    CountSetter setter,
+    int minimum,
+    int maximum,
+    CountExpressionGetter hasExpression
+)
 {
     countGetter = std::move(getter);
     countSetter = std::move(setter);
+    countExpressionGetter = std::move(hasExpression);
     countMinimum = minimum;
     countMaximum = std::max(minimum, maximum);
     if (container) {
@@ -208,6 +215,11 @@ void Gizmo::setCountBinding(CountGetter getter, CountSetter setter, int minimum,
 bool Gizmo::hasCountBinding() const
 {
     return countGetter && countSetter;
+}
+
+bool Gizmo::hasCountExpression() const
+{
+    return countExpressionGetter && countExpressionGetter();
 }
 
 GizmoValueLabel* Gizmo::getCountLabel() const
@@ -1279,7 +1291,11 @@ void GizmoContainer::rebuildValueLabels()
 void GizmoContainer::refreshValueLabels()
 {
     for (auto [gizmo, label] : labelsInOrder()) {
-        bool shown = visible.getValue() && gizmo->isShownInView();
+        // A count box hides for its own formula too, not just the value box's - the two
+        // can be driven by expressions independently of one another
+        bool isCountLabel = label == gizmo->getCountLabel();
+        bool shown = visible.getValue() && gizmo->isShownInView()
+            && (!isCountLabel || !gizmo->hasCountExpression());
         // A box being typed in never disappears under the user, e.g. when what has been
         // typed so far fails to recompute and the task panel hides its gizmos
         if (!shown && label->hasFocus()) {
