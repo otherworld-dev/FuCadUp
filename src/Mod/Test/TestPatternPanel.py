@@ -511,6 +511,52 @@ class TestFeaturesField(PatternPanelCase):
         self.assertFalse(field.property("active"))
         self.assertIsNotNone(FreeCADGui.Control.activeTaskDialog())
 
+    def test_a_lost_escape_release_does_not_eat_the_next_one(self):
+        """eatEscapeRelease stays set from a press until its matching release is seen,
+        so the filter knows to eat that release too rather than let the view take it
+        as Cancel. If the release never arrives - focus lost to another window
+        mid-press, say - the flag used to stay stuck, and the very next Esc release
+        anywhere in the app, unrelated or not, was silently eaten by a filter that
+        should already be gone.
+
+        A plain QWidget's own event() returns True for a recognised key event whether
+        or not it was accepted, so QApplication.sendEvent()'s return value alone
+        cannot tell "delivered" from "eaten" - confirmed empirically (a bare press and
+        release sent to a widget with no filters installed at all still both come
+        back True). An event filter installed on the probe itself is not fooled by
+        that: application-level filters (ours among them) run before an object's own
+        installed filters and before event() is ever called, so the spy only sees a
+        release that got past every application-level filter first."""
+
+        class ReleaseSpy(QtCore.QObject):
+            def __init__(self):
+                super().__init__()
+                self.saw_release = False
+
+            def eventFilter(self, watched, event):
+                if event.type() == QtCore.QEvent.KeyRelease:
+                    self.saw_release = True
+                return False  # never consumes; only observes
+
+        def key_event(kind):
+            return QtGui.QKeyEvent(kind, QtCore.Qt.Key_Escape, QtCore.Qt.NoModifier)
+
+        self._run("PartDesign_LinearPattern")
+        probe = QtWidgets.QWidget()  # never shown; app filters still see events sent to it
+        spy = ReleaseSpy()
+        probe.installEventFilter(spy)
+
+        self._click(self._direction_field(2))
+        QtWidgets.QApplication.sendEvent(self.viewport, key_event(QtCore.QEvent.KeyPress))
+        self._process_events(100)  # the pick ends; the matching release never arrives
+
+        # The next, unrelated Esc press and release: sent to the probe, not the
+        # viewport, so a correctly passed-through one cannot reach the view and close
+        # the dialog mid-test.
+        QtWidgets.QApplication.sendEvent(probe, key_event(QtCore.QEvent.KeyPress))
+        QtWidgets.QApplication.sendEvent(probe, key_event(QtCore.QEvent.KeyRelease))
+        self.assertTrue(spy.saw_release, "a later Esc release was eaten by a lost one's flag")
+
 
 class TestNothingSelected(PatternPanelCase):
     """With nothing selected the tool asks for the feature to copy before it makes anything."""
