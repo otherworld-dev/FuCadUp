@@ -795,16 +795,24 @@ class TestLinearArrows(PatternPanelCase):
         """With "Recompute on change" off, onParameterWidgetParametersChanged() used to
         return before setGizmoPositions() ever ran, so a mode switch left the arrow
         bound to the box it no longer drives. Length is kept in sync with Occurrences
-        and Offset synchronously (LinearPatternExtension::extensionOnChanged), not by a
-        recompute, so the box already holds the right value (2 x 15 mm = 30 mm) the
-        moment the arrow is rebound to it - no recompute is needed to show it."""
+        and Offset synchronously (LinearPatternExtension::extensionOnChanged), not by
+        a recompute, so the rebound box already holds the right value (2 x 15 mm =
+        30 mm) - no recompute is needed to show it, only the same ~100 ms debounce
+        the recomputing path already uses (onUpdateViewTimer() skips the recompute
+        itself but still rebinds the gizmos when blocked). There is always exactly
+        one distance box here, before and after, so the wait is on the rebound value
+        rather than a box count that never changes."""
 
         self._find_widget("optionUpdateView").setChecked(False)
         combo = self._direction_widget(1).findChild(QtWidgets.QComboBox, "comboMode")
         combo.setCurrentIndex(0)
         combo.activated.emit(0)
-        self.assertTrue(self._wait(lambda: len(self._distance_boxes()) == 1))
-        self.assertAlmostEqual(self._distance_boxes()[0].property("rawValue"), 30.0)
+
+        def rebound_to_total_length():
+            boxes = self._distance_boxes()
+            return len(boxes) == 1 and abs(boxes[0].property("rawValue") - 30.0) < 1e-6
+
+        self.assertTrue(self._wait(rebound_to_total_length), "the arrow was not rebound")
 
     def test_the_preview_follows_a_change_within_a_quarter_second(self):
         count = self._direction_widget(1).findChild(QtWidgets.QSpinBox, "spinOccurrences")

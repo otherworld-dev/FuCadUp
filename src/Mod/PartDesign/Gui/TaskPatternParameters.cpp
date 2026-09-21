@@ -317,10 +317,16 @@ void TaskPatternParameters::showOriginAxes(bool show)
 
 void TaskPatternParameters::onUpdateViewTimer()
 {
-    // Recompute is triggered when parameters change and this timer fires
-    setupTransaction();  // Group potential property changes
-    recomputeFeature();
+    if (!blockUpdate) {
+        // Recompute is triggered when parameters change and this timer fires
+        setupTransaction();  // Group potential property changes
+        recomputeFeature();
+    }
 
+    // Runs either way, recompute or not: with "Recompute on change" off this is what
+    // rebinds the gizmos to what they now drive (a mode switch, a Reversed click), the
+    // same debounce as the recomputing path so a getStartPoint() (BRepBndLib) does not
+    // run on every keystroke in exactly the mode chosen for a slow model
     updateSpacingLabels();
 
     updateUI();
@@ -709,16 +715,11 @@ void TaskPatternParameters::onSecondDirectionFilled(bool wasInUse)
 
 void TaskPatternParameters::onParameterWidgetParametersChanged()
 {
-    // A parameter in the embedded widget changed, trigger a recompute
-    if (blockUpdate) {
-        // "Recompute on change" is off (the only way TaskPatternParameters sets this):
-        // no recompute, but the gizmos must still follow along - a mode switch rebinds
-        // the arrow to the box it now drives, and a Reversed click flips it, neither of
-        // which needs a recompute to show
-        setGizmoPositions();
-        return;
-    }
-    kickUpdateViewTimer();  // Debounce recompute
+    // A parameter in the embedded widget changed; debounced either way, recompute or
+    // not - with "Recompute on change" off (the only way TaskPatternParameters sets
+    // blockUpdate) onUpdateViewTimer() itself skips the recompute but still rebinds the
+    // gizmos, see there
+    kickUpdateViewTimer();
 }
 
 void TaskPatternParameters::onUpdateView(bool on)
