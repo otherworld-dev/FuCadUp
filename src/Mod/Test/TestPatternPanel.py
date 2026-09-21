@@ -1177,15 +1177,22 @@ class TestCountBoxes(PatternPanelCase):
         way when it was last saved. RecomputesFrozen is set too, belt and
         braces, and restored after.
 
-        Covers both directions, one at a time - not just Direction 1
-        (test_the_in_view_count_range_follows_the_panel_box, above, already covers
-        the in-view gizmo box widening this test does not need to repeat; the gap
-        the batch A review found was that Occurrences2 had no coverage of its own
-        here at all). Direction 1 is dropped back down before Direction 2 goes up
-        rather than leaving both elevated together: a LinearPattern's total copies
-        is Occurrences x Occurrences2, so an ever-both-huge state would risk a much
+        Covers both directions, one at a time - not just Direction 1 (the gap the
+        batch A review found was that Occurrences2 had no coverage of its own here
+        at all). Direction 1 is dropped back down before Direction 2 goes up rather
+        than leaving both elevated together: a LinearPattern's total copies is
+        Occurrences x Occurrences2, so an ever-both-huge state would risk a much
         larger grid than 1200 if the RecomputesFrozen/purgeTouched guard were ever
         bypassed by a future change near this test.
+
+        Also checks the in-view (gizmo) count box's own maximum widened, not just
+        the panel box's: bindGizmoCount() (TaskPatternParameters.cpp) takes a
+        one-time snapshot of the panel box's range at setupGizmos() time, when the
+        panel first opens - a different path from the one
+        test_the_in_view_count_range_follows_the_panel_box (above) exercises, which
+        only reopens on an *already-open* panel's box widening further
+        (refreshGizmoCountRanges()). An old document opened straight at 1200 goes
+        through the one-time-snapshot path alone, so it needs its own check here.
 
         Extent mode (set on both directions below) is what let this drop from
         ~1.6s: in Spacing mode updateSpacingLabels() builds one on-view
@@ -1235,6 +1242,20 @@ class TestCountBoxes(PatternPanelCase):
             )
             self.assertGreaterEqual(
                 box.maximum() + 2**31, 1200, f"Direction {number}: the panel's maximum did not widen"
+            )
+
+            # The in-view count box's own range, bound once at setupGizmos() time
+            # (bindGizmoCount()) - a document already above the cap when the panel
+            # opens goes through that one-time snapshot, not the later-widening path
+            # test_the_in_view_count_range_follows_the_panel_box (above) covers.
+            # Both directions are in use here, so _first_count_box() (which waits
+            # for exactly one) cannot be used; take whichever of the two boxes
+            # widened furthest.
+            self.assertTrue(self._wait(lambda: len(self._count_boxes()) == 2), "no count boxes in the view")
+            self.assertGreaterEqual(
+                max(box.property("maximum") for box in self._count_boxes()),
+                1200.0,
+                f"Direction {number}: the in-view count box's range did not widen",
             )
 
             # Close with Cancel: resetEdit()/closeDialog() never call accept(), so
