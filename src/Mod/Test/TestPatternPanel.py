@@ -701,6 +701,27 @@ class TestNothingSelected(PatternPanelCase):
             [obj for obj in self.doc.Objects if obj.TypeId == "PartDesign::PolarPattern"], []
         )
 
+    def test_the_cancel_button_makes_nothing(self):
+        """The picker offers only a Cancel button (TaskDlgPatternFeaturePick::
+        getStandardButtons() returns just QDialogButtonBox::Cancel). Reject the
+        dialog the same way a click on it does - TaskDialogPy.reject() finds the
+        panel's own QDialogButtonBox and calls click() on its Cancel button, not
+        just the dialog's reject() method directly - and check the body ends up
+        exactly as Esc already leaves it (test_escape_before_picking_makes_nothing,
+        above): nothing created, nothing changed."""
+
+        before = list(self.doc.Objects)
+        self._run("PartDesign_LinearPattern", select_pad=False)
+
+        FreeCADGui.Control.activeTaskDialog().reject()
+
+        self.assertTrue(self._wait(lambda: not FreeCADGui.Control.activeDialog()))
+        self.assertIs(self.body.Tip, self.pad)
+        self.assertEqual(list(self.doc.Objects), before)
+        self.assertEqual(
+            [obj for obj in self.doc.Objects if obj.TypeId == "PartDesign::LinearPattern"], []
+        )
+
 
 class TestLinearArrows(PatternPanelCase):
     """Each direction of a linear pattern has an arrow to drag, with its value on it."""
