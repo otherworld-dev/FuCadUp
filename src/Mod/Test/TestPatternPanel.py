@@ -371,6 +371,20 @@ class TestDirectionFields(PatternPanelCase):
         # The Pad is 6 mm along Y: 1.5 x 6.
         self.assertAlmostEqual(self._value(self.pattern.Offset2), 9.0)
 
+    def test_a_finished_pick_hands_the_keyboard_back_to_a_value_box(self):
+        """Direction 2's field takes the keyboard while its pick lasts; ending it must
+        hand the keyboard back to a value box, the way the panel does when it first
+        opens - not leave it on the now-inactive field. _pick() adds straight to the
+        selection rather than clicking in the 3D view, so nothing else moves the
+        keyboard off the field on its own; the fix must do it."""
+
+        self._click(self._direction_field(2))
+        self._pick(self._edge_along(FreeCAD.Vector(0, 1, 0)))
+        self.assertTrue(
+            self._wait(lambda: any(box.hasFocus() for box in self._boxes())),
+            "no value box took the keyboard back after the pick",
+        )
+
     def test_a_pick_leaves_the_preview_showing_what_it_showed(self):
         """The Preview panel's "Show final result" decides whether the pattern or the
         feature before it is shown; a pick shows the originals only while it lasts."""

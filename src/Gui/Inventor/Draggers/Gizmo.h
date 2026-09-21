@@ -343,6 +343,10 @@ public:
     void refreshValueLabels();
     /// Makes the value labels again, e.g. after a gizmo was bound to another field
     void rebuildValueLabels();
+    /// Gives the keyboard to the first shown value box, unconditionally - what happens when
+    /// the panel first opens, and what a pick that just ended must also do, since it holds
+    /// the keyboard in its own field for as long as it lasts
+    void focusFirstValueLabel();
 
     static std::unique_ptr<GizmoContainer> create(
         std::initializer_list<Gui::Gizmo*> gizmos,
@@ -367,7 +371,6 @@ private:
     /// Every shown gizmo's boxes in Tab order: its value, then its count
     std::vector<std::pair<Gizmo*, GizmoValueLabel*>> labelsInOrder() const;
     void connectLabel(GizmoValueLabel* label);
-    void focusFirstValueLabel();
     void focusNextValueLabel(GizmoValueLabel* from, bool backwards);
     bool isKeyboardOnView() const;
 

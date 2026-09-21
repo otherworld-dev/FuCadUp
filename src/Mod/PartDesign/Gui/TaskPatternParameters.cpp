@@ -423,6 +423,13 @@ void TaskPatternParameters::setPickTarget(PickTarget next)
 
     updateFeaturesField();
     setGizmoPositions();
+    if (target == PickTarget::None && gizmoContainer) {
+        // A pick holds the keyboard in its own field for as long as it lasts; ending one
+        // must hand it back to a value box, the same way the panel does when it first
+        // opens (GizmoContainer::attachViewer) - otherwise the keyboard is left on a
+        // field that is no longer active
+        gizmoContainer->focusFirstValueLabel();
+    }
     Q_EMIT pickTargetChanged();
 }
 
