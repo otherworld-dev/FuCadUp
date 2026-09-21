@@ -1042,6 +1042,49 @@ class TestCountBoxes(PatternPanelCase):
         # apply() never runs and nothing is written back or recomputed.
         self._close_editing()
 
+    def test_the_in_view_count_range_follows_the_panel_box(self):
+        """setupGizmos() bound the in-view count box's range from the panel box once, at
+        panel-open time; the panel box can widen again later while the panel stays open
+        (updateOccurrencesMaximum(), called from PatternParametersWidget::updateUI()),
+        but nothing told the in-view box to widen with it. Re-ticking "Recompute on
+        change" is the trigger used here because, unlike every other route to
+        TaskPatternParameters::updateUI(), it writes no property of its own - Occurrences
+        is set once, then purged, and never touched again, so the recompute the timer
+        forces (TaskTransformedParameters::recomputeFeature() always passes force=true,
+        see test_an_old_documents_count_above_the_cap_still_shows above) finds nothing to
+        do. Document::recompute's force only bypasses the document-level SkipRecompute
+        gate; whether an object's execute() runs is decided per object by
+        mustRecompute() (Touch || mustExecute() > 0), which purgeTouched() clears."""
+
+        def unfreeze():
+            try:
+                self.doc.RecomputesFrozen = False
+            except ReferenceError:
+                pass
+
+        box = self._first_count_box()
+        self.assertAlmostEqual(box.property("maximum"), 1000.0)
+
+        self.doc.RecomputesFrozen = True
+        self.addCleanup(unfreeze)
+        self.pattern.Occurrences = 1200
+        self.pattern.purgeTouched()
+        self.assertEqual(
+            self.pattern.getStatusString(),
+            "Valid",
+            "the pattern is touched: the update-view timer below would recompute 1200 copies",
+        )
+
+        check = self._find_widget("optionUpdateView")
+        check.setChecked(False)
+        check.setChecked(True)  # neither toggle writes a property; this just kicks the timer
+        self._process_events(300)
+
+        self.assertGreaterEqual(self._first_count_box().property("maximum"), 1200.0)
+
+        # Close with Cancel: apply() never runs, so 1200 is never written back or recomputed.
+        self._close_editing()
+
 
 class TestPolarHandle(PatternPanelCase):
     """A polar pattern's angle is turned with a handle, and its copies counted beside it."""
