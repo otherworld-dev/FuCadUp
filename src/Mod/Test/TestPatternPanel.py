@@ -162,6 +162,28 @@ class PatternPanelCase(unittest.TestCase):
     def _tr(context, text):
         return QtCore.QCoreApplication.translate(context, text)
 
+    def _search_paths(self, type_name, interest=None):
+        """A configured, already-applied SoSearchAction over the 3D view's scene graph.
+
+        The setup (setType/setInterest/setSearchingAll/apply) is the same in every
+        caller; only the node type, and whether one hit is enough, ever differ.
+
+        Kept alive on self rather than handed back as a bare local: getPaths()/
+        getPath() return paths owned by the action itself, and a chained
+        self._search_paths(...).getPaths() would otherwise drop the only reference
+        to the action - and so, in pivy, the paths it returned - the moment this
+        call returns, before the caller ever reads them."""
+
+        from pivy import coin
+
+        search = coin.SoSearchAction()
+        search.setType(coin.SoType.fromName(type_name))
+        search.setInterest(coin.SoSearchAction.ALL if interest is None else interest)
+        search.setSearchingAll(True)
+        search.apply(self.viewer.getSoRenderManager().getSceneGraph())
+        self._last_search_action = search
+        return search
+
     def _calibrated_pixels(self, point):
         """Where `point` lands in the view, in Coin device pixels - a replacement for
         _pixels() (view.getPointOnScreen(), i.e. View3DInventorViewer::
@@ -811,14 +833,7 @@ class TestLinearArrows(PatternPanelCase):
     def test_the_gaps_after_the_first_keep_their_own_labels(self):
         """Only the first gap's label is replaced by the arrow's box."""
 
-        from pivy import coin
-
-        search = coin.SoSearchAction()
-        search.setType(coin.SoType.fromName("SoDatumLabel"))
-        search.setInterest(coin.SoSearchAction.ALL)
-        search.setSearchingAll(True)
-        search.apply(self.viewer.getSoRenderManager().getSceneGraph())
-        paths = search.getPaths()
+        paths = self._search_paths("SoDatumLabel").getPaths()
         gap_labels = [
             paths[index]
             for index in range(paths.getLength())
@@ -832,20 +847,13 @@ class TestLinearArrows(PatternPanelCase):
         unoverridden first gap can safely be left to it - but a first gap with its own
         override needs a label of its own, or that value is never shown anywhere."""
 
-        from pivy import coin
-
         self.pattern.Spacings = [20.0, -1.0]
         # Nudges the panel to refresh from what was just set from Python, the way any
         # panel-driven change normally would; Reversed's own value is incidental here.
         self._direction_field(1).reverseClicked.emit()
         self._process_events(300)
 
-        search = coin.SoSearchAction()
-        search.setType(coin.SoType.fromName("SoDatumLabel"))
-        search.setInterest(coin.SoSearchAction.ALL)
-        search.setSearchingAll(True)
-        search.apply(self.viewer.getSoRenderManager().getSceneGraph())
-        paths = search.getPaths()
+        paths = self._search_paths("SoDatumLabel").getPaths()
         gap_labels = [
             paths[index]
             for index in range(paths.getLength())
@@ -1177,14 +1185,7 @@ class TestPolarHandle(PatternPanelCase):
         return [box for box in self._boxes() if "°" in box.text()]
 
     def _handle_shown(self):
-        from pivy import coin
-
-        search = coin.SoSearchAction()
-        search.setType(coin.SoType.fromName("SoRotationDraggerContainer"))
-        search.setInterest(coin.SoSearchAction.ALL)
-        search.setSearchingAll(True)
-        search.apply(self.viewer.getSoRenderManager().getSceneGraph())
-        paths = search.getPaths()
+        paths = self._search_paths("SoRotationDraggerContainer").getPaths()
         return any(self._path_is_on(paths[index]) for index in range(paths.getLength()))
 
     def test_a_polar_pattern_has_a_rotation_handle(self):
@@ -1259,12 +1260,7 @@ class TestPolarHandle(PatternPanelCase):
     def _handle_container(self):
         from pivy import coin
 
-        search = coin.SoSearchAction()
-        search.setType(coin.SoType.fromName("SoRotationDraggerContainer"))
-        search.setInterest(coin.SoSearchAction.FIRST)
-        search.setSearchingAll(True)
-        search.apply(self.viewer.getSoRenderManager().getSceneGraph())
-        path = search.getPath()
+        path = self._search_paths("SoRotationDraggerContainer", coin.SoSearchAction.FIRST).getPath()
         self.assertIsNotNone(path, "the handle is not in the scene")
         return path.getTail()
 
