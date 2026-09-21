@@ -1179,11 +1179,12 @@ class TestCountBoxes(PatternPanelCase):
 
         Covers both directions, one at a time - not just Direction 1 (the gap the
         batch A review found was that Occurrences2 had no coverage of its own here
-        at all). Direction 1 is dropped back down before Direction 2 goes up rather
-        than leaving both elevated together: a LinearPattern's total copies is
-        Occurrences x Occurrences2, so an ever-both-huge state would risk a much
-        larger grid than 1200 if the RecomputesFrozen/purgeTouched guard were ever
-        bypassed by a future change near this test.
+        at all). Direction 1 is dropped back down to 1, not just under the cap,
+        before Direction 2 goes up: a LinearPattern's total copies is Occurrences x
+        Occurrences2, so leaving Direction 1 at anything higher would still make the
+        worst case (if the RecomputesFrozen/purgeTouched guard below were ever
+        bypassed by a future change near this test) a multiple of the 1200 copies
+        this test means to risk at most, not that figure itself.
 
         Also checks the in-view (gizmo) count box's own maximum widened, not just
         the panel box's: bindGizmoCount() (TaskPatternParameters.cpp) takes a
@@ -1263,7 +1264,10 @@ class TestCountBoxes(PatternPanelCase):
             self._close_editing()
 
         check_widened(1, "Occurrences")
-        self.pattern.Occurrences = 3  # back down before Direction 2 goes up
+        self.pattern.Occurrences = 1  # back down (to the true minimum, not just under
+        # the cap) before Direction 2 goes up: a LinearPattern's total copies is
+        # Occurrences x Occurrences2, so this keeps the worst case at 1200, not
+        # some larger multiple of it, if the guard above were ever bypassed
         self.pattern.purgeTouched()
         check_widened(2, "Occurrences2")
 
