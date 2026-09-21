@@ -451,12 +451,27 @@ void TaskPatternParameters::showPickHints()
 
 bool TaskPatternParameters::eventFilter(QObject* watched, QEvent* event)
 {
+    if (event->type() == QEvent::ApplicationStateChange
+        && QApplication::applicationState() != Qt::ApplicationActive) {
+        // Losing focus or activation mid-press (Alt-Tab, say) can lose the matching
+        // release that would otherwise clear this below; left set, it would go on to
+        // silently eat the very next Esc release anywhere in the app, unrelated or not.
+        eatEscapeRelease = false;
+    }
+
     const bool escape = (event->type() == QEvent::ShortcutOverride
                          || event->type() == QEvent::KeyPress
                          || event->type() == QEvent::KeyRelease)
         && static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape;
     if (!escape || QApplication::mouseButtons() != Qt::NoButton) {
         return TaskTransformedParameters::eventFilter(watched, event);
+    }
+
+    if (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) {
+        // A fresh press means any release the flag was still waiting for is not coming;
+        // a flag left stuck from that lost release must not go on to eat this key's own
+        // release either (harmless when it was already false, as in the ordinary case).
+        eatEscapeRelease = false;
     }
 
     if (event->type() == QEvent::KeyRelease) {
