@@ -703,6 +703,21 @@ class TestLinearArrows(PatternPanelCase):
         # Three copies make two gaps; the first is the arrow's.
         self.assertEqual(len(gap_labels), 1)
 
+    def test_with_recompute_off_a_mode_switch_still_rebinds_the_arrow(self):
+        """With "Recompute on change" off, onParameterWidgetParametersChanged() used to
+        return before setGizmoPositions() ever ran, so a mode switch left the arrow
+        bound to the box it no longer drives. Length is kept in sync with Occurrences
+        and Offset synchronously (LinearPatternExtension::extensionOnChanged), not by a
+        recompute, so the box already holds the right value (2 x 15 mm = 30 mm) the
+        moment the arrow is rebound to it - no recompute is needed to show it."""
+
+        self._find_widget("optionUpdateView").setChecked(False)
+        combo = self._direction_widget(1).findChild(QtWidgets.QComboBox, "comboMode")
+        combo.setCurrentIndex(0)
+        combo.activated.emit(0)
+        self.assertTrue(self._wait(lambda: len(self._distance_boxes()) == 1))
+        self.assertAlmostEqual(self._distance_boxes()[0].property("rawValue"), 30.0)
+
     def test_the_preview_follows_a_change_within_a_quarter_second(self):
         count = self._direction_widget(1).findChild(QtWidgets.QSpinBox, "spinOccurrences")
         # One click on the up arrow. The box is a Gui::UIntSpinBox, which keeps its count

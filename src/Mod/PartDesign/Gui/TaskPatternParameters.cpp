@@ -674,7 +674,12 @@ void TaskPatternParameters::onParameterWidgetParametersChanged()
 {
     // A parameter in the embedded widget changed, trigger a recompute
     if (blockUpdate) {
-        return;  // Avoid loops if change originated from Task update
+        // "Recompute on change" is off (the only way TaskPatternParameters sets this):
+        // no recompute, but the gizmos must still follow along - a mode switch rebinds
+        // the arrow to the box it now drives, and a Reversed click flips it, neither of
+        // which needs a recompute to show
+        setGizmoPositions();
+        return;
     }
     kickUpdateViewTimer();  // Debounce recompute
 }
