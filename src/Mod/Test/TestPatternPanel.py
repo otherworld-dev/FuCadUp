@@ -1150,7 +1150,24 @@ class TestCountBoxes(PatternPanelCase):
         recompute all 1200 copies; purgeTouched() after setting it keeps this
         test from ever doing that, matching a document that was already this
         way when it was last saved. RecomputesFrozen is set too, belt and
-        braces, and restored after."""
+        braces, and restored after.
+
+        Covers both directions, one at a time - not just Direction 1
+        (test_the_in_view_count_range_follows_the_panel_box, above, already covers
+        the in-view gizmo box widening this test does not need to repeat; the gap
+        the batch A review found was that Occurrences2 had no coverage of its own
+        here at all). Direction 1 is dropped back down before Direction 2 goes up
+        rather than leaving both elevated together: a LinearPattern's total copies
+        is Occurrences x Occurrences2, so an ever-both-huge state would risk a much
+        larger grid than 1200 if the RecomputesFrozen/purgeTouched guard were ever
+        bypassed by a future change near this test.
+
+        Extent mode (set on both directions below) is what let this drop from
+        ~1.6s: in Spacing mode updateSpacingLabels() builds one on-view
+        EditableDatumLabel per gap - 1199 of them at 1200 copies - which Extent mode
+        does not, since there is no per-gap spacing to show. That label building is
+        unrelated to what this test actually checks (the panel's and the in-view
+        box's own count range), so switching mode first does not weaken it."""
 
         def unfreeze():
             # tearDown() (closeDocument) runs before an addCleanup callback, so by here
@@ -1162,29 +1179,47 @@ class TestCountBoxes(PatternPanelCase):
             except ReferenceError:
                 pass
 
+        # Direction 2 needs a pick before it has an Occurrences2 box at all
+        # (test_direction_2_starts_empty_and_says_how_to_add_one) - safe here, since
+        # it starts at its own default 2 copies, well under the cap.
+        self._click(self._direction_field(2))
+        self._pick(self._edge_along(FreeCAD.Vector(0, 1, 0)))
+
         self.doc.RecomputesFrozen = True
         self.addCleanup(unfreeze)
-
         self._close_editing()
-        self.pattern.Occurrences = 1200
+        self.pattern.Mode = "Extent"
+        self.pattern.Mode2 = "Extent"
+
+        def check_widened(number, prop_name):
+            setattr(self.pattern, prop_name, 1200)
+            self.pattern.purgeTouched()
+            self.assertEqual(
+                self.pattern.getStatusString(),
+                "Valid",
+                f"Direction {number} is touched: opening the panel would recompute 1200 copies",
+            )
+
+            FreeCADGui.getDocument(self.doc.Name).setEdit(self.pattern.Name)
+            self._process_events(300)
+
+            box = self._direction_widget(number).findChild(QtWidgets.QSpinBox, "spinOccurrences")
+            # Same INT_MIN shift as test_the_count_boxes_stop_at_a_thousand_copies above
+            self.assertEqual(
+                box.value() + 2**31, 1200, f"Direction {number}: the panel clamped an old document's count"
+            )
+            self.assertGreaterEqual(
+                box.maximum() + 2**31, 1200, f"Direction {number}: the panel's maximum did not widen"
+            )
+
+            # Close with Cancel: resetEdit()/closeDialog() never call accept(), so
+            # apply() never runs and nothing is written back or recomputed.
+            self._close_editing()
+
+        check_widened(1, "Occurrences")
+        self.pattern.Occurrences = 3  # back down before Direction 2 goes up
         self.pattern.purgeTouched()
-        self.assertEqual(
-            self.pattern.getStatusString(),
-            "Valid",
-            "the pattern is touched: opening the panel would recompute 1200 copies",
-        )
-
-        FreeCADGui.getDocument(self.doc.Name).setEdit(self.pattern.Name)
-        self._process_events(300)
-
-        box = self._direction_widget(1).findChild(QtWidgets.QSpinBox, "spinOccurrences")
-        # Same INT_MIN shift as test_the_count_boxes_stop_at_a_thousand_copies above
-        self.assertEqual(box.value() + 2**31, 1200, "the panel clamped an old document's count")
-        self.assertGreaterEqual(box.maximum() + 2**31, 1200, "the panel's maximum did not widen")
-
-        # Close with Cancel: resetEdit()/closeDialog() never call accept(), so
-        # apply() never runs and nothing is written back or recomputed.
-        self._close_editing()
+        check_widened(2, "Occurrences2")
 
     def test_the_in_view_count_range_follows_the_panel_box(self):
         """setupGizmos() bound the in-view count box's range from the panel box once, at
