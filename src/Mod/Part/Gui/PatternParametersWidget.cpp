@@ -763,9 +763,11 @@ void PatternParametersWidget::updateSpacingLabels(
                 double currentSpacing = (spacingOverride == -1.0) ? globalOffset : spacingOverride;
                 Base::Vector3d p2 = p1 + Base::Vector3d(currentSpacing, 0.0, 0.0);
 
-                if (gizmoCoversFirstLabel && i == 0) {
-                    // The arrow's own box shows this gap; the label stays, switched off,
-                    // so the indices still match the per-gap overrides
+                if (gizmoCoversFirstLabel && i == 0 && spacingOverride == -1.0) {
+                    // The arrow's own box shows this gap when it follows the global
+                    // Offset; an override needs its own label, since the arrow only ever
+                    // shows the global value, not a per-gap one. The label stays,
+                    // switched off, so the indices still match the per-gap overrides.
                     label->deactivate();
                     currentPoint = p2;
                     continue;
@@ -884,9 +886,11 @@ void PatternParametersWidget::updateSpacingLabels(
                 double currentAngle_deg = (spacingOverride == -1.0) ? globalOffset : spacingOverride;
                 double currentAngle_rad = Base::toRadians(currentAngle_deg);
 
-                if (gizmoCoversFirstLabel && i == 0) {
-                    // The arrow's own box shows this gap; the label stays, switched off,
-                    // so the indices still match the per-gap overrides
+                if (gizmoCoversFirstLabel && i == 0 && spacingOverride == -1.0) {
+                    // The arrow's own box shows this gap when it follows the global
+                    // Offset; an override needs its own label, since the arrow only ever
+                    // shows the global value, not a per-gap one. The label stays,
+                    // switched off, so the indices still match the per-gap overrides.
                     label->deactivate();
                     cumulativeAngle += currentAngle_rad;
                     continue;

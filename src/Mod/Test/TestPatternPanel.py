@@ -703,6 +703,34 @@ class TestLinearArrows(PatternPanelCase):
         # Three copies make two gaps; the first is the arrow's.
         self.assertEqual(len(gap_labels), 1)
 
+    def test_a_first_gap_with_its_own_override_keeps_its_label(self):
+        """The arrow's box always shows the global Offset, never a per-gap value, so an
+        unoverridden first gap can safely be left to it - but a first gap with its own
+        override needs a label of its own, or that value is never shown anywhere."""
+
+        from pivy import coin
+
+        self.pattern.Spacings = [20.0, -1.0]
+        # Nudges the panel to refresh from what was just set from Python, the way any
+        # panel-driven change normally would; Reversed's own value is incidental here.
+        self._direction_field(1).reverseClicked.emit()
+        self._process_events(300)
+
+        search = coin.SoSearchAction()
+        search.setType(coin.SoType.fromName("SoDatumLabel"))
+        search.setInterest(coin.SoSearchAction.ALL)
+        search.setSearchingAll(True)
+        search.apply(self.viewer.getSoRenderManager().getSceneGraph())
+        paths = search.getPaths()
+        gap_labels = [
+            paths[index]
+            for index in range(paths.getLength())
+            if paths[index].getTail().getName() != "GizmoValueLabel" and self._path_is_on(paths[index])
+        ]
+        # Both gaps now show their own label: the first because it has an override, the
+        # second because it always did (only the first can ever be the arrow's own).
+        self.assertEqual(len(gap_labels), 2)
+
     def test_with_recompute_off_a_mode_switch_still_rebinds_the_arrow(self):
         """With "Recompute on change" off, onParameterWidgetParametersChanged() used to
         return before setGizmoPositions() ever ran, so a mode switch left the arrow
