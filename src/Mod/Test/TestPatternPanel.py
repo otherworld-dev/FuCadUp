@@ -1400,7 +1400,15 @@ class TestPolarHandle(PatternPanelCase):
         Originals: a feature added to the body after the pattern already exists
         sits downstream of it in the timeline, so it can never be one of that
         pattern's own Originals (adding it through the Features field is refused,
-        as confirmed by running this the other way round first)."""
+        as confirmed by running this the other way round first).
+
+        setGizmoPositions()'s own top guard hides the handle for a pattern left in
+        error too (see test_a_pattern_left_in_error_after_a_release_hides_the_container,
+        below) - before placePolarHandle(), and its radial check, ever run. The
+        getStatusString() assertion just before the real one rules that out: without
+        it, a four-times-coincident on-axis pattern that happened to end up broken for
+        an unrelated reason would still pass here with the radial branch never
+        exercised at all."""
 
         self.doc.removeObject(self.pattern.Name)
         self.doc.recompute()
@@ -1418,6 +1426,9 @@ class TestPolarHandle(PatternPanelCase):
         self.assertEqual(self.pattern.TypeId, "PartDesign::PolarPattern")
         self.assertEqual(self.pattern.Originals, [cylinder])
 
+        self.assertEqual(
+            self.pattern.getStatusString(), "Valid", "the pattern broke for another reason"
+        )
         self.assertFalse(self._handle_shown(), "the handle stayed shown for an on-axis feature")
 
     def test_a_pattern_left_in_error_after_a_release_hides_the_container(self):
