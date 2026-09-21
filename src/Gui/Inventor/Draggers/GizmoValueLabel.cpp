@@ -23,6 +23,7 @@
 
 #include <cmath>
 
+#include <QAction>
 #include <QEvent>
 #include <QKeyEvent>
 #include <QLineEdit>
@@ -95,7 +96,7 @@ GizmoValueLabel::GizmoValueLabel(
             // and the mark would otherwise crop the digits instead of sitting beside them
             box->addIconSpace(true);
             if (auto* edit = box->findChild<QLineEdit*>()) {
-                edit->addAction(timesMark(box), QLineEdit::LeadingPosition);
+                timesMarkAction = edit->addAction(timesMark(box), QLineEdit::LeadingPosition);
             }
             label->updateGeometry();
         }
@@ -252,6 +253,15 @@ bool GizmoValueLabel::eventFilter(QObject* watched, QEvent* event)
     if (event->type() == QEvent::FocusOut) {
         Q_EMIT focusLeft();
     }
+    else if (event->type() == QEvent::PaletteChange || event->type() == QEvent::StyleChange
+             || event->type() == QEvent::ScreenChangeInternal
+             || event->type() == QEvent::DevicePixelRatioChange) {
+        // The pixmap was drawn once, from the box's palette and device pixel ratio at
+        // construction; a theme switch or a move to a screen with a different scale
+        // leaves it stale otherwise (a fixed dark-on-light glyph on a dark theme, or a
+        // blurry one after a DPI change) until redrawn here.
+        updateTimesMark();
+    }
     else if (event->type() == QEvent::KeyPress) {
         // Seen before EditableDatumLabel's own handling, which is the sketcher's
         switch (static_cast<QKeyEvent*>(event)->key()) {
@@ -297,6 +307,18 @@ Base::Vector3d GizmoValueLabel::towardsViewer() const
         viewer->getCamera()->orientation.getValue().multVec(towards, towards);
     }
     return Base::Vector3d(towards[0], towards[1], towards[2]);
+}
+
+void GizmoValueLabel::updateTimesMark()
+{
+    if (!timesMarkAction) {
+        return;
+    }
+    QuantitySpinBox* box = label->getSpinBox();
+    if (!box) {
+        return;
+    }
+    timesMarkAction->setIcon(timesMark(box));
 }
 
 #include "moc_GizmoValueLabel.cpp"  // NOLINT

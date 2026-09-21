@@ -33,6 +33,8 @@
 
 #include <FCGlobal.h>
 
+class QAction;
+
 namespace Gui
 {
 class EditableDatumLabel;
@@ -105,6 +107,8 @@ private:
     Base::Vector3d toGlobalPoint(const SbVec3f& point) const;
     Base::Vector3d toGlobalDirection(const SbVec3f& direction) const;
     Base::Vector3d towardsViewer() const;
+    /// Redraws the "x" mark for the box's current palette, font and device pixel ratio
+    void updateTimesMark();
 
     QPointer<View3DInventorViewer> viewer;
     Base::Placement editPlacement;
@@ -112,6 +116,9 @@ private:
     Kind kind;
     std::unique_ptr<EditableDatumLabel> label;
     bool shown = false;
+    /// The count box's leading "x" mark action, so it can be redrawn in place rather than
+    /// added again; null for a Kind::Value box, which has none
+    QPointer<QAction> timesMarkAction;
 };
 
 }  // namespace Gui

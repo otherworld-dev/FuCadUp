@@ -870,6 +870,23 @@ class TestCountBoxes(PatternPanelCase):
         self._process_events(300)
         self.assertEqual(self._count_boxes(), [])
 
+    def test_the_times_mark_redraws_on_a_palette_change(self):
+        """The "x" mark pixmap is drawn once, from the box's palette and device pixel
+        ratio, at construction; QEvent::PaletteChange must redraw it, or a theme
+        switch (or a move to a screen with a different scale, via the DPI/screen-
+        change events the same handler covers) leaves a stale glyph in place."""
+
+        box = self._first_count_box()
+        edit = box.findChild(QtWidgets.QLineEdit)
+        actions = edit.actions()
+        self.assertEqual(len(actions), 1, "expected only the count box's own x mark action")
+        before = actions[0].icon().cacheKey()
+
+        QtWidgets.QApplication.sendEvent(box, QtCore.QEvent(QtCore.QEvent.PaletteChange))
+        self._process_events(100)
+
+        self.assertNotEqual(actions[0].icon().cacheKey(), before, "the x mark was not redrawn")
+
     def test_a_shown_labels_points_never_fall_short_for_its_type(self):
         """SoDatumLabel::GLRender warns "Too few points to render distance label" once
         a shown DISTANCE-type label has fewer than 2 points (SoDatumLabel.cpp). Coin's
