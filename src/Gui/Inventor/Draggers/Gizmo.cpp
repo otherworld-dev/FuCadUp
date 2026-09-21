@@ -1300,8 +1300,9 @@ void GizmoContainer::rebuildValueLabels()
 void GizmoContainer::refreshValueLabels()
 {
     for (auto [gizmo, label] : labelsInOrder()) {
-        // A count box hides for its own formula too, not just the value box's - the two
-        // can be driven by expressions independently of one another
+        // A count box already hides when the value box's own formula hides the whole
+        // dragger (isShownInView(), below) - this adds the count's own formula as a
+        // second, independent reason for the count box alone to hide, on top of that
         bool isCountLabel = label == gizmo->getCountLabel();
         bool shown = visible.getValue() && gizmo->isShownInView()
             && (!isCountLabel || !gizmo->hasCountExpression());

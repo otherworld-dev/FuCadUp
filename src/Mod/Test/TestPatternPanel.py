@@ -913,9 +913,11 @@ class TestCountBoxes(PatternPanelCase):
 
     def test_the_count_box_hides_for_an_expression(self):
         """The value box already hides when its own property carries a formula
-        (Gizmo::isShownInView); the count box must do the same for its own, which is
-        independent - a value box with no formula must not hide it, and vice versa.
-        2 + 1 keeps this a three-copy pattern, so nothing expensive is computed."""
+        (Gizmo::isShownInView), and a value-box formula already hides the count box
+        along with it (there is no arrow left to hang a count on). The count box must
+        hide for its own formula too, independently of the value box's - this is the
+        count-only case, with no formula on the value box at all. 2 + 1 keeps this a
+        three-copy pattern, so nothing expensive is computed."""
 
         self.pattern.setExpression("Occurrences", "2 + 1")
         self.doc.recompute()
