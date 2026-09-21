@@ -354,6 +354,23 @@ class TestDirectionFields(PatternPanelCase):
         values = self._direction_widget(2).findChild(QtWidgets.QWidget, "valuesRow")
         self.assertTrue(values.isVisible())
 
+    def test_a_whole_body_pattern_sizes_direction_2_from_the_body(self):
+        """Whole-body mode has nothing in Originals to size Direction 2 from
+        (getOriginals() is empty once TransformMode is Whole shape), so starting
+        Direction 2 must fall back to the base shape instead - the same fallback
+        getStartPoint() already uses - rather than the 10 mm default for an
+        empty list."""
+
+        self._find_widget("optionWholeBody").setChecked(True)
+        self._process_events(300)
+        self.assertEqual(self.pattern.TransformMode, "Whole shape")
+
+        self._click(self._direction_field(2))
+        self._pick(self._edge_along(FreeCAD.Vector(0, 1, 0)))
+        self.assertEqual(self.pattern.Mode2, "Spacing")
+        # The Pad is 6 mm along Y: 1.5 x 6.
+        self.assertAlmostEqual(self._value(self.pattern.Offset2), 9.0)
+
     def test_a_pick_leaves_the_preview_showing_what_it_showed(self):
         """The Preview panel's "Show final result" decides whether the pattern or the
         feature before it is shown; a pick shows the originals only while it lasts."""

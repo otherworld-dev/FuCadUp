@@ -615,11 +615,26 @@ void TaskPatternParameters::startSecondDirection(PartDesign::LinearPattern* patt
 {
     pattern->Mode2.setValue(static_cast<long>(Part::LinearPatternMode::Spacing));
     auto* body = PartDesign::Body::findBodyOf(pattern);
-    pattern->Offset2.setValue(PartDesignGui::suggestPatternSpacing(
-        pattern->getOriginals(),
-        PartDesignGui::patternDirection(*pattern, pattern->Direction2).value_or(Base::Vector3d(0, 1, 0)),
-        !body || body->AllowCompound.getValue()
-    ));
+    const bool allowGaps = !body || body->AllowCompound.getValue();
+    const Base::Vector3d direction =
+        PartDesignGui::patternDirection(*pattern, pattern->Direction2).value_or(Base::Vector3d(0, 1, 0));
+
+    std::vector<App::DocumentObject*> originals = pattern->getOriginals();
+    double spacing;
+    if (!originals.empty()) {
+        spacing = PartDesignGui::suggestPatternSpacing(originals, direction, allowGaps);
+    }
+    else if (auto* base = pattern->getBaseObject(/* silent = */ true)) {
+        // Whole-body mode: Originals is empty, so size from the base shape instead, the
+        // way getStartPoint() falls back to it.
+        spacing =
+            PartDesignGui::suggestPatternSpacing(base->Shape.getShape().getShape(), direction, allowGaps);
+    }
+    else {
+        spacing = PartDesignGui::suggestPatternSpacing(originals, direction, allowGaps);
+    }
+    pattern->Offset2.setValue(spacing);
+
     if (pattern->Occurrences2.getValue() < 2) {
         pattern->Occurrences2.setValue(2);
     }

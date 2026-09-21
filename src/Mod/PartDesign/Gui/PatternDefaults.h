@@ -7,6 +7,8 @@
 
 #include <Base/Vector3D.h>
 
+class TopoDS_Shape;
+
 namespace App
 {
 class DocumentObject;
@@ -29,6 +31,16 @@ double roundUpSpacing(double value);
 /// originals have no size along direction.
 double suggestPatternSpacing(
     const std::vector<App::DocumentObject*>& originals,
+    const Base::Vector3d& direction,
+    bool allowGaps = true
+);
+
+/// The same spacing, measured from a single already-placed shape rather than a list of
+/// originals. Used in whole-body mode, where there are no originals to measure: the
+/// caller sizes from the base feature's own shape instead, the way getStartPoint() falls
+/// back to it.
+double suggestPatternSpacing(
+    const TopoDS_Shape& shape,
     const Base::Vector3d& direction,
     bool allowGaps = true
 );

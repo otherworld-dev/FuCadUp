@@ -35,16 +35,70 @@ double roundUpSpacing(double value)
     return std::ceil(value / step - roundingSlack) * step;
 }
 
+namespace
+{
+/// Widens [lowest, highest] with shape's extent along dir (already normalized). Leaves
+/// both untouched for a null or void shape.
+void extendRangeAlongDirection(
+    const TopoDS_Shape& shape,
+    const Base::Vector3d& dir,
+    double& lowest,
+    double& highest
+)
+{
+    if (shape.IsNull()) {
+        return;
+    }
+    Bnd_Box box;
+    // Tight and without the shape's tolerance, so a 10 mm pad measures 10 mm
+    BRepBndLib::AddOptimal(shape, box, Standard_False, Standard_False);
+    if (box.IsVoid()) {
+        return;
+    }
+    double xmin, ymin, zmin, xmax, ymax, zmax;
+    box.Get(xmin, ymin, zmin, xmax, ymax, zmax);
+    for (double x : {xmin, xmax}) {
+        for (double y : {ymin, ymax}) {
+            for (double z : {zmin, zmax}) {
+                const double along = Base::Vector3d(x, y, z) * dir;
+                lowest = std::min(lowest, along);
+                highest = std::max(highest, along);
+            }
+        }
+    }
+}
+
+/// The spacing for a measured [lowest, highest] range along direction, or the fallback
+/// when it comes out empty (nothing measured, or no extent along direction).
+double spacingFromRange(double lowest, double highest, bool allowGaps)
+{
+    const double size = highest - lowest;
+    if (!(size > Base::Precision::Confusion())) {
+        return fallbackSpacing;
+    }
+    return roundUpSpacing(size * (allowGaps ? clearFactor : 1.0));
+}
+
+/// direction, normalized, or nullopt when it is too short to give a direction at all.
+std::optional<Base::Vector3d> normalizedOrNullopt(const Base::Vector3d& direction)
+{
+    if (direction.Length() < Base::Precision::Confusion()) {
+        return std::nullopt;
+    }
+    return Base::Vector3d(direction).Normalize();
+}
+}  // namespace
+
 double suggestPatternSpacing(
     const std::vector<App::DocumentObject*>& originals,
     const Base::Vector3d& direction,
     bool allowGaps
 )
 {
-    if (direction.Length() < Base::Precision::Confusion()) {
+    const auto dir = normalizedOrNullopt(direction);
+    if (!dir) {
         return fallbackSpacing;
     }
-    const Base::Vector3d dir = Base::Vector3d(direction).Normalize();
 
     double lowest = std::numeric_limits<double>::max();
     double highest = std::numeric_limits<double>::lowest();
@@ -58,31 +112,28 @@ double suggestPatternSpacing(
             continue;
         }
         shape.Move(feature->getLocation());
-
-        Bnd_Box box;
-        // Tight and without the shape's tolerance, so a 10 mm pad measures 10 mm
-        BRepBndLib::AddOptimal(shape, box, Standard_False, Standard_False);
-        if (box.IsVoid()) {
-            continue;
-        }
-        double xmin, ymin, zmin, xmax, ymax, zmax;
-        box.Get(xmin, ymin, zmin, xmax, ymax, zmax);
-        for (double x : {xmin, xmax}) {
-            for (double y : {ymin, ymax}) {
-                for (double z : {zmin, zmax}) {
-                    const double along = Base::Vector3d(x, y, z) * dir;
-                    lowest = std::min(lowest, along);
-                    highest = std::max(highest, along);
-                }
-            }
-        }
+        extendRangeAlongDirection(shape, *dir, lowest, highest);
     }
 
-    const double size = highest - lowest;
-    if (!(size > Base::Precision::Confusion())) {
+    return spacingFromRange(lowest, highest, allowGaps);
+}
+
+double suggestPatternSpacing(
+    const TopoDS_Shape& shape,
+    const Base::Vector3d& direction,
+    bool allowGaps
+)
+{
+    const auto dir = normalizedOrNullopt(direction);
+    if (!dir) {
         return fallbackSpacing;
     }
-    return roundUpSpacing(size * (allowGaps ? clearFactor : 1.0));
+
+    double lowest = std::numeric_limits<double>::max();
+    double highest = std::numeric_limits<double>::lowest();
+    extendRangeAlongDirection(shape, *dir, lowest, highest);
+
+    return spacingFromRange(lowest, highest, allowGaps);
 }
 
 std::optional<Base::Vector3d> patternDirection(
