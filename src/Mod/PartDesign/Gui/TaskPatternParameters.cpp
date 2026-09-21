@@ -460,6 +460,12 @@ bool TaskPatternParameters::eventFilter(QObject* watched, QEvent* event)
         // release that would otherwise clear this below; left set, it would go on to
         // silently eat the very next Esc release anywhere in the app, unrelated or not.
         eatEscapeRelease = false;
+        // The release branch below removes the filter the same way once it has eaten
+        // the release it was left installed for; that release is the one going missing
+        // here, so do the same removal in its place.
+        if (target == PickTarget::None) {
+            qApp->removeEventFilter(this);
+        }
     }
 
     const bool escape = (event->type() == QEvent::ShortcutOverride
@@ -475,6 +481,12 @@ bool TaskPatternParameters::eventFilter(QObject* watched, QEvent* event)
         // a flag left stuck from that lost release must not go on to eat this key's own
         // release either (harmless when it was already false, as in the ordinary case).
         eatEscapeRelease = false;
+        // Mirrors the release branch below: with the flag no longer waiting on anything
+        // and no pick active, the filter has nothing left to do until the next pick
+        // starts and installs it again.
+        if (target == PickTarget::None) {
+            qApp->removeEventFilter(this);
+        }
     }
 
     if (event->type() == QEvent::KeyRelease) {
