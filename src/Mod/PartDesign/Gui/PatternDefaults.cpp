@@ -49,22 +49,31 @@ void extendRangeAlongDirection(
     if (shape.IsNull()) {
         return;
     }
-    Bnd_Box box;
-    // Tight and without the shape's tolerance, so a 10 mm pad measures 10 mm
-    BRepBndLib::AddOptimal(shape, box, Standard_False, Standard_False);
-    if (box.IsVoid()) {
-        return;
-    }
-    double xmin, ymin, zmin, xmax, ymax, zmax;
-    box.Get(xmin, ymin, zmin, xmax, ymax, zmax);
-    for (double x : {xmin, xmax}) {
-        for (double y : {ymin, ymax}) {
-            for (double z : {zmin, zmax}) {
-                const double along = Base::Vector3d(x, y, z) * dir;
-                lowest = std::min(lowest, along);
-                highest = std::max(highest, along);
+    try {
+        Bnd_Box box;
+        // Tight and without the shape's tolerance, so a 10 mm pad measures 10 mm
+        BRepBndLib::AddOptimal(shape, box, Standard_False, Standard_False);
+        if (box.IsVoid()) {
+            return;
+        }
+        double xmin, ymin, zmin, xmax, ymax, zmax;
+        box.Get(xmin, ymin, zmin, xmax, ymax, zmax);
+        for (double x : {xmin, xmax}) {
+            for (double y : {ymin, ymax}) {
+                for (double z : {zmin, zmax}) {
+                    const double along = Base::Vector3d(x, y, z) * dir;
+                    lowest = std::min(lowest, along);
+                    highest = std::max(highest, along);
+                }
             }
         }
+    }
+    catch (const Standard_Failure&) {
+        // A degenerate or whole-body shape can make AddOptimal throw; leave the range
+        // untouched, the same as a shape with nothing to measure - spacingFromRange
+        // already falls back when lowest/highest never widen at all
+    }
+    catch (const Base::Exception&) {
     }
 }
 
