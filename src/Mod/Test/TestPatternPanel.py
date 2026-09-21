@@ -1287,10 +1287,103 @@ class TestPolarHandle(PatternPanelCase):
         self._press(angle, QtCore.Qt.Key_Tab)
         self._wait_for_focus(count)
 
+    def test_switching_to_angle_between_rebinds_the_handle(self):
+        """The same rebind TestLinearArrows.
+        test_with_recompute_off_a_mode_switch_still_rebinds_the_arrow covers for the
+        arrows' own mode combo, but for the handle's (PatternParametersWidget::
+        activeValueBox() switches from spinExtent to spinSpacing, and
+        placePolarHandle's own handle->setProperty(...) follows), and with
+        "Recompute on change" left on - the ordinary path, not the debounced-while-
+        blocked one that test already covers."""
+
+        self.assertTrue(self._wait(lambda: len(self._angle_boxes()) == 1))
+        self.assertAlmostEqual(self._angle_boxes()[0].property("rawValue"), 360.0)
+
+        combo = self._direction_widget(1).findChild(QtWidgets.QComboBox, "comboMode")
+        combo.setCurrentIndex(1)
+        combo.activated.emit(1)
+
+        def rebound_to_spacing():
+            boxes = self._angle_boxes()
+            return len(boxes) == 1 and abs(
+                boxes[0].property("rawValue") - self._value(self.pattern.Offset)
+            ) < 1e-6
+
+        self.assertTrue(self._wait(rebound_to_spacing), "the handle was not rebound to the spacing box")
+        # Not a tautology: rawValue tracks whatever property is bound right now, and a
+        # stale binding would just keep reading Angle's own 360 forever, which Offset
+        # is not.
+        self.assertNotAlmostEqual(self._value(self.pattern.Offset), 360.0)
+
     def test_the_handle_hides_while_the_axis_is_being_picked(self):
         self.assertTrue(self._wait(self._handle_shown))
         self._click(self._direction_field(1))
         self.assertFalse(self._handle_shown())
+
+    def test_a_feature_centred_on_the_axis_hides_the_handle(self):
+        """placePolarHandle hides the handle once the offset from the axis is
+        (near) zero (radial.Length() < Precision::Confusion() in
+        TaskPatternParameters.cpp) - there is no side left to put it on. A feature
+        whose own AddSubShape sits centred right on the pattern's axis triggers
+        exactly that; the default Pad every other test here copies is centred off
+        to one side of it (RADIAL, above), which is why its handle shows at all.
+        The default Axis for a feature with no sketch of its own to fall back to is
+        the body's own Z origin axis (CmdPartDesignPolarPattern::activated) - the
+        same line as the sketch's N_Axis this class's PIVOT sits on, for a fresh
+        Pad-based body - so a cylinder left at the origin lands right on it.
+
+        setUp's own pattern (copying the Pad) is undone first, and a fresh one made
+        to copy the cylinder instead of adding the cylinder to the existing one's
+        Originals: a feature added to the body after the pattern already exists
+        sits downstream of it in the timeline, so it can never be one of that
+        pattern's own Originals (adding it through the Features field is refused,
+        as confirmed by running this the other way round first)."""
+
+        self.doc.removeObject(self.pattern.Name)
+        self.doc.recompute()
+
+        cylinder = self.doc.addObject("PartDesign::AdditiveCylinder", "OnAxisCylinder")
+        self.body.addObject(cylinder)
+        cylinder.Radius = 1.0
+        cylinder.Height = 4.0
+        self.doc.recompute()
+
+        self._run("PartDesign_PolarPattern", select_pad=False)
+        self._pick("Face1", cylinder)
+        self.assertTrue(self._wait(lambda: self.body.Tip is not self.pad), "no pattern was made")
+        self.pattern = self.body.Tip
+        self.assertEqual(self.pattern.TypeId, "PartDesign::PolarPattern")
+        self.assertEqual(self.pattern.Originals, [cylinder])
+
+        self.assertFalse(self._handle_shown(), "the handle stayed shown for an on-axis feature")
+
+    def test_a_pattern_left_in_error_after_a_release_hides_the_container(self):
+        """setGizmoPositions()'s own top guard (feature->isError()) hides the whole
+        container - not just the handle's own axis-radius check above, and not just
+        the picking-mode guard test_the_handle_hides_while_the_axis_is_being_picked
+        already covers - once a pattern is left broken. Checking the count box too
+        (not just the handle) is what proves this is the container's own gate: a
+        per-gizmo hide (like the axis-centred case above) would leave the count box
+        showing regardless, since nothing about the count box depends on where the
+        handle itself would sit."""
+
+        self.assertTrue(self._wait(self._handle_shown), "no rotation handle in the view")
+        self.assertTrue(self._wait(lambda: len(self._count_boxes()) == 1), "no count box")
+
+        # PolarPatternExtension::calculateTransformations() throws "Pattern angle
+        # can't be null" for Angle == 0 in Extent mode - see
+        # test_dragging_the_handle_towards_zero_keeps_it_under_the_pointer, below.
+        self.pattern.Angle = 0.0
+        check = self._find_widget("optionUpdateView")
+        check.setChecked(False)
+        check.setChecked(True)  # neither toggle writes a property; this just kicks
+        # the timer for a real recompute + gizmo refresh, the same cycle a drag's
+        # own release already goes through (arrowDragFinished/handleDragFinished)
+        self._process_events(300)
+
+        self.assertFalse(self.pattern.isValid(), "the pattern did not end up broken")
+        self.assertFalse(self._handle_shown(), "the handle stayed shown for a broken pattern")
+        self.assertEqual(self._count_boxes(), [], "the count box stayed shown for a broken pattern")
 
     def test_nothing_runs_off_the_narrowest_tasks_panel(self):
         axis = self._direction_widget(1)
