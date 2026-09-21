@@ -147,6 +147,10 @@ private:
     void setupGizmos();
     /// Binds one gizmo's count box to a panel's count box, range included
     void bindGizmoCount(Gui::Gizmo* gizmo, PartGui::PatternParametersWidget* widget);
+    /// Brings each bound gizmo's count range in step with its panel box, which can widen
+    /// (or since narrow) from outside while the panel is open - see PatternParametersWidget::
+    /// updateOccurrencesMaximum, which updateUI() calls just before this
+    void refreshGizmoCountRanges();
     void setGizmoPositions();
     void placePolarHandle(PartDesign::PolarPattern* polar);
     void placeLinearArrows(PartDesign::LinearPattern* pattern);

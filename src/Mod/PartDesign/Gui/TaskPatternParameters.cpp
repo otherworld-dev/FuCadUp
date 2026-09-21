@@ -284,6 +284,9 @@ void TaskPatternParameters::updateUI()
     if (parametersWidget2) {
         parametersWidget2->updateUI();
     }
+    // The panel boxes' ranges may just have widened (or narrowed back) above; keep the
+    // in-view count boxes in step with them
+    refreshGizmoCountRanges();
 }
 
 // --- Task-Specific Logic ---
@@ -1066,6 +1069,26 @@ void TaskPatternParameters::bindGizmoCount(Gui::Gizmo* gizmo, PartGui::PatternPa
         static_cast<int>(box->maximum()),
         [box]() { return box->hasExpression(); }
     );
+}
+
+void TaskPatternParameters::refreshGizmoCountRanges()
+{
+    // updateOccurrencesMaximum() (called from PatternParametersWidget::updateUI(), just
+    // before this) can widen a panel box's maximum while the panel is open - an old
+    // document's Occurrences raised further from Python, say. The in-view count box bound
+    // to it took a one-time snapshot of that range at setupGizmos() time; left stale, a
+    // programmatic clamp there could fire valueEdited and write the truncated value back,
+    // the same silent-truncation bug the panel box itself was fixed for, by another route.
+    const auto refresh = [](Gui::Gizmo* gizmo, PartGui::PatternParametersWidget* widget) {
+        if (!gizmo || !gizmo->hasCountBinding()) {
+            return;
+        }
+        Gui::UIntSpinBox* box = widget->countBox();
+        gizmo->setCountRange(static_cast<int>(box->minimum()), static_cast<int>(box->maximum()));
+    };
+    refresh(arrow1, parametersWidget);
+    refresh(arrow2, parametersWidget2);
+    refresh(handle, parametersWidget);
 }
 
 void TaskPatternParameters::setGizmoPositions()

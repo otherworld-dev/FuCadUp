@@ -217,6 +217,15 @@ bool Gizmo::hasCountBinding() const
     return countGetter && countSetter;
 }
 
+void Gizmo::setCountRange(int minimum, int maximum)
+{
+    countMinimum = minimum;
+    countMaximum = std::max(minimum, maximum);
+    if (countLabel) {
+        countLabel->setRange(countMinimum, countMaximum);
+    }
+}
+
 bool Gizmo::hasCountExpression() const
 {
     return countExpressionGetter && countExpressionGetter();

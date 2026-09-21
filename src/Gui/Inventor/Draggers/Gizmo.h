@@ -111,6 +111,10 @@ public:
         CountExpressionGetter hasExpression = {}
     );
     bool hasCountBinding() const;
+    /// Brings the count box's range in step with a panel box that has widened (or since
+    /// narrowed) from outside, without touching the getter, the setter or the current value -
+    /// cheaper than setCountBinding, which rebuilds every value label in the container
+    void setCountRange(int minimum, int maximum);
     /// Whether the count's own source is a formula, if setCountBinding was given a way to ask
     bool hasCountExpression() const;
     GizmoValueLabel* getCountLabel() const;
