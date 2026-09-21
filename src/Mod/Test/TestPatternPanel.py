@@ -200,12 +200,13 @@ class PatternPanelCase(unittest.TestCase):
         around it instead.
 
         Calibrated from view.projectPointToLine(), which is unaffected by the same
-        bug. Every dragger test in this module uses an orthographic camera
-        (view.viewIsometric()), so screen position is an affine function of world
-        position with no perspective divide: three calibration points - the
-        viewport's own centre pixel, and one small step from it along each of Coin's
-        own pixel axes - are enough to invert that affine map exactly for any point,
-        whatever the view's aspect ratio or shape."""
+        bug. Every dragger test in this module uses an orthographic camera (set
+        explicitly in setUp() with setCameraType() - viewIsometric() only sets the
+        camera's orientation, not its type), so screen position is an affine
+        function of world position with no perspective divide: three calibration
+        points - the viewport's own centre pixel, and one small step from it along
+        each of Coin's own pixel axes - are enough to invert that affine map exactly
+        for any point, whatever the view's aspect ratio or shape."""
 
         vp = self.viewer.getSoRenderManager().getViewportRegion()
         size = vp.getViewportSizePixels()
@@ -781,6 +782,10 @@ class TestLinearArrows(PatternPanelCase):
         self._run("PartDesign_LinearPattern")
         self._refresh_view_widgets()
         self.view.viewIsometric()
+        # viewIsometric() only sets the camera's orientation (View3DPy.cpp), not its
+        # type; _calibrated_pixels()'s affine-map assumption needs an orthographic
+        # one (the usual default, but made explicit here rather than assumed).
+        self.view.setCameraType("Orthographic")
         self.view.fitAll()
         self._process_events(300)
 
@@ -1281,6 +1286,9 @@ class TestPolarHandle(PatternPanelCase):
         self._run("PartDesign_PolarPattern")
         self._refresh_view_widgets()
         self.view.viewIsometric()
+        # See TestLinearArrows.setUp: viewIsometric() sets orientation only, not
+        # camera type; _calibrated_pixels() needs an orthographic one.
+        self.view.setCameraType("Orthographic")
         self.view.fitAll()
         self._process_events(300)
 
