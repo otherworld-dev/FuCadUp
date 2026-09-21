@@ -1090,8 +1090,11 @@ void TaskPatternParameters::refreshGizmoCountRanges()
     // before this) can widen a panel box's maximum while the panel is open - an old
     // document's Occurrences raised further from Python, say. The in-view count box bound
     // to it took a one-time snapshot of that range at setupGizmos() time; left stale, a
-    // programmatic clamp there could fire valueEdited and write the truncated value back,
-    // the same silent-truncation bug the panel box itself was fixed for, by another route.
+    // narrower range there than the panel box now has refuses a count the panel would
+    // accept, and a wider one (the panel's own maximum narrowed back down, say) lets the
+    // in-view box accept a count the panel box would not - UIntSpinBox::setValue then
+    // silently clamps that on its way into the property, the same wrong-ceiling shape
+    // as the bug the panel box itself was fixed for, by the other box this time.
     const auto refresh = [](Gui::Gizmo* gizmo, PartGui::PatternParametersWidget* widget) {
         if (!gizmo || !gizmo->hasCountBinding()) {
             return;
