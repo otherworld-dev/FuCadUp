@@ -36,14 +36,12 @@ class PatternPanelCase(unittest.TestCase):
     _draw_rectangle = staticmethod(extrude.ExtrudePanelCase._draw_rectangle)
     _find_widget = staticmethod(extrude.ExtrudePanelCase._find_widget)
     _refresh_view_widgets = extrude.TestExtrudeDrag._refresh_view_widgets
-    _pixels = extrude.TestExtrudeDrag._pixels
     _qt_pos = extrude.TestExtrudeDrag._qt_pos
     _mouse = extrude.TestExtrudeDrag._mouse
     _wait = gizmo_labels.GizmoLabelCase._wait
     _press = gizmo_labels.GizmoLabelCase._press
     _type = gizmo_labels.GizmoLabelCase._type
     _select_all = gizmo_labels.GizmoLabelCase._select_all
-    _screen_point = gizmo_labels.GizmoLabelCase._screen_point
     _box_centre_on_screen = gizmo_labels.GizmoLabelCase._box_centre_on_screen
     _dragger_under = gizmo_labels.TestGizmoValueLabels._dragger_under
     SO_SWITCH_NONE = extrude.TestExtrudeDrag.SO_SWITCH_NONE
