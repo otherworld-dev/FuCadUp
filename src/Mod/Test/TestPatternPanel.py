@@ -788,6 +788,54 @@ class TestCountBoxes(PatternPanelCase):
             self.assertEqual(count.maximum() + 2**31, 1000, f"Direction {number}'s count")
         self.assertAlmostEqual(self._first_count_box().property("maximum"), 1000.0)
 
+    def test_an_old_documents_count_above_the_cap_still_shows(self):
+        """A document saved before the panel capped copies at 1000 can carry a
+        higher count. Set here the way a load from disk would leave it - the
+        property holds 1200 but nothing is touched - rather than by simply
+        assigning Occurrences and opening the panel: ViewProviderTransformed::
+        setEdit calls recomputeFeature(false), which forces a real recompute
+        whenever mustExecute() is true, no matter that RecomputesFrozen is set
+        (Document::recomputeFeature's recursive path always passes force=true).
+        A freshly touched Occurrences would make mustExecute() true and so
+        recompute all 1200 copies; purgeTouched() after setting it keeps this
+        test from ever doing that, matching a document that was already this
+        way when it was last saved. RecomputesFrozen is set too, belt and
+        braces, and restored after."""
+
+        def unfreeze():
+            # tearDown() (closeDocument) runs before an addCleanup callback, so by here
+            # self.doc's wrapper may already be a dead reference - even reading .Name
+            # off it raises, so the only safe check is to try the write and let a dead
+            # document's ReferenceError pass.
+            try:
+                self.doc.RecomputesFrozen = False
+            except ReferenceError:
+                pass
+
+        self.doc.RecomputesFrozen = True
+        self.addCleanup(unfreeze)
+
+        self._close_editing()
+        self.pattern.Occurrences = 1200
+        self.pattern.purgeTouched()
+        self.assertEqual(
+            self.pattern.getStatusString(),
+            "Valid",
+            "the pattern is touched: opening the panel would recompute 1200 copies",
+        )
+
+        FreeCADGui.getDocument(self.doc.Name).setEdit(self.pattern.Name)
+        self._process_events(300)
+
+        box = self._direction_widget(1).findChild(QtWidgets.QSpinBox, "spinOccurrences")
+        # Same INT_MIN shift as test_the_count_boxes_stop_at_a_thousand_copies above
+        self.assertEqual(box.value() + 2**31, 1200, "the panel clamped an old document's count")
+        self.assertGreaterEqual(box.maximum() + 2**31, 1200, "the panel's maximum did not widen")
+
+        # Close with Cancel: resetEdit()/closeDialog() never call accept(), so
+        # apply() never runs and nothing is written back or recomputed.
+        self._close_editing()
+
 
 class TestPolarHandle(PatternPanelCase):
     """A polar pattern's angle is turned with a handle, and its copies counted beside it."""

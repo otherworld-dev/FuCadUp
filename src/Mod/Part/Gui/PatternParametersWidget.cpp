@@ -225,12 +225,8 @@ void PatternParametersWidget::bindProperties(
 
     ui->spinOccurrences->bind(*m_occurrencesProp);
     ui->spinOccurrences->blockSignals(true);
-    // Capped here and not on the property: a count typed a digit or two too long would
-    // take ages to recompute
-    ui->spinOccurrences->setMaximum(
-        static_cast<uint>(std::min<long>(m_occurrencesProp->getMaximum(), maxCopies))
-    );
     ui->spinOccurrences->setMinimum(m_occurrencesProp->getMinimum());
+    updateOccurrencesMaximum();
     ui->spinOccurrences->blockSignals(false);
 
     // Initial UI update from properties
@@ -273,6 +269,7 @@ void PatternParametersWidget::updateUI()
     ui->comboMode->setCurrentIndex(m_modeProp->getValue());
     ui->spinExtent->setValue(m_extentProp->getValue());
     ui->spinSpacing->setValue(m_spacingProp->getValue());
+    updateOccurrencesMaximum();
     ui->spinOccurrences->setValue(m_occurrencesProp->getValue());
 
     rebuildDynamicSpacingUI();
@@ -288,6 +285,20 @@ void PatternParametersWidget::adaptVisibilityToMode()
     auto mode = static_cast<PartGui::PatternMode>(m_modeProp->getValue());
     ui->spinExtent->setVisible(mode == PartGui::PatternMode::Extent);
     ui->spacingControlsWidget->setVisible(mode == PartGui::PatternMode::Spacing);
+}
+
+void PatternParametersWidget::updateOccurrencesMaximum()
+{
+    if (!m_occurrencesProp) {
+        return;
+    }
+    // Capped here and not on the property: a count typed a digit or two too long would
+    // take ages to recompute. But the cap must never cut down a value the property already
+    // carries (an old document, or one edited from Python) - only limit raising it further,
+    // so a count above the cap still shows and round-trips unchanged.
+    const auto cap = static_cast<uint>(std::min<long>(m_occurrencesProp->getMaximum(), maxCopies));
+    const auto current = static_cast<uint>(m_occurrencesProp->getValue());
+    ui->spinOccurrences->setMaximum(std::max(cap, current));
 }
 
 const App::PropertyLinkSub& PatternParametersWidget::getCurrentDirectionLink() const

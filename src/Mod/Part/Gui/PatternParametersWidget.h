@@ -245,6 +245,7 @@ private:
     // UI Update and state management
     void adaptVisibilityToMode();
     void refreshPickField();
+    void updateOccurrencesMaximum();
     void onCleared();
 
     // Dynamic spacing helpers
