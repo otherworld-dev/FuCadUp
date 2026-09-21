@@ -1425,10 +1425,12 @@ class TestPolarHandle(PatternPanelCase):
         container - not just the handle's own axis-radius check above, and not just
         the picking-mode guard test_the_handle_hides_while_the_axis_is_being_picked
         already covers - once a pattern is left broken. Checking the count box too
-        (not just the handle) is what proves this is the container's own gate: a
-        per-gizmo hide (like the axis-centred case above) would leave the count box
-        showing regardless, since nothing about the count box depends on where the
-        handle itself would sit."""
+        is not a discriminator between this guard and a per-gizmo hide, for a polar
+        pattern specifically: setupGizmos() binds the one count box to the same
+        handle gizmo (bindGizmoCount(handle, ...)), so hiding the handle alone would
+        already take the count box with it (Gizmo::isShownInView(), refreshValueLabels()).
+        Its value here is narrower: a broken pattern leaves nothing at all in the
+        view, not just an invisible handle with a stray count box left over."""
 
         self.assertTrue(self._wait(self._handle_shown), "no rotation handle in the view")
         self.assertTrue(self._wait(lambda: len(self._count_boxes()) == 1), "no count box")
