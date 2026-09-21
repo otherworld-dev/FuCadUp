@@ -66,6 +66,7 @@
 #include <Gui/View3DInventor.h>
 #include <Gui/View3DInventorViewer.h>
 #include <Gui/ViewProviderCoordinateSystem.h>
+#include <Gui/ViewProviderDocumentObject.h>
 #include <Mod/PartDesign/App/Body.h>
 #include <Mod/PartDesign/App/DatumLine.h>
 #include <Mod/PartDesign/App/DatumPlane.h>
@@ -565,6 +566,23 @@ void TaskPatternParameters::updateFeaturesField()
     }
     featuresField->setSummary(whole ? tr("The whole body") : labels.join(QStringLiteral(", ")));
     featuresField->setEnabled(!whole || target == PickTarget::Features);
+}
+
+void TaskPatternParameters::slotChangedObject(
+    const Gui::ViewProviderDocumentObject& Obj,
+    const App::Property& Prop
+)
+{
+    // Fires for every property change in the document; stay cheap and bail unless it is
+    // this pattern's own Originals or TransformMode, the two updateFeaturesField() reads.
+    // Neither is written here, so this cannot recurse back into itself.
+    auto* pattern = getObject();
+    if (!pattern || Obj.getObject() != pattern) {
+        return;
+    }
+    if (&Prop == &pattern->Originals || &Prop == &pattern->TransformMode) {
+        updateFeaturesField();
+    }
 }
 
 void TaskPatternParameters::toggleFeature(const Gui::SelectionChanges& msg)

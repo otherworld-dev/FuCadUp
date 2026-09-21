@@ -101,6 +101,10 @@ public:
 protected:
     void onSelectionChanged(const Gui::SelectionChanges& msg) override;
     bool eventFilter(QObject* watched, QEvent* event) override;
+    /// Keeps the Features field's summary in step with Originals/TransformMode changes
+    /// that do not come from this panel: an undo, a Python edit, a deleted feature
+    void slotChangedObject(const Gui::ViewProviderDocumentObject& Obj, const App::Property& Prop)
+        override;
 
 private Q_SLOTS:
     void onUpdateViewTimer();

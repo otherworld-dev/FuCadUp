@@ -418,6 +418,21 @@ class TestFeaturesField(PatternPanelCase):
         self._run("PartDesign_LinearPattern")
         self.assertEqual(self._features_field().property("summary"), self.pad.Label)
 
+    def test_the_summary_follows_an_external_change_to_originals(self):
+        """updateFeaturesField() used to run only from the panel's own paths, so an
+        undo, a Python edit or a deleted feature left the summary showing stale
+        labels. A Python edit to Originals is the cheapest of those three to drive
+        here; all three go through the same property change, observed the same way."""
+
+        cylinder = self._add_cylinder()
+        self._run("PartDesign_LinearPattern")
+        self.pattern.Originals = [self.pad, cylinder]
+        self._process_events(300)
+        self.assertEqual(
+            self._features_field().property("summary"),
+            f"{self.pad.Label}, {cylinder.Label}",
+        )
+
     def test_the_old_feature_list_is_gone(self):
         self._run("PartDesign_LinearPattern")
         self.assertFalse(self._find_widget("listWidgetFeatures").isVisible())
