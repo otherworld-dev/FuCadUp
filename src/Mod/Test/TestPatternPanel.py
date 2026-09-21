@@ -565,6 +565,55 @@ class TestFeaturesField(PatternPanelCase):
         self.assertEqual(self.pattern.TransformMode, "Whole shape")
         self.assertFalse(self._features_field().isEnabled())
 
+    def test_the_options_toggle_shows_and_hides_the_box(self):
+        """The Options box (holding "Copy the whole body" and "Recompute on change")
+        starts collapsed and has no object name of its own to find directly; a child
+        that does (optionUpdateView) is only ever visible when its parent box is, so
+        checking it is the same as checking the box itself."""
+
+        self._run("PartDesign_LinearPattern")
+        check = self._find_widget("optionUpdateView")
+        self.assertFalse(check.isVisible(), "the options box should start collapsed")
+
+        self._click(self._find_widget("optionsToggle"))
+        self.assertTrue(check.isVisible(), "the options box did not open")
+
+        self._click(self._find_widget("optionsToggle"))
+        self.assertFalse(check.isVisible(), "the options box did not close again")
+
+    def test_unticking_recompute_on_change_stops_the_recompute(self):
+        """optionUpdateView only gates TaskPatternParameters::blockUpdate, which
+        onUpdateViewTimer() checks before calling recomputeFeature() - the panel
+        widget itself still writes the property straight through regardless (its
+        own, differently-named blockUpdate is just a recursion guard around
+        updateUI(), unrelated to this checkbox). So unticking it must leave the
+        property changed but the object's own shape stale (still "Touched", not
+        recomputed) until it is ticked back on."""
+
+        self._run("PartDesign_LinearPattern")
+        self._click(self._find_widget("optionsToggle"))
+        self._find_widget("optionUpdateView").setChecked(False)
+        self.assertEqual(self.pattern.getStatusString(), "Valid")
+
+        # A Gui::UIntSpinBox: stepUp(), not setValue(), see
+        # TestLinearArrows.test_the_preview_follows_a_change_within_a_quarter_second.
+        count = self._direction_widget(1).findChild(QtWidgets.QSpinBox, "spinOccurrences")
+        count.stepUp()
+        self.assertEqual(self.pattern.Occurrences, 4, "the property itself must still update")
+        self._process_events(300)
+
+        self.assertEqual(
+            self.pattern.getStatusString(),
+            "Touched",
+            "the pattern was recomputed with Update view off",
+        )
+        self.assertAlmostEqual(self.pattern.Shape.Volume, 3 * PAD_VOLUME, places=3)
+
+        self._find_widget("optionUpdateView").setChecked(True)
+        self._process_events(300)
+        self.assertEqual(self.pattern.getStatusString(), "Valid")
+        self.assertAlmostEqual(self.pattern.Shape.Volume, 4 * PAD_VOLUME, places=3)
+
     def test_only_one_field_is_active_at_a_time(self):
         self._run("PartDesign_LinearPattern")
         self._click(self._features_field())
