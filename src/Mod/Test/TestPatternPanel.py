@@ -461,12 +461,26 @@ class TestDirectionFields(PatternPanelCase):
         hand the keyboard back to a value box, the way the panel does when it first
         opens - not leave it on the now-inactive field. _pick() adds straight to the
         selection rather than clicking in the 3D view, so nothing else moves the
-        keyboard off the field on its own; the fix must do it."""
+        keyboard off the field on its own; the fix must do it.
+
+        Seen fail once, intermittently, in a full-suite sweep (passing again on an
+        immediate rerun, in isolation and as part of this class) - no widget-level
+        cause reproduced under repeated runs here. main.activateWindow() only runs
+        once, in setUp(), and Qt cannot hand real keyboard focus to any child widget
+        at all once the top-level window itself has lost OS activation (a stray
+        Remote Desktop or focus blip, say) - reasserting it here, right before the
+        wait, closes that one gap without loosening what is actually asserted (a
+        real value box must still end up holding focus)."""
 
         self._click(self._direction_field(2))
         self._pick(self._edge_along(FreeCAD.Vector(0, 1, 0)))
+
+        main = FreeCADGui.getMainWindow()
+        main.raise_()
+        main.activateWindow()
+
         self.assertTrue(
-            self._wait(lambda: any(box.hasFocus() for box in self._boxes())),
+            self._wait(lambda: any(box.hasFocus() for box in self._boxes()), timeout_ms=5000),
             "no value box took the keyboard back after the pick",
         )
 
