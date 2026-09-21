@@ -211,16 +211,24 @@ class PatternPanelCase(unittest.TestCase):
         vp = self.viewer.getSoRenderManager().getViewportRegion()
         size = vp.getViewportSizePixels()
         width, height = float(size[0]), float(size[1])
-        origin = (width / 2.0, height / 2.0)
-        step = max(1.0, min(width, height) / 4.0)
+        # world_at() below is read through projectPointToLine(), which only accepts
+        # integer pixels (SbVec2s). ox/oy/step are rounded here, once, to plain
+        # ints, so the two points sampled are exactly ox,oy and ox+step,oy/oy+step
+        # with nothing left to truncate at the call site - the delta divided into
+        # below (step) is then guaranteed to be the delta actually sampled, not a
+        # float that world_at() would have quietly rounded by up to 1 px (which,
+        # applied as a *scale* about the view centre, would grow with distance from
+        # the centre and get worse in a smaller viewport).
+        ox, oy = int(width / 2.0), int(height / 2.0)
+        step = max(1, int(min(width, height) / 4.0))
 
         def world_at(pixel):
             near, _far = self.view.projectPointToLine(int(pixel[0]), int(pixel[1]))
             return near
 
-        base = world_at(origin)
-        along_x = world_at((origin[0] + step, origin[1])) - base
-        along_y = world_at((origin[0], origin[1] + step)) - base
+        base = world_at((ox, oy))
+        along_x = world_at((ox + step, oy)) - base
+        along_y = world_at((ox, oy + step)) - base
 
         # `target`'s own position within the (along_x, along_y) plane - solved, not
         # assumed axis-aligned, so a rolled camera still inverts correctly. Any part
@@ -237,7 +245,7 @@ class PatternPanelCase(unittest.TestCase):
         a = (rx * gyy - ry * gxy) / det
         b = (gxx * ry - gyx * rx) / det
 
-        return (origin[0] + a * step, origin[1] + b * step)
+        return (ox + a * step, oy + b * step)
 
     # -- the task panel's width ----------------------------------------------
 
