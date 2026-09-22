@@ -16,11 +16,16 @@ from PySide import QtCore, QtGui, QtWidgets
 # classes are the same objects either way, so its QTest drives widgets that came
 # through the shim just as well.
 QtTest = None
-for _binding in ("PySide6.QtTest", "PySide2.QtTest", "PySide.QtTest"):
+# Only the Qt6 binding is tried. A machine can carry a half-installed PySide2
+# beside it, whose import raises something other than ImportError, and anything
+# raised here happens while the whole -t 0 run is still loading its tests, so it
+# takes every suite down rather than this one. Whatever a candidate throws, it
+# is not usable, and QtTest of None already skips the tests that need it.
+for _binding in ("PySide6.QtTest", "PySide.QtTest"):
     try:
         QtTest = importlib.import_module(_binding)
         break
-    except ImportError:  # pragma: no cover - depends on which binding is installed
+    except Exception:  # pragma: no cover - depends on which binding is installed
         continue
 
 SKETCHER_PARAMS = "User parameter:BaseApp/Preferences/Mod/Sketcher"
