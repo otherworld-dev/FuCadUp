@@ -73,7 +73,12 @@ bool NavigationAnimator::startAndWait(const std::shared_ptr<NavigationAnimation>
         loop.quit();
     });
     start(animation);
-    loop.exec();
+    // A zero-length animation finishes inside start(), before the loop is running, and
+    // a quit() that arrives before exec() is lost, so the loop would then wait for ever.
+    // viewPosition(placement, 0, 0) asks for exactly that, and hung FuCadUp.
+    if (animation->state() != QAbstractAnimation::State::Stopped) {
+        loop.exec();
+    }
     return finished;
 }
 

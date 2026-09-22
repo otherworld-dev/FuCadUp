@@ -32,6 +32,10 @@ import FreeCAD
 import FreeCADGui
 from PySide import QtCore, QtGui
 
+from PinnedPreferences import PinnedPreferences
+
+VIEW_PARAMS = "User parameter:BaseApp/Preferences/View"
+
 FUSION_STYLE = "Gui::FusionNavigationStyle"
 
 NO_BUTTON = QtCore.Qt.NoButton
@@ -435,3 +439,31 @@ class TestViewerMethodDispatch(ViewerTestCase):
     def test_a_varargs_method_answers_after_a_no_args_one(self):
         self.assertIsInstance(self.viewer.isSpinning(), bool)
         self.assertIsInstance(self.viewer.isEnabledNaviCube(), bool)
+
+
+class TestZeroLengthCameraMove(ViewerTestCase):
+    """A camera move asked to take no time must return at once.
+
+    NavigationAnimator::startAndWait() started the animation and then entered an
+    event loop until it finished. A zero-length animation finishes inside start(),
+    so the loop's quit() had already come and gone and the loop waited for ever:
+    viewPosition(placement, 0, 0) hung FuCadUp whenever navigation animations were
+    on, which is the default. A failure here shows as a hang, which the per-module
+    time limit in run_gui_tests.py reports by name.
+    """
+
+    def setUp(self):
+        pins = PinnedPreferences(VIEW_PARAMS, {"UseNavigationAnimations": ("bool", True)}).pin()
+        self.addCleanup(pins.restore)
+        super().setUp()
+
+    def test_a_move_with_no_duration_returns_and_arrives(self):
+        start = self.view.viewPosition()
+        target = FreeCAD.Placement(start.Base + FreeCAD.Vector(10.0, 0.0, 0.0), start.Rotation)
+
+        began = time.monotonic()
+        self.view.viewPosition(target, 0, 0)
+        self.assertLess(time.monotonic() - began, 5.0, "viewPosition took too long")
+
+        arrived = self.view.viewPosition()
+        self.assertAlmostEqual((arrived.Base - target.Base).Length, 0.0, places=3)
