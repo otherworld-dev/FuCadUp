@@ -176,7 +176,9 @@ jobs:
 
       - name: FuCadUp GUI tests on build dir
         if: inputs.testOnBuildDir
-        timeout-minutes: 25
+        # Measured at over 25 minutes on the hosted runner, where it was cut off
+        # mid-run. Generous enough to finish, tight enough to catch a hang.
+        timeout-minutes: 60
         uses: ./.github/workflows/actions/runPythonTests
         with:
           testDescription: "GUI tests on build dir"

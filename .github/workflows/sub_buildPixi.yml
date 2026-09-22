@@ -184,7 +184,8 @@ jobs:
 
     - name: FuCadUp GUI tests on build dir
       if: runner.os == 'Linux' && inputs.testOnBuildDir && !inputs.skipBuild
-      timeout-minutes: 15
+      # The whole registered set takes over 25 minutes on a hosted runner.
+      timeout-minutes: 60
       uses: ./.github/workflows/actions/runPythonTests
       with:
         testDescription: "GUI tests on build dir"
