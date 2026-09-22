@@ -72,6 +72,7 @@ TaskExtrudeParameters::TaskExtrudeParameters(
     // we need a separate container widget to add all controls to
     proxy = new QWidget(this);
     ui->setupUi(proxy);
+    hideFeatureDiagnostics(proxy);
     setupOperation(ui->labelOperation, ui->comboOperation);
     handleLineFaceNameNo(ui->lineFaceName);
     handleLineFaceNameNo(ui->lineFaceName2);
@@ -959,15 +960,19 @@ void TaskExtrudeParameters::fillDirectionCombo()
     // highlight either current index or set custom direction
     auto extrude = getObject<PartDesign::FeatureExtrude>();
     bool hasCustom = extrude->UseCustomVector.getValue();
-    if (indexOfCurrent != -1 && !hasCustom) {
-        ui->directionCB->setCurrentIndex(indexOfCurrent);
-        updateDirectionEdits();
-        setDirectionMode(indexOfCurrent);
-    }
     if (hasCustom) {
         ui->directionCB->setCurrentIndex(DirectionModes::Custom);
-        setDirectionMode(ui->directionCB->currentIndex());
     }
+    else if (indexOfCurrent != -1) {
+        ui->directionCB->setCurrentIndex(indexOfCurrent);
+        updateDirectionEdits();
+    }
+
+    // Whatever the combo settled on, the vector and the along-normal box follow
+    // it. A feature naming no direction leaves indexOfCurrent at -1 and lands on
+    // the sketch normal, and neither branch above used to run, so the dialog kept
+    // showing a vector that the extrude does not use.
+    setDirectionMode(ui->directionCB->currentIndex());
 }
 
 void TaskExtrudeParameters::addAxisToCombo(

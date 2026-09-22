@@ -50,6 +50,7 @@ SET(Test_SRCS
     TestRibbonLayout.py
     TestRibbonSketchSolid.py
     TestShellVocabulary.py
+    TestFeatureDialogs.py
     TestFuCadDefaults.py
     TestSketcherSnapFeedback.py
     TestSketchPlanePick.py

@@ -186,4 +186,13 @@ private:
     PartDesignGui::ViewProvider* vp;
 };
 
+/// Whether the controls that exist for debugging a feature rather than for
+/// modelling with it should be shown. Off unless it is asked for.
+bool showFeatureDiagnostics();
+
+/// Hides those controls in \a form. Every feature form carries a
+/// "Recompute on change" box of its own, so each calls this once its widgets
+/// exist rather than reading the preference itself.
+void hideFeatureDiagnostics(QWidget* form);
+
 }  // namespace PartDesignGui

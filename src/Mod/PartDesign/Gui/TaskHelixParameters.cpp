@@ -80,6 +80,7 @@ TaskHelixParameters::TaskHelixParameters(PartDesignGui::ViewProviderHelix* Helix
     // we need a separate container widget to add all controls to
     proxy = new QWidget(this);
     ui->setupUi(proxy);
+    hideFeatureDiagnostics(proxy);
     this->groupLayout()->addWidget(proxy);
 
     initializeHelix();

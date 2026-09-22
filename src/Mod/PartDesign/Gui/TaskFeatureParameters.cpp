@@ -23,6 +23,7 @@
  ***************************************************************************/
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QMessageBox>
 
 
@@ -62,6 +63,14 @@ TaskPreviewParameters::TaskPreviewParameters(ViewProvider* vp, QWidget* parent)
     ui->showFinalCheckBox->setChecked(vp->isVisible());
     ui->showTransparentPreviewCheckBox->setChecked(vp->isPreviewEnabled());
 
+    // Both boxes are for whoever is debugging the feature rather than modelling
+    // with it, so the box stays out of the dialog unless it has been asked for.
+    // Every PartDesign dialog pushes one of these, so hiding it here covers all
+    // eighteen of them without touching each.
+    if (!showFeatureDiagnostics()) {
+        hide();
+    }
+
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     connect(
         ui->showTransparentPreviewCheckBox,
@@ -94,6 +103,27 @@ TaskPreviewParameters::TaskPreviewParameters(ViewProvider* vp, QWidget* parent)
 }
 
 TaskPreviewParameters::~TaskPreviewParameters() = default;
+
+bool PartDesignGui::showFeatureDiagnostics()
+{
+    const ParameterGrp::handle partDesign = App::GetApplication().GetParameterGroupByPath(
+        "User parameter:BaseApp/Preferences/Mod/PartDesign"
+    );
+    return partDesign->GetBool("ShowFeatureDiagnostics", false);
+}
+
+void PartDesignGui::hideFeatureDiagnostics(QWidget* form)
+{
+    if (form == nullptr || showFeatureDiagnostics()) {
+        return;
+    }
+
+    // Named rather than typed: the box sits in a different place in each form,
+    // and the name is what the forms already agree on.
+    if (auto* updateView = form->findChild<QCheckBox*>(QStringLiteral("checkBoxUpdateView"))) {
+        updateView->hide();
+    }
+}
 
 void TaskPreviewParameters::onShowFinalChanged(bool show)
 {

@@ -97,6 +97,7 @@ void TaskTransformedParameters::setupUI()
     // we need a separate container widget to add all controls to
     proxy = new QWidget(this);
     ui->setupUi(proxy);
+    hideFeatureDiagnostics(proxy);
     QMetaObject::connectSlotsByName(this);
 
     connect(

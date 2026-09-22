@@ -81,6 +81,7 @@ TaskRevolutionParameters::TaskRevolutionParameters(
 {
     // we need a separate container widget to add all controls to
     ui->setupUi(proxy);
+    hideFeatureDiagnostics(proxy);
     setupOperation(ui->labelOperation, ui->comboOperation);
     QMetaObject::connectSlotsByName(this);
     this->groupLayout()->addWidget(proxy);
