@@ -61,6 +61,7 @@
 #include "Action.h"
 #include "Document.h"
 #include "Inventor/SoMouseWheelEvent.h"
+#include "Inventor/ViewVolumeCorrection.h"
 #include "MarkingMenu.h"
 #include "MenuManager.h"
 #include "MouseSelection.h"
@@ -778,6 +779,13 @@ void NavigationStyle::viewAll()
         return;
     }
 
+    // NavigationStyle::viewAll() has no caller in this tree - every viewAll() call
+    // site resolves to View3DInventorViewer's own, unrelated method - so this is
+    // dead code. It is also wrong: the square volume below, sized from cam_width/
+    // cam_height and then decided by cam->aspectRatio (always 1.0, never the
+    // viewport's) rather than by Gui::mappedViewVolume, ends up about 1/aspect too
+    // far zoomed out in a tall view. Left uncorrected deliberately - an untested
+    // edit to unreachable code is pure risk - but noted here for whoever revives it.
     SbViewVolume vol = cam->getViewVolume();
     if (vol.ulf == vol.llf) {
         return;  // empty frustum (no view up vector defined)
@@ -1585,19 +1593,22 @@ void NavigationStyle::saveCursorPosition(const SoEvent* const ev)
     if (this->rotationCenterMode & NavigationStyle::RotationCenterMode::FocalPointAtCursor) {
         // get the intersection point of the ray and the focal plane
         const SbViewportRegion& vp = viewer->getSoRenderManager()->getViewportRegion();
-        float ratio = vp.getViewportAspectRatio();
 
         SoCamera* cam = viewer->getSoRenderManager()->getCamera();
         if (!cam) {  // no camera
             return;
         }
-        SbViewVolume vv = cam->getViewVolume(ratio);
+
+        // The volume the point was actually rendered through, and the viewport it maps
+        // onto: without this the pivot is pulled toward the view centre by the view's
+        // own aspect ratio whenever the 3D view is taller than it is wide.
+        MappedView mapped = mappedViewVolume(*cam, vp);
 
         SbLine line;
-        SbVec2f currpos = ev->getNormalizedPosition(vp);
-        vv.projectPointToLine(currpos, line);
+        SbVec2f currpos = ev->getNormalizedPosition(mapped.viewport);
+        mapped.volume.projectPointToLine(currpos, line);
         SbVec3f current_planept;
-        SbPlane panplane = vv.getPlane(cam->focalDistance.getValue());
+        SbPlane panplane = mapped.volume.getPlane(cam->focalDistance.getValue());
         panplane.intersect(line, current_planept);
 
         setRotationCenter(current_planept);
@@ -1606,7 +1617,6 @@ void NavigationStyle::saveCursorPosition(const SoEvent* const ev)
     // mode is BoundingBoxCenter or a ScenePointAtCursor failed
     if (this->rotationCenterMode & NavigationStyle::RotationCenterMode::BoundingBoxCenter) {
         const SbViewportRegion& vp = viewer->getSoRenderManager()->getViewportRegion();
-        float ratio = vp.getViewportAspectRatio();
 
         SoCamera* cam = viewer->getSoRenderManager()->getCamera();
         if (!cam) {  // no camera
@@ -1623,11 +1633,17 @@ void NavigationStyle::saveCursorPosition(const SoEvent* const ev)
         // To drag around the center point of the bbox we have to determine
         // its projection on the screen because this information is used in
         // NavigationStyle::spin() for the panning
-        SbViewVolume vv = cam->getViewVolume(ratio);
-        vv.projectToScreen(boundingBoxCenter, boundingBoxCenter);
-        SbVec2s size = vp.getViewportSizePixels();
-        auto tox = static_cast<short>(boundingBoxCenter[0] * size[0]);
-        auto toy = static_cast<short>(boundingBoxCenter[1] * size[1]);
+        //
+        // The volume the point was actually rendered through, and the viewport it maps
+        // onto: without this the stored screen anchor is wrong by the view's own aspect
+        // ratio whenever the 3D view is taller than it is wide, and its corner is not
+        // the window's corner once a CROP_VIEWPORT_* mode is in play either.
+        MappedView mapped = mappedViewVolume(*cam, vp);
+        mapped.volume.projectToScreen(boundingBoxCenter, boundingBoxCenter);
+        const SbVec2s& size = mapped.viewport.getViewportSizePixels();
+        const SbVec2s& origin = mapped.viewport.getViewportOriginPixels();
+        auto tox = static_cast<short>(origin[0] + boundingBoxCenter[0] * size[0]);
+        auto toy = static_cast<short>(origin[1] + boundingBoxCenter[1] * size[1]);
         this->localPos.setValue(tox, toy);
     }
 }

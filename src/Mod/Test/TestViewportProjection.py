@@ -17,7 +17,7 @@ import unittest
 
 import FreeCAD
 import FreeCADGui
-from PySide import QtCore, QtWidgets
+from PySide import QtCore, QtGui, QtWidgets
 
 TOLERANCE_PX = 1.5
 
@@ -159,6 +159,153 @@ class ViewportProjectionCase(unittest.TestCase):
             TOLERANCE_PX,
             "in a %dx%d viewport, %s projected to %s but was rendered at (%.1f, %.1f)"
             % (achieved[0], achieved[1], point, tuple(actual), expected[0], expected[1]),
+        )
+
+    # -- helpers for driving real mouse/keyboard events -------------------------
+
+    def _viewport_widget(self):
+        """The QWidget synthetic mouse/keyboard events must be delivered to for
+        NavigationStyle/SoQTQuarterAdaptor to see them, same widget TestNavigationStyles
+        drives."""
+        return self.view.graphicsView().viewport()
+
+    def _device_pixel_ratio(self, widget):
+        if hasattr(widget, "devicePixelRatioF"):
+            return widget.devicePixelRatioF()
+        return float(widget.devicePixelRatio())
+
+    def _to_widget_point(self, pixel):
+        """Coin device pixel (origin bottom-left, as _viewport_pixels()/
+        getPointOnViewport use) to a widget-local logical QPoint (origin top-left),
+        the same conversion TestRubberbandSelection._to_qpoint uses."""
+        widget = self._viewport_widget()
+        _width, height = self._viewport_pixels()
+        scale = self._device_pixel_ratio(widget)
+        x = int(round(pixel[0] / scale))
+        y = int(round((height - pixel[1] - 1) / scale))
+        return QtCore.QPoint(x, y)
+
+    def _post(self, widget, event_type, pos, button, buttons, modifiers=QtCore.Qt.NoModifier):
+        app = QtWidgets.QApplication.instance()
+        event = QtGui.QMouseEvent(event_type, pos, widget.mapToGlobal(pos), button, buttons, modifiers)
+        app.sendEvent(widget, event)
+
+    def _press_orbit(self, pixel, modifiers):
+        """Move to, then press, an orbit button at `pixel` (Coin device px) and hold
+        it - exactly the press that fires NavigationStyle::saveCursorPosition and,
+        through setViewingMode(DRAGGING), shows the rotation-centre indicator at the
+        point it just computed. Returns (widget, pos) so the caller can release."""
+        widget = self._viewport_widget()
+        widget.setFocus(QtCore.Qt.OtherFocusReason)
+        pos = self._to_widget_point(pixel)
+        no_button = QtCore.Qt.NoButton
+        middle = QtCore.Qt.MiddleButton
+        self._post(widget, QtCore.QEvent.MouseMove, pos, no_button, no_button, modifiers)
+        self._pump(20)
+        self._post(widget, QtCore.QEvent.MouseButtonPress, pos, middle, middle, modifiers)
+        self._pump(50)
+        return widget, pos
+
+    def _release_orbit(self, widget, pos, modifiers):
+        self._post(
+            widget, QtCore.QEvent.MouseButtonRelease, pos, QtCore.Qt.MiddleButton, QtCore.Qt.NoButton, modifiers
+        )
+        self._pump(50)
+
+    def _rotation_center_indicator(self):
+        """The world-space rotation centre NavigationStyle::saveCursorPosition just
+        set, read back via the small sphere View3DInventorViewer::showRotationCenter/
+        changeRotationCenterPosition place in the scene graph while DRAGGING - an
+        SoTranslation named "translation" holding rotationCenter itself, not a
+        screen projection of it. Returns None if the indicator is not there."""
+        from pivy import coin
+
+        search = coin.SoSearchAction()
+        search.setType(coin.SoType.fromName("SoTranslation"))
+        search.setInterest(coin.SoSearchAction.ALL)
+        search.setSearchingAll(True)
+        search.apply(self.viewer.getSoRenderManager().getSceneGraph())
+        paths = search.getPaths()
+        for i in range(paths.getLength()):
+            node = paths[i].getTail()
+            if node.getName().getString() == "translation":
+                v = node.translation.getValue().getValue()
+                return FreeCAD.Vector(v[0], v[1], v[2])
+        return None
+
+    # -- navigation: the orbit pivot NavigationStyle::saveCursorPosition sets ---
+
+    def test_focal_point_at_cursor_orbit_pivots_under_the_cursor_in_a_tall_view(self):
+        """NavigationStyle::saveCursorPosition (FocalPointAtCursor, :1594) built its
+        volume from cam->getViewVolume(ratio) with no 1/ratio scale, then intersected
+        the focal plane with a plain-normalized cursor ray - pulling the pivot toward
+        the view centre by the view's own aspect ratio in a tall window. Independently
+        verified against getPointOnFocalPlane, which is already paired with the
+        aspect-corrected getNormalizedPosition()."""
+        self._shape_view(700, 1300)
+        # Hidden so SoRayPickAction can't hit it and short-circuit into
+        # ScenePointAtCursor before the FocalPointAtCursor branch ever runs.
+        self.doc.Box.ViewObject.Visibility = False
+        self._pump(100)
+
+        params = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/View")
+        original_mode = params.GetInt("RotationMode", 0)
+        original_nav = self.view.getNavigationType()
+        self.addCleanup(params.SetInt, "RotationMode", original_mode)
+        self.addCleanup(self.view.setNavigationType, original_nav)
+        self.view.setNavigationType("Gui::FusionNavigationStyle")
+        params.SetInt("RotationMode", 1)  # ScenePointAtCursor | FocalPointAtCursor
+        self._pump(50)
+
+        width, height = self._viewport_pixels()
+        press_pixel = (int(width * 0.82), int(height * 0.12))  # off-centre, near the top
+        expected = FreeCAD.Vector(self.view.getPointOnFocalPlane(*press_pixel))
+
+        widget, pos = self._press_orbit(press_pixel, QtCore.Qt.ShiftModifier)
+        try:
+            actual = self._rotation_center_indicator()
+            self.assertIsNotNone(actual, "the rotation-centre indicator never appeared")
+            self.assertLess(
+                (actual - expected).Length,
+                0.1,
+                "orbit pivot landed at %s but the cursor was over %s" % (tuple(actual), tuple(expected)),
+            )
+        finally:
+            self._release_orbit(widget, pos, QtCore.Qt.ShiftModifier)
+
+    def test_arrow_key_pan_moves_the_same_ratio_on_both_axes_in_a_tall_view(self):
+        """SoQTQuarterAdaptor::moveCameraScreen (:661) built its volume from
+        getGLWidget()->width() / getGLWidget()->height() - an integer division that
+        reads 0 in a tall view (Coin then substitutes the camera's own square
+        aspectRatio) - and applied no 1/aspect scale either way, so an up/down pan
+        moved by a factor of the view's aspect ratio too little. Independently
+        verified: a fixed 0.1 normalized step should move the camera 1/aspect times
+        further along the view's tall axis than its narrow one, because the mapped
+        volume is taller in world units than it is wide."""
+        achieved = self._shape_view(700, 1300)
+        aspect = achieved[0] / float(achieved[1])
+        widget = self._viewport_widget()
+        widget.setFocus(QtCore.Qt.OtherFocusReason)
+        self._pump(50)
+
+        def press(key):
+            before = FreeCAD.Vector(*self.view.getCameraNode().position.getValue().getValue())
+            for kind in (QtCore.QEvent.KeyPress, QtCore.QEvent.KeyRelease):
+                QtWidgets.QApplication.sendEvent(widget, QtGui.QKeyEvent(kind, key, QtCore.Qt.NoModifier))
+            self._pump(50)
+            after = FreeCAD.Vector(*self.view.getCameraNode().position.getValue().getValue())
+            return (after - before).Length
+
+        right = press(QtCore.Qt.Key_Right)
+        self.assertGreater(right, 1e-6, "a right-arrow pan produced no camera movement")
+        up = press(QtCore.Qt.Key_Up)
+
+        self.assertAlmostEqual(
+            up / right,
+            1.0 / aspect,
+            delta=0.15,
+            msg="an up-arrow pan moved %.4f%% of a right-arrow pan, expected about %.1f%% (1/aspect) in a %dx%d view"
+            % (100.0 * up / right, 100.0 / aspect, achieved[0], achieved[1]),
         )
 
     # -- the projection itself -------------------------------------------------

@@ -55,6 +55,7 @@
 # include <GL/gl.h>
 # endif
 
+#include "Inventor/ViewVolumeCorrection.h"
 #include "SoQTQuarterAdaptor.h"
 
 #ifdef BUILD_TRACY_FRAME_PROFILER
@@ -657,16 +658,20 @@ void SIM::Coin3D::Quarter::SoQTQuarterAdaptor::moveCameraScreen(const SbVec2f& s
     SoCamera* cam = getSoRenderManager()->getCamera();
     assert(cam);
 
-
-    SbViewVolume vv = cam->getViewVolume(getGLWidget()->width() / getGLWidget()->height());
-    SbPlane panplane = vv.getPlane(cam->focalDistance.getValue());
+    // The volume the scene was actually rendered through, and the viewport it maps
+    // onto: getGLWidget()->width() / getGLWidget()->height() was integer division -
+    // square in a wide-or-square view, and 0 (which Coin reads as "use the camera's
+    // own aspectRatio") in a tall one - and, either way, missing the 1/aspect scale
+    // ADJUST_CAMERA applies, so an up/down pan moved too little in a tall viewport.
+    Gui::MappedView mapped = Gui::mappedViewVolume(*cam, getSoRenderManager()->getViewportRegion());
+    SbPlane panplane = mapped.volume.getPlane(cam->focalDistance.getValue());
 
     constexpr const float mid = 0.5F;
     SbLine line;
-    vv.projectPointToLine(screenpos + SbVec2f(mid, mid), line);
+    mapped.volume.projectPointToLine(screenpos + SbVec2f(mid, mid), line);
     SbVec3f current_planept;
     panplane.intersect(line, current_planept);
-    vv.projectPointToLine(SbVec2f(mid, mid), line);
+    mapped.volume.projectPointToLine(SbVec2f(mid, mid), line);
     SbVec3f old_planept;
     panplane.intersect(line, old_planept);
 
