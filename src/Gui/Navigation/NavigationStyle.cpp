@@ -601,13 +601,7 @@ void NavigationStyle::lookAtPoint(const SbVec2s screenpos)
     }
     else {
         const SbViewportRegion& vp = viewer->getViewportRegion();
-        const float aspectratio = vp.getViewportAspectRatio();
-        SbViewVolume vv = camera->getViewVolume(aspectratio);
-
-        // See note in Coin docs for SoCamera::getViewVolume re:viewport mapping
-        if (aspectratio < 1.0) {
-            vv.scale(1.0 / aspectratio);
-        }
+        SbViewVolume vv = mappedViewVolume(*camera, vp).volume;
 
         SbLine line;
         vv.projectPointToLine(normalizePixelPos(screenpos), line);
@@ -938,12 +932,8 @@ void NavigationStyle::panCamera(
 
 
     // Find projection points for the last and current mouse coordinates.
-    SbViewVolume vv = cam->getViewVolume(aspectratio);
-
-    // See note in Coin docs for SoCamera::getViewVolume re:viewport mapping
-    if (aspectratio < 1.0) {
-        vv.scale(1.0 / aspectratio);
-    }
+    const SbViewportRegion& vp = viewer->getViewportRegion();
+    SbViewVolume vv = mappedViewVolume(*cam, vp).volume;
 
     SbLine line;
     vv.projectPointToLine(currpos, line);
@@ -972,13 +962,7 @@ void NavigationStyle::setupPanningPlane(const SoCamera* camera)
     }
     else {
         const SbViewportRegion& vp = viewer->getViewportRegion();
-        const float aspectratio = vp.getViewportAspectRatio();
-        SbViewVolume vv = camera->getViewVolume(aspectratio);
-
-        // See note in Coin docs for SoCamera::getViewVolume re:viewport mapping
-        if (aspectratio < 1.0) {
-            vv.scale(1.0 / aspectratio);
-        }
+        SbViewVolume vv = mappedViewVolume(*camera, vp).volume;
 
         this->panningplane = vv.getPlane(camera->focalDistance.getValue());
     }

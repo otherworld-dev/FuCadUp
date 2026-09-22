@@ -230,6 +230,34 @@ class ViewportProjectionCase(unittest.TestCase):
         )
         self._pump(50)
 
+    def _drag_pan(self, start_pixel, end_pixel, steps=4):
+        """Drag the middle mouse button from `start_pixel` to `end_pixel` (Coin
+        device px) - press, several intermediate moves, release - the same event
+        sequence TestNavigationStyles._drag uses to exercise
+        FusionNavigationStyle's middle-drag pan (test_middle_drag_pans), which
+        is the public API this drives NavigationStyle::panCamera through."""
+        widget = self._viewport_widget()
+        widget.setFocus(QtCore.Qt.OtherFocusReason)
+        no_button = QtCore.Qt.NoButton
+        middle = QtCore.Qt.MiddleButton
+
+        start = self._to_widget_point(start_pixel)
+        end = self._to_widget_point(end_pixel)
+
+        self._post(widget, QtCore.QEvent.MouseMove, start, no_button, no_button)
+        self._pump(20)
+        self._post(widget, QtCore.QEvent.MouseButtonPress, start, middle, middle)
+        self._pump(50)
+        for step in range(1, steps + 1):
+            point = QtCore.QPoint(
+                start.x() + (end.x() - start.x()) * step // steps,
+                start.y() + (end.y() - start.y()) * step // steps,
+            )
+            self._post(widget, QtCore.QEvent.MouseMove, point, no_button, middle)
+            self._pump(20)
+        self._post(widget, QtCore.QEvent.MouseButtonRelease, end, middle, no_button)
+        self._pump(50)
+
     def _rotation_center_indicator(self):
         """The world-space rotation centre NavigationStyle::saveCursorPosition just
         set, read back via the small sphere View3DInventorViewer::showRotationCenter/
@@ -342,6 +370,45 @@ class ViewportProjectionCase(unittest.TestCase):
                 "%.1f%% (1/aspect) in a %dx%d view"
             )
             % (100.0 * up / right, 100.0 / aspect, achieved[0], achieved[1]),
+        )
+
+    def test_panning_follows_the_pointer_in_a_tall_view(self):
+        """A pan drag moves the scene by what the pointer moved, whatever the view's
+        shape. Pins NavigationStyle's aspect handling (lookAtPoint :604, panCamera
+        :936, setupPanningPlane :965 as of the pre-refactor HEAD) before it is
+        collapsed onto Gui::mappedViewVolume.
+
+        Drives a real middle-button drag through FusionNavigationStyle - the same
+        public API TestNavigationStyles.test_middle_drag_pans exercises, via
+        setupPanningPlane (BUTTON3 press) and panCamera (the drag's Location2Events)
+        - rather than calling either directly, so the whole event path is under
+        test exactly as a user's drag would hit it. Independently verified: with a
+        pure-translation orthographic pan, every point in the scene moves by the
+        same screen-space delta, so the box corner's calibrated pixel before and
+        after the drag must differ by exactly the drag's own pixel distance."""
+        self._shape_view(700, 1300)
+        point = FreeCAD.Vector(10, 6, 4)
+        before = self._calibrated_pixel(point)
+
+        original_nav = self.view.getNavigationType()
+        self.addCleanup(self.view.setNavigationType, original_nav)
+        self.view.setNavigationType("Gui::FusionNavigationStyle")
+        self._pump(50)
+
+        start_pixel = (300, 750)
+        dx, dy = 90, -70  # Coin device px, y up
+        end_pixel = (start_pixel[0] + dx, start_pixel[1] + dy)
+        self._drag_pan(start_pixel, end_pixel)
+
+        after = self._calibrated_pixel(point)
+        actual_dx = after[0] - before[0]
+        actual_dy = after[1] - before[1]
+        error = ((actual_dx - dx) ** 2 + (actual_dy - dy) ** 2) ** 0.5
+        self.assertLess(
+            error,
+            TOLERANCE_PX,
+            "dragging the pointer by (%d, %d) px moved the scene by (%.1f, %.1f) px"
+            % (dx, dy, actual_dx, actual_dy),
         )
 
     # -- the projection itself -------------------------------------------------
