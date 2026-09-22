@@ -43,6 +43,8 @@ from pathlib import Path
 # unittest prints "Ran 1 test" as well as "Ran 12 tests", so the s is optional.
 TEST_TOTAL = re.compile(r"^Ran \d+ tests?\b", re.MULTILINE)
 TEST_FAILURE = re.compile(r"^FAILED \(", re.MULTILINE)
+# A registered test unit is an importable name, dotted or not ("Menu.MenuDeleteCases").
+UNIT_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
 
 # Long enough for the slowest suite seen so far, which is a minute or two, with plenty to spare.
 DEFAULT_MODULE_TIMEOUT = 600
@@ -123,7 +125,14 @@ def parse_registered_tests(output: str) -> list[str]:
     """Parse output from `FuCadUp -t` and return a list of registered test unit names.
 
     The function looks for the section starting with the literal 'Registered test units:' and
-    then collects non-empty, stripped lines from that point onwards as test names.
+    then reads the block of unit names under it.
+
+    The binary goes on to print its prompt after the list and then runs nothing and says so:
+    "Please choose one or use 0 for all", "Ran 0 tests", then "OK" on Windows or "NO TESTS RAN"
+    on Linux, then "System exit". Taking every line after the header ran each of those as a
+    module, and "OK" is as good an identifier as any unit name, so filtering line by line cannot
+    tell them apart. What does is that the units are one block: the list ends at the first line
+    after it that is blank or is not a unit name.
     """
     lines = output.splitlines()
     tests: list[str] = []
@@ -134,11 +143,23 @@ def parse_registered_tests(output: str) -> list[str]:
                 started = True
             continue
         s = ln.strip()
-        if not s:
-            # allow blank lines but keep going
+        if not s and not tests:
+            # The blank line under the header.
             continue
+        if not UNIT_NAME.match(s):
+            break
         tests.append(s)
     return tests
+
+
+def console_sibling(fucad_exec: str) -> str | None:
+    """The console binary that sits beside `fucad_exec`, or None if there is not one."""
+    gui = Path(fucad_exec)
+    for name in (gui.stem + "Cmd" + gui.suffix, "FuCadUpCmd" + gui.suffix):
+        candidate = gui.with_name(name)
+        if candidate.is_file():
+            return str(candidate)
+    return None
 
 
 def _kill_process_tree(proc: subprocess.Popen) -> None:
@@ -201,6 +222,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="seconds a module may run before it is killed and reported as hung",
     )
     parser.add_argument(
+        "--gui-only",
+        action="store_true",
+        help="skip every unit the console binary beside it also registers",
+    )
+    parser.add_argument(
         "--only",
         action="append",
         default=[],
@@ -240,6 +266,25 @@ def main(argv: list[str]) -> int:
         print(out)
         print("::error::No registered test modules were found, so nothing was verified.")
         return 1
+
+    if args.gui_only:
+        # The console binary registers the App suites and the GUI binary registers those and
+        # the GUI ones, so the difference is exactly the set that needs a display. The rest are
+        # run by the CLI step already, and under the GUI binary every document they open gets
+        # a 3D view drawn in software, which made TestSketcherApp and TestCAMApp run past five
+        # minutes each where the console binary gets through every App suite in under three.
+        console = console_sibling(fucad_exec)
+        if console is None:
+            print(f"::error::--gui-only needs the console binary beside {fucad_exec}")
+            return 1
+        _, console_out = run_and_capture([console, "-t"])
+        console_units = set(parse_registered_tests(console_out))
+        if not console_units:
+            print(console_out)
+            print("::error::The console binary listed no test units to leave out.")
+            return 1
+        tests = [name for name in tests if name not in console_units]
+        print(f"Leaving out {len(console_units)} units the console binary also registers.")
 
     if args.only:
         unknown = [name for name in args.only if name not in tests]

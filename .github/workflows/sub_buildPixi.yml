@@ -191,7 +191,8 @@ jobs:
         testDescription: "GUI tests on build dir"
         # One process per module with a five-minute limit each, failing any that
         # hangs or prints no test total. See .github/scripts/run_gui_tests.py.
-        testCommand: xvfb-run -a python3 ./.github/scripts/run_gui_tests.py "${{ env.builddir }}" --timeout 300
+        # A real screen rather than xvfb-run's default of 640x480 at 8 bits.
+        testCommand: xvfb-run -a -s "-screen 0 1920x1080x24" python3 ./.github/scripts/run_gui_tests.py "${{ env.builddir }}" --timeout 300 --gui-only
         logFile: ${{ env.logdir }}TestGUIBuild.log
         reportFile: ${{env.reportdir}}${{ env.reportfilename }}
         shellCmd: ${{ env.shellCmd }}

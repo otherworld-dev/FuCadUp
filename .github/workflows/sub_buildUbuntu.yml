@@ -188,7 +188,9 @@ jobs:
           # timed out, and the log arrived in batches so it never said which one. A
           # module that prints no test total fails too, since a binary that cannot
           # start its Python side runs nothing and still exits 0.
-          testCommand: xvfb-run -a python3 ./.github/scripts/run_gui_tests.py "${{ env.builddir }}" --timeout 300
+          # xvfb-run's default screen is 640x480 at 8 bits, which squeezes the 3D view
+          # under the ribbon to almost nothing and drops the colours the theme checks read.
+          testCommand: xvfb-run -a -s "-screen 0 1920x1080x24" python3 ./.github/scripts/run_gui_tests.py "${{ env.builddir }}" --timeout 300 --gui-only
           logFile: ${{ env.logdir }}TestGUIBuild.log
           reportFile: ${{env.reportdir}}${{ env.reportfilename }}
 
