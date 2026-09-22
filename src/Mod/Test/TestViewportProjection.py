@@ -75,7 +75,9 @@ class ViewportProjectionCase(unittest.TestCase):
         device-pixel size. Tries the main window first, then - if the window manager
         won't give the wanted orientation that way (e.g. a maximised or tiled window
         manager) - resizes the MDI sub-window directly instead of skipping: a skipped
-        test proves nothing, so a second shape is tried before giving up."""
+        test proves nothing, so a second shape is tried before failing loudly. Ends in
+        a real assertion, not skipTest(): a window manager that refuses both resizes
+        must not turn a test that needs a tall (or wide) view silently green."""
         window = FreeCADGui.getMainWindow()
         window.resize(width, height)
         self._pump(400)
@@ -98,11 +100,11 @@ class ViewportProjectionCase(unittest.TestCase):
                 self._pump(300)
                 achieved = self._viewport_pixels()
 
-        if not is_right_shape(achieved):
-            self.skipTest(
-                "the window manager gave a %dx%d viewport, not the %s shape this test needs"
-                % (achieved[0], achieved[1], "tall" if wanted_tall else "wide")
-            )
+        self.assertTrue(
+            is_right_shape(achieved),
+            "the window manager gave a %dx%d viewport, not the %s shape this test needs"
+            % (achieved[0], achieved[1], "tall" if wanted_tall else "wide"),
+        )
         return achieved
 
     def _calibrated_pixel(self, point):
@@ -423,8 +425,14 @@ class ViewportProjectionCase(unittest.TestCase):
         self._assert_projects_where_rendered((1000, 1000), FreeCAD.Vector(10, 6, 4))
 
     def test_the_centre_of_the_view_projects_to_the_centre_in_a_tall_view(self):
-        """The one case needing no calibration at all: whatever the view's shape, the
-        camera's focal point is rendered at the middle of the viewport."""
+        """A smoke check, not evidence for the aspect fix: SbViewVolume::scale() scales
+        the volume about its own centre, so the focal point projects to the viewport's
+        centre whether or not the 1/aspect correction is applied - this assertion
+        passes identically with the pre-fix bug present or absent. It needs no
+        calibration, which is exactly why it cannot detect an aspect-scaling defect;
+        it only guards against a gross axis/sign error. See
+        test_a_point_projects_where_it_is_rendered_in_a_tall_view for a test that
+        actually fails on one."""
         achieved = self._shape_view(700, 1300)
         focal = self.view.getCameraNode().position.getValue()
         direction = self.view.getViewDirection()  # exposed on the view, not the viewer
@@ -448,10 +456,18 @@ class ViewportProjectionCase(unittest.TestCase):
             "the round trip landed %.3f mm away from where the point is rendered" % error,
         )
 
-    def test_the_screen_to_world_path_is_correct_in_a_tall_view(self):
-        """Documents that getPointOnFocalPlane already honours the view's shape: it is
-        paired with getNormalizedPosition(), unlike getPointOnViewport. Expected to pass
-        before any fix - if it ever fails, the convention moved.
+    def test_get_point_on_focal_plane_and_project_point_to_line_agree_in_a_tall_view(self):
+        """Not evidence that either path is aspect-correct - only that the two
+        screen->world paths agree with each other. getPointOnFocalPlane (:3920) and
+        projectPointToLine (:4088) both build their ray from the same
+        getNormalizedPosition() and the same zero-argument (unmapped) view volume, so
+        the focal-plane point lies on the picking ray by construction, at any aspect,
+        correct or not: this cannot fail for an aspect defect in either function.
+
+        What it does pin down is real: if someone "fixes" one of the two functions
+        onto the mapped volume without the other, the pair falls out of agreement and
+        this test catches it - a genuine hazard now that this branch's mapped-volume
+        convention exists alongside the original, unmapped one the two of them share.
 
         Asserts the focal-plane point's perpendicular distance from the picking ray at
         the same pixel, rather than a signed dot product against one particular

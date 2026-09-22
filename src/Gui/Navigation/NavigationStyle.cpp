@@ -926,6 +926,9 @@ void NavigationStyle::panCamera(
     if (!cam) {  // can happen for empty scenegraph
         return;
     }
+    if (!viewer) {  // set only by setViewer; unreachable while attached, but no longer assumed
+        return;
+    }
     if (currpos == prevpos) {  // useless invocation
         return;
     }
