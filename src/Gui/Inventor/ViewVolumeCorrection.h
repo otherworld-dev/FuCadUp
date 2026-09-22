@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <FCGlobal.h>
+
 #include <Inventor/SbViewportRegion.h>
 #include <Inventor/SbViewVolume.h>
 
@@ -37,7 +39,7 @@ struct MappedView
  * it - Coin's own overload takes a model-matrix argument for the general case, but every
  * caller of this function has one.
  */
-[[nodiscard]] MappedView mappedViewVolume(const SoCamera& camera,
-                                          const SbViewportRegion& viewport);
+[[nodiscard]] GuiExport MappedView mappedViewVolume(const SoCamera& camera,
+                                                     const SbViewportRegion& viewport);
 
 }  // namespace Gui

@@ -67,6 +67,7 @@
 #include <Gui/BitmapFactory.h>
 #include <Gui/Command.h>
 #include <Gui/Document.h>
+#include <Gui/Inventor/ViewVolumeCorrection.h>
 #include <Gui/Selection/Selection.h>
 #include <Gui/SoFCDB.h>
 #include <Gui/SoFCOffscreenRenderer.h>
@@ -1396,7 +1397,7 @@ std::vector<Mesh::FacetIndex> ViewProviderMesh::getFacetsOfRegion(
 
 void ViewProviderMesh::panCamera(
     SoCamera* cam,
-    float aspectratio,
+    const SbViewportRegion& vp,
     const SbPlane& panplane,
     const SbVec2f& currpos,
     const SbVec2f& prevpos
@@ -1410,13 +1411,16 @@ void ViewProviderMesh::panCamera(
     }
 
 
-    // Find projection points for the last and current mouse coordinates.
-    SbViewVolume vv = cam->getViewVolume(aspectratio);
+    // The volume the scene was actually rendered through, and the viewport it maps
+    // onto: without this the offscreen visibility pass boxZoom feeds into is
+    // recentred by only 1/aspect of the distance it needs whenever the 3D view is
+    // taller than it is wide, so it inspects the wrong part of the model.
+    Gui::MappedView mapped = Gui::mappedViewVolume(*cam, vp);
     SbLine line;
-    vv.projectPointToLine(currpos, line);
+    mapped.volume.projectPointToLine(currpos, line);
     SbVec3f current_planept;
     panplane.intersect(line, current_planept);
-    vv.projectPointToLine(prevpos, line);
+    mapped.volume.projectPointToLine(prevpos, line);
     SbVec3f old_planept;
     panplane.intersect(line, old_planept);
 
@@ -1452,7 +1456,7 @@ void ViewProviderMesh::boxZoom(const SbBox2s& box, const SbViewportRegion& vp, S
     // clang-format on
 
     SbPlane plane = vv.getPlane(cam->focalDistance.getValue());
-    panCamera(cam, vp.getViewportAspectRatio(), plane, SbVec2f(0.5, 0.5), center);
+    panCamera(cam, vp, plane, SbVec2f(0.5, 0.5), center);
 
     // Set height or height angle of the camera
     float scaleX = (float)sizeX / (float)size[0];
