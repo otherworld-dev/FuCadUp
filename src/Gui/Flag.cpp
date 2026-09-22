@@ -434,6 +434,12 @@ void GLFlagWindow::paintGL()
         const SbViewportRegion vp = _viewer->getSoRenderManager()->getViewportRegion();
         SbVec2s size = vp.getViewportSizePixels();
         float aspectratio = float(size[0]) / float(size[1]);
+        // getViewVolume(aspectratio) skips the 1/aspect scale ADJUST_CAMERA applies
+        // in a tall viewport, so each flag's leader line would end up 1/aspect away
+        // from the 3D point it annotates - the same defect Gui::mappedViewVolume
+        // exists to fix. Left uncorrected deliberately: nothing in this fork calls
+        // addFlag, so no flag is ever created and there is no reachable symptom to
+        // test against; noted here for whoever revives this code.
         SbViewVolume vv = _viewer->getSoRenderManager()->getCamera()->getViewVolume(aspectratio);
         for (int i = 0; i < ct; i++) {
             Flag* flag = qobject_cast<Flag*>(_flagLayout->itemAt(i)->widget());
