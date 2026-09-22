@@ -15,6 +15,8 @@ import FreeCADGui
 from FreeCADGui import Selection
 import Part
 
+from PinnedPreferences import PinnedPreferences, fucad_dark
+
 try:
     from PySide6 import QtWidgets
 except ImportError:
@@ -22,6 +24,13 @@ except ImportError:
 
 
 PART_PLANE_TYPE = f"{Part.__name__}::Plane"
+VIEW_PARAMS = "User parameter:BaseApp/Preferences/View"
+
+# The overlay colours come from the FuCad Dark pack, which a test run never applies.
+# Without it the built-in fallbacks are #0ac8ff for preselection and #00abff for
+# selection, close enough that preselecting a selected face barely changes it, so the
+# ordering these tests look for only shows up with the pack's colours in place.
+OVERLAY_COLOURS = ("SelectionColor", "HighlightColor")
 
 
 class TestSelectionVisual(unittest.TestCase):
@@ -31,6 +40,10 @@ class TestSelectionVisual(unittest.TestCase):
     _COLOR_DELTA_RESTORE_MAX = 0.05
 
     def setUp(self):
+        # Before the view exists, so it is built with these colours.
+        pins = PinnedPreferences(VIEW_PARAMS, fucad_dark(VIEW_PARAMS, OVERLAY_COLOURS)).pin()
+        self.addCleanup(pins.restore)
+
         self.doc = FreeCAD.newDocument("TestSelectionVisual")
         FreeCADGui.ActiveDocument = FreeCADGui.getDocument(self.doc.Name)
         self.view = FreeCADGui.ActiveDocument.ActiveView

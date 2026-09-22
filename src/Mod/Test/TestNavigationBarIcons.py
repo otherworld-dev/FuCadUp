@@ -35,11 +35,23 @@ To run tests:
 """
 
 import re
+import time
 import unittest
 
 import FreeCAD
 import FreeCADGui
 from PySide import QtCore, QtGui, QtWidgets
+
+from PinnedPreferences import PinnedPreferences, fucad_dark
+
+MAIN_WINDOW_PARAMS = "User parameter:BaseApp/Preferences/MainWindow"
+THEMES_PARAMS = "User parameter:BaseApp/Preferences/Themes"
+
+# The bar is styled by FuCad.qss and coloured from the pack's accents. A test run
+# never applies the FuCad Dark pack, so on any profile that had not saved it these
+# tests read a bare stylesheet with no NavigationBar rules at all.
+THEME_SETTINGS = ("StyleSheet", "Theme")
+NAVIGATION_BAR_RULE = "QToolBar#NavigationBar QToolButton:hover"
 
 # Measured over every icon the bar carries, FreeCAD's cyan covers hues 175 to 186
 # and then stops dead: nothing until 196, and the blues those same icons are drawn
@@ -149,6 +161,14 @@ class TestNavigationBarIcons(unittest.TestCase):
     """The bar's icons must read in the accent, without disturbing the shared actions."""
 
     def setUp(self):
+        for pins in (
+            PinnedPreferences(THEMES_PARAMS, fucad_dark(THEMES_PARAMS)),
+            PinnedPreferences(MAIN_WINDOW_PARAMS, fucad_dark(MAIN_WINDOW_PARAMS, THEME_SETTINGS)),
+        ):
+            pins.pin()
+            self.addCleanup(pins.restore)
+        self.waitForStyleSheet()
+
         self.doc = FreeCAD.newDocument("TestNavigationBarIcons")
         FreeCADGui.ActiveDocument = FreeCADGui.getDocument(self.doc.Name)
         FreeCADGui.activeDocument().activeView()
@@ -156,6 +176,17 @@ class TestNavigationBarIcons(unittest.TestCase):
 
     def tearDown(self):
         FreeCAD.closeDocument(self.doc.Name)
+
+    def waitForStyleSheet(self, timeout=5.0):
+        """Setting StyleSheet reloads it from a parameter observer, not at once."""
+        app = QtWidgets.QApplication.instance()
+        deadline = time.monotonic() + timeout
+        while NAVIGATION_BAR_RULE not in app.styleSheet():
+            if time.monotonic() >= deadline:
+                self.fail("FuCad.qss was not applied within %.0fs of being set" % timeout)
+            FreeCADGui.updateGui()
+            app.processEvents()
+            time.sleep(0.02)
 
     def navigationBar(self):
         bars = [

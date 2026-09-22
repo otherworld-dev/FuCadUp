@@ -38,7 +38,18 @@ import FreeCAD
 import FreeCADGui
 from PySide import QtCore, QtGui
 
+from PinnedPreferences import PinnedPreferences
+
 VIEW_PARAMS = "User parameter:BaseApp/Preferences/View"
+
+# The datum sizes the planes are drawn at for these tests, pinned rather than read
+# back with a fallback. The fallback used to be 100 for DatumScale, the value before
+# the fork made it 300, so on any profile that had not stored 300 explicitly the test
+# placed its "empty space" on a plane three times the size it thought. The values are
+# the product's own defaults, see ViewParams.cpp and ViewProviderDatum.cpp.
+DATUM_PLANE_SIZE = 62.0
+DATUM_SCALE = 300.0
+LOCAL_COORDINATE_SYSTEM_SIZE = 1.0
 
 NO_BUTTON = QtCore.Qt.NoButton
 NO_MODIFIER = QtCore.Qt.NoModifier
@@ -53,6 +64,18 @@ class TestOriginPlaneHover(unittest.TestCase):
     """Moving the cursor between origin planes must always highlight the plane under it."""
 
     def setUp(self):
+        # Before the coordinate system exists, so its planes are built at these sizes.
+        pins = PinnedPreferences(
+            VIEW_PARAMS,
+            {
+                "DatumPlaneSize": ("float", DATUM_PLANE_SIZE),
+                "DatumScale": ("float", DATUM_SCALE),
+                "LocalCoordinateSystemSize": ("float", LOCAL_COORDINATE_SYSTEM_SIZE),
+            },
+        ).pin()
+        # A cleanup rather than tearDown, so the pins come off even when setUp skips.
+        self.addCleanup(pins.restore)
+
         self.doc = FreeCAD.newDocument("TestOriginPlaneHover")
         FreeCADGui.ActiveDocument = FreeCADGui.getDocument(self.doc.Name)
         self.lcs = self.doc.addObject("App::LocalCoordinateSystem", "LCS")
@@ -218,11 +241,8 @@ class TestOriginPlaneHover(unittest.TestCase):
         datum unit is one widget pixel times the LocalCoordinateSystemSize preference.
         """
 
-        params = FreeCAD.ParamGet(VIEW_PARAMS)
-        size = (
-            params.GetFloat("DatumPlaneSize", 62.0) * params.GetFloat("DatumScale", 100.0) / 100.0
-        )
-        scale = params.GetFloat("LocalCoordinateSystemSize", 1.0)
+        size = DATUM_PLANE_SIZE * DATUM_SCALE / 100.0
+        scale = LOCAL_COORDINATE_SYSTEM_SIZE
         mid = (QUARTER_OFFSET + size) / 2.0 * scale
         far = 2.0 * size * scale
 
