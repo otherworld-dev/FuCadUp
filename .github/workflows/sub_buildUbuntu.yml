@@ -176,31 +176,19 @@ jobs:
 
       - name: FuCadUp GUI tests on build dir
         if: inputs.testOnBuildDir
-        # Measured at over 25 minutes on the hosted runner, where it was cut off
-        # mid-run. Generous enough to finish, tight enough to catch a hang.
+        # A backstop only: each module has its own limit below, so a hang is killed
+        # and named long before this is reached.
         timeout-minutes: 60
         uses: ./.github/workflows/actions/runPythonTests
         with:
           testDescription: "GUI tests on build dir"
-          # -t 0 runs every suite the GUI binary registers, which is the only way
-          # the fork's own suites (TestRibbon, TestTimeline, TestPatternPanel and
-          # the rest of the list in src/Mod/Test/InitGui.py) get run at all. The
-          # wrapper this replaces selected modules whose name contains "Gui", which
-          # none of them do.
-          #
-          # The run is checked for a test total as well as for its exit code. A GUI
-          # binary that cannot start its Python side prints a traceback, runs
-          # nothing and still exits 0, which is how this step passed for months
-          # whilst verifying nothing at all.
-          testCommand: |
-            raw="${{ env.logdir }}TestGUIBuild.raw"
-            xvfb-run "${{ env.builddir }}/bin/FuCadUp" -t 0 2>&1 | tee "$raw"
-            rc=${PIPESTATUS[0]}
-            if ! grep -qE '^Ran [0-9]+ tests' "$raw"; then
-              echo "::error::The GUI run printed no test total, so it verified nothing."
-              exit 1
-            fi
-            exit "$rc"
+          # Every module the GUI binary registers, the fork's own suites included,
+          # each in a process of its own with a five-minute limit. Run as one -t 0
+          # process, a single module that hung held up all the rest until the step
+          # timed out, and the log arrived in batches so it never said which one. A
+          # module that prints no test total fails too, since a binary that cannot
+          # start its Python side runs nothing and still exits 0.
+          testCommand: xvfb-run -a python3 ./.github/scripts/run_gui_tests.py "${{ env.builddir }}" --timeout 300
           logFile: ${{ env.logdir }}TestGUIBuild.log
           reportFile: ${{env.reportdir}}${{ env.reportfilename }}
 
