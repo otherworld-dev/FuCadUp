@@ -174,6 +174,13 @@ class TestDatumScaleDefault(unittest.TestCase):
         A new document each time because ViewProviderPlane reads the scale as it
         attaches: the handler that resizes what is already on screen runs delayed,
         so a plane built before the parameter moved keeps the size it was built at.
+
+        Read from the plane's own coordinates, which ViewProviderPlane::updatePlaneSize
+        writes as DatumPlaneSize times the scale. A bounding box of the plane is no use:
+        the datum sits under an SoShapeScale that keeps it a constant size on screen,
+        and that factor depends on the camera and on whether the view has drawn yet.
+        Under xvfb's software OpenGL it had not, and the box came back as nonsense such
+        as -352914 or 4e32 while the same test passed on a desktop.
         """
         from pivy import coin
 
@@ -188,9 +195,29 @@ class TestDatumScaleDefault(unittest.TestCase):
             plane = doc.getObject("XY_Plane")
             self.assertIsNotNone(plane, "the coordinate system grew no XY plane")
 
-            action = coin.SoGetBoundingBoxAction(coin.SbViewportRegion(1000, 1000))
-            action.apply(plane.ViewObject.RootNode)
-            return action.getBoundingBox().getMax().getValue()[0]
+            search = coin.SoSearchAction()
+            search.setType(coin.SoCoordinate3.getClassTypeId())
+            search.setInterest(coin.SoSearchAction.ALL)
+            # Whether the drawn square is on show depends on the display mode switch.
+            search.setSearchingAll(True)
+            # The coordinates are a part of the SoShapeScale node kit, which a search does
+            # not enter unless told to. The setting is global, so it is put back after.
+            searched_kits = coin.SoBaseKit.isSearchingChildren()
+            coin.SoBaseKit.setSearchingChildren(True)
+            try:
+                search.apply(plane.ViewObject.RootNode)
+            finally:
+                coin.SoBaseKit.setSearchingChildren(searched_kits)
+
+            # A path into a node kit ends at the kit unless it is read as a full path.
+            paths = search.getPaths()
+            reach = [
+                point.getValue()[0]
+                for index in range(paths.getLength())
+                for point in coin.cast(paths[index], "SoFullPath").getTail().point.getValues()
+            ]
+            self.assertTrue(reach, "the XY plane has no coordinates to measure")
+            return max(reach)
         finally:
             FreeCAD.closeDocument(doc.Name)
 
