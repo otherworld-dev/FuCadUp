@@ -133,6 +133,7 @@
 #include "Inventor/SoAxisCrossKit.h"
 #include "Inventor/SoFCBackgroundGradient.h"
 #include "Inventor/SoFCBoundingBox.h"
+#include "Inventor/ViewVolumeCorrection.h"
 #include "MainWindow.h"
 #include "Multisample.h"
 #include "NaviCube.h"
@@ -3947,14 +3948,23 @@ SbVec3f View3DInventorViewer::getPointOnFocalPlane(const SbVec2s& pnt) const
 
 SbVec2s View3DInventorViewer::getPointOnViewport(const SbVec3f& pnt) const
 {
-    const SbViewportRegion& vp = this->getSoRenderManager()->getViewportRegion();
-    float fRatio = vp.getViewportAspectRatio();
-    const SbVec2s& sp = vp.getViewportSizePixels();
-    SbViewVolume vv = this->getSoRenderManager()->getCamera()->getViewVolume(fRatio);
+    SoCamera* camera = this->getSoRenderManager()->getCamera();
+
+    if (!camera) {
+        return {};
+    }
+
+    // The volume the point was actually rendered through, and the viewport it maps
+    // onto: without this the projection is wrong by the view's own aspect ratio
+    // whenever the 3D view is taller than it is wide.
+    SbViewportRegion mapped;
+    SbViewVolume vv =
+        mappedViewVolume(*camera, this->getSoRenderManager()->getViewportRegion(), mapped);
 
     SbVec3f pt(pnt);
     vv.projectToScreen(pt, pt);
 
+    const SbVec2s& sp = mapped.getViewportSizePixels();
     auto xpos = short(std::roundf(pt[0] * sp[0]));  // NOLINT
     auto ypos = short(std::roundf(pt[1] * sp[1]));  // NOLINT
 
