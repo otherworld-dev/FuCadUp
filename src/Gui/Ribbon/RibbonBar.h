@@ -28,6 +28,7 @@
 
 #include <FCGlobal.h>
 
+class QLabel;
 class QStackedWidget;
 class QTabBar;
 class QToolButton;
@@ -79,6 +80,10 @@ public:
     int currentIndex() const;
     void setCurrentIndex(int index);
 
+    /// Names the workspace the ribbon has loaded. The block shows this and
+    /// nothing else: a workbench is the core's own idea, not the shell's.
+    void setWorkspaceName(const QString& name);
+
 Q_SIGNALS:
     void tabActivated(int index);
 
@@ -92,8 +97,8 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-    /// Builds the block holding the workspace selector, or returns null when
-    /// the Std_Workbench command has nothing to offer.
+    /// Builds the block that names the workspace, at the left of the strip
+    /// where Fusion puts its own workspace control.
     QWidget* createWorkspaceBlock(QWidget* parent);
 
     /// The buttons of the page on screen that the keyboard can reach, in
@@ -109,6 +114,7 @@ private:
 
     QTabBar* tabBar;
     QStackedWidget* pageStack;
+    QLabel* workspaceLabel {nullptr};
 
     Q_DISABLE_COPY(RibbonBar)
 };

@@ -154,6 +154,11 @@ private:
         QString id;
         QString workbench;
         bool optional {false};
+        /// Only a command list over an upstream workbench, with none of the
+        /// shell's own affordances behind it. Such a tab stays off the strip
+        /// until its workbench is the active one, which also keeps the
+        /// generated tab from being titled after that workbench instead.
+        bool passthrough {false};
         /// Only on the strip while a mode pushed it, and never auto-activates
         /// its workbench: the mode that owns it decides which one is active.
         bool context {false};
@@ -237,6 +242,9 @@ private:
     static RibbonManager* _instance;
 
     QPointer<RibbonBar> ribbonBar;
+    /// What the definition calls itself, shown in the block at the left of
+    /// the strip. Never a workbench name.
+    QString workspaceName;
     std::vector<TabDefinition> workspaceTabs;
     /// Filled once by loadWorkspace(), so that pushed tabs stay addressable.
     std::vector<TabDefinition> contextTabs;

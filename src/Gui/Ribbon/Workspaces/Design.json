@@ -235,6 +235,7 @@
             "id": "SURFACE",
             "workbench": "SurfaceWorkbench",
             "optional": true,
+            "passthrough": true,
             "panels": [
                 {
                     "caption": "CREATE",
@@ -282,6 +283,7 @@
             "id": "MESH",
             "workbench": "MeshWorkbench",
             "optional": true,
+            "passthrough": true,
             "panels": [
                 {
                     "caption": "CREATE",
@@ -328,6 +330,7 @@
             "id": "DRAWING",
             "workbench": "TechDrawWorkbench",
             "optional": true,
+            "passthrough": true,
             "panels": [
                 {
                     "caption": "CREATE",
@@ -426,6 +429,7 @@
             "id": "MANUFACTURE",
             "workbench": "CAMWorkbench",
             "optional": true,
+            "passthrough": true,
             "panels": [
                 {
                     "caption": "SETUP",
@@ -492,6 +496,7 @@
             "id": "SIMULATION",
             "workbench": "FemWorkbench",
             "optional": true,
+            "passthrough": true,
             "panels": [
                 {
                     "caption": "STUDY",

@@ -237,7 +237,7 @@ void StartView::configureNewFileButtons(QLayout* layout) const
     ));
     auto partDesign = gsl::owner<NewFileButton*>(new NewFileButton(
         {tr("Parametric Body"),
-         tr("Creates a body with the Part Design workbench"),
+         tr("Creates a parametric solid body"),
          QLatin1String(":/icons/PartDesignWorkbench.svg")}
     ));
     auto assembly = gsl::owner<NewFileButton*>(new NewFileButton(

@@ -488,6 +488,8 @@ void RibbonManager::loadWorkspace()
 
     const QJsonObject root = document.object();
 
+    workspaceName = root.value(QLatin1String("name")).toString();
+
     const QJsonArray tabs = root.value(QLatin1String("tabs")).toArray();
     for (int i = 0; i < tabs.size(); ++i) {
         const QJsonValue value = tabs.at(i);
@@ -526,6 +528,7 @@ bool RibbonManager::parseTab(const QJsonObject& source, TabDefinition& tab)
 
     tab.workbench = source.value(QLatin1String("workbench")).toString();
     tab.optional = source.value(QLatin1String("optional")).toBool(false);
+    tab.passthrough = source.value(QLatin1String("passthrough")).toBool(false);
 
     // A context tab may name the command that ends its mode, which keeps the
     // ordinary tabs usable while the mode runs; see createPage().
@@ -624,6 +627,8 @@ void RibbonManager::rebuildTabs(const QString& workbench)
 
     loadWorkspace();
 
+    ribbonBar->setWorkspaceName(workspaceName);
+
     QStringList available;
     {
         Base::PyGILStateLocker lock;
@@ -646,6 +651,10 @@ void RibbonManager::rebuildTabs(const QString& workbench)
                     tab.id.toUtf8().constData(),
                     tab.workbench.toUtf8().constData()
                 );
+                continue;
+            }
+
+            if (tab.passthrough && tab.workbench != workbench) {
                 continue;
             }
 
