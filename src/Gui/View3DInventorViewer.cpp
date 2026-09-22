@@ -3957,16 +3957,25 @@ SbVec2s View3DInventorViewer::getPointOnViewport(const SbVec3f& pnt) const
     // The volume the point was actually rendered through, and the viewport it maps
     // onto: without this the projection is wrong by the view's own aspect ratio
     // whenever the 3D view is taller than it is wide.
-    SbViewportRegion mapped;
-    SbViewVolume vv =
-        mappedViewVolume(*camera, this->getSoRenderManager()->getViewportRegion(), mapped);
+    MappedView mapped = mappedViewVolume(*camera, this->getSoRenderManager()->getViewportRegion());
+
+    const SbVec2s& sp = mapped.viewport.getViewportSizePixels();
+    if (sp[0] <= 0 || sp[1] <= 0) {
+        // A zero-extent viewport would otherwise scale the volume by 1/0, producing an
+        // infinite/NaN frustum and undefined behaviour in the cast below.
+        return {};
+    }
 
     SbVec3f pt(pnt);
-    vv.projectToScreen(pt, pt);
+    mapped.volume.projectToScreen(pt, pt);
 
-    const SbVec2s& sp = mapped.getViewportSizePixels();
-    auto xpos = short(std::roundf(pt[0] * sp[0]));  // NOLINT
-    auto ypos = short(std::roundf(pt[1] * sp[1]));  // NOLINT
+    // The CROP_VIEWPORT_* modes narrow the mapped viewport and recentre it, so its
+    // corner is not the window's corner - offset by it to land back in window pixels,
+    // which is the space every other consumer (toQPoint, fromQPoint,
+    // getNormalizedPosition) works in.
+    const SbVec2s& org = mapped.viewport.getViewportOriginPixels();
+    auto xpos = short(org[0] + std::roundf(pt[0] * sp[0]));  // NOLINT
+    auto ypos = short(org[1] + std::roundf(pt[1] * sp[1]));  // NOLINT
 
     return {xpos, ypos};
 }

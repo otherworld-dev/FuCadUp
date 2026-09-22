@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
-#ifndef GUI_INVENTOR_VIEWVOLUMECORRECTION_H
-#define GUI_INVENTOR_VIEWVOLUMECORRECTION_H
+#pragma once
 
 #include <Inventor/SbViewportRegion.h>
 #include <Inventor/SbViewVolume.h>
@@ -11,7 +10,8 @@ class SoCamera;
 namespace Gui
 {
 
-/** The camera's view volume, corrected for how the viewport maps onto it.
+/** A camera's view volume, corrected for how the viewport maps onto it, paired with the
+ * viewport it maps onto.
  *
  * A camera's own view volume is not what gets rendered: SoCamera::viewportMapping
  * decides how the volume meets a viewport that is a different shape. With the
@@ -20,13 +20,24 @@ namespace Gui
  * instead of a squashed version of it. Projecting a point through the uncorrected
  * volume therefore lands somewhere the point was never drawn.
  *
- * \a mappedViewport receives the viewport the returned volume maps onto, which the
- * CROP_VIEWPORT_* modes narrow; project to pixels against that, not the original.
+ * \c viewport is the viewport the returned volume maps onto, which the CROP_VIEWPORT_*
+ * modes narrow; project to pixels against that, not the original, and offset the result
+ * by its getViewportOriginPixels() - the CROP modes recentre the region as well as
+ * shrinking it, so its corner is not the window's corner.
  */
-SbViewVolume mappedViewVolume(const SoCamera& camera,
-                              const SbViewportRegion& viewport,
-                              SbViewportRegion& mappedViewport);
+struct MappedView
+{
+    SbViewVolume volume;
+    SbViewportRegion viewport;
+};
+
+/** Pairs \a camera's view volume, corrected for how it maps onto \a viewport, with the
+ * (possibly narrowed) viewport it maps onto. See MappedView for why both are needed
+ * together. \a camera is assumed to sit at the scene root with no transform in front of
+ * it - Coin's own overload takes a model-matrix argument for the general case, but every
+ * caller of this function has one.
+ */
+[[nodiscard]] MappedView mappedViewVolume(const SoCamera& camera,
+                                          const SbViewportRegion& viewport);
 
 }  // namespace Gui
-
-#endif  // GUI_INVENTOR_VIEWVOLUMECORRECTION_H
