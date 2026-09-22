@@ -24,6 +24,8 @@
 # Workbench test module
 
 import FreeCAD, FreeCADGui, os, unittest
+
+from PinnedPreferences import PinnedPreferences
 import tempfile
 
 from PySide import QtWidgets, QtCore
@@ -125,6 +127,15 @@ class CommandTestCase(unittest.TestCase):
 
 class TestNavigationStyle(unittest.TestCase):
     def setUp(self):
+        # These check the orientation lock, and read the camera straight back after
+        # moving it. With navigation animations on, which is the default, a programmatic
+        # orientation change glides there instead, so it has not happened yet when read.
+        pins = PinnedPreferences(
+            "User parameter:BaseApp/Preferences/View",
+            {"UseNavigationAnimations": ("bool", False)},
+        ).pin()
+        self.addCleanup(pins.restore)
+
         self.Doc = FreeCAD.newDocument("CreateTest")
         self.View = FreeCADGui.getDocument(self.Doc).ActiveView
 
