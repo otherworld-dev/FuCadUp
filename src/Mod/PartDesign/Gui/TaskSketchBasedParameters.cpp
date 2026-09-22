@@ -185,6 +185,8 @@ void ProfileSelectionWidget::setPickingActive(bool active)
                         "Click a region to extrude only that region; click it again to "
                         "release it"
                     ),
+                    // The hint names no key: the region is picked with the mouse.
+                    .sequences = {},
                 }});
             });
         }
