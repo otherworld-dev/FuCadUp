@@ -188,7 +188,17 @@ jobs:
       uses: ./.github/workflows/actions/runPythonTests
       with:
         testDescription: "GUI tests on build dir"
-        testCommand: xvfb-run ${{ env.builddir }}/bin/FuCadUp -t 0
+        # Checked for a test total as well as for its exit code: a GUI binary that
+        # cannot start its Python side runs nothing and still exits 0.
+        testCommand: |
+          raw="${{ env.logdir }}TestGUIBuild.raw"
+          xvfb-run ${{ env.builddir }}/bin/FuCadUp -t 0 2>&1 | tee "$raw"
+          rc=${PIPESTATUS[0]}
+          if ! grep -qE '^Ran [0-9]+ tests' "$raw"; then
+            echo "::error::The GUI run printed no test total, so it verified nothing."
+            exit 1
+          fi
+          exit "$rc"
         logFile: ${{ env.logdir }}TestGUIBuild.log
         reportFile: ${{env.reportdir}}${{ env.reportfilename }}
         shellCmd: ${{ env.shellCmd }}

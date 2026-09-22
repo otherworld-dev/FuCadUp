@@ -160,6 +160,7 @@ jobs:
     uses: ./.github/workflows/sub_buildPixi.yml
     with:
       artifactBasename: Pixi-${{ github.run_id }}
+      testOnBuildDir: true
       skipBuild: ${{ needs.Gate.outputs.should-run != 'true' }}
 
   Windows:
