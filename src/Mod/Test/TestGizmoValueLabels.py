@@ -499,5 +499,7 @@ class TestGizmoValueLabelsOnOtherFeatures(GizmoLabelCase):
             for side in (1.0, -1.0)
         ]
         box_centre = self._box_centre_on_screen(box)
-        misses = [(box_centre - self._screen_point(point)).manhattanLength() for point in candidates]
+        misses = [
+            (box_centre - self._screen_point(point)).manhattanLength() for point in candidates
+        ]
         self.assertLessEqual(min(misses), 15, f"box at {box_centre} is not halfway round the arc")

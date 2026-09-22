@@ -3,6 +3,7 @@
 To run tests:
     FreeCAD -t TestFusionShortcuts
 """
+
 import importlib
 import time
 import unittest
@@ -160,9 +161,7 @@ class TestFusionShortcuts(unittest.TestCase):
         # priority ShortcutManager::setPriority wrote straight from the
         # parameter group it uses (ShortcutManager.cpp: hShortcuts is
         # ".../Preferences/Shortcut", hPriorities is its "Priorities" group).
-        hPriorities = FreeCAD.ParamGet(
-            "User parameter:BaseApp/Preferences/Shortcut/Priorities"
-        )
+        hPriorities = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Shortcut/Priorities")
         prio = hPriorities.GetInt("Std_CommandPalette")
         self.assertGreater(prio, 0)
 
@@ -319,9 +318,7 @@ class TestFusionShortcuts(unittest.TestCase):
             # its second key - which is the behaviour the Fusion letters give up.
             self._send_key(QtCore.Qt.Key_K)
             QtWidgets.QApplication.instance().processEvents()
-            self.assertEqual(
-                sketch.ConstraintCount, before, "K alone already changed the sketch"
-            )
+            self.assertEqual(sketch.ConstraintCount, before, "K alone already changed the sketch")
 
             self._send_key(second)
             deadline = time.monotonic() + 0.6

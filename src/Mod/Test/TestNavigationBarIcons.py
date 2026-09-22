@@ -116,9 +116,7 @@ def visible_hsv(image):
 
 def count_in_band(pixels, low, high, min_saturation=MIN_SATURATION):
     return sum(
-        1
-        for hue, saturation, _ in pixels
-        if saturation >= min_saturation and low <= hue <= high
+        1 for hue, saturation, _ in pixels if saturation >= min_saturation and low <= hue <= high
     )
 
 
@@ -227,15 +225,11 @@ class TestNavigationBarIcons(unittest.TestCase):
     def test_the_cyan_turns_into_the_accent_blue(self):
         recoloured = 0
         for button, action in self.buttons():
-            stock = count_in_band(
-                visible_hsv(image_of(action.icon())), CYAN_HUE_LOW, CYAN_HUE_HIGH
-            )
+            stock = count_in_band(visible_hsv(image_of(action.icon())), CYAN_HUE_LOW, CYAN_HUE_HIGH)
             if not stock:
                 continue
             recoloured += 1
-            blue = count_in_band(
-                visible_hsv(image_of(button.icon())), BLUE_HUE_LOW, BLUE_HUE_HIGH
-            )
+            blue = count_in_band(visible_hsv(image_of(button.icon())), BLUE_HUE_LOW, BLUE_HUE_HIGH)
             self.assertGreaterEqual(
                 blue,
                 stock,
@@ -247,9 +241,7 @@ class TestNavigationBarIcons(unittest.TestCase):
     def test_draw_style_keeps_its_red_slash(self):
         pixels = visible_hsv(image_of(self.buttonFor("Std_DrawStyle").icon()))
         red = sum(
-            1
-            for hue, saturation, _ in pixels
-            if saturation >= 100 and (hue <= 12 or hue >= 348)
+            1 for hue, saturation, _ in pixels if saturation >= 100 and (hue <= 12 or hue >= 348)
         )
         self.assertGreaterEqual(red, 4, "the slash across the draw style icon went blue")
 
@@ -266,15 +258,9 @@ class TestNavigationBarIcons(unittest.TestCase):
         """
         sheet = QtWidgets.QApplication.instance().styleSheet()
         for state in ("hover", "checked"):
-            block = style_block(
-                sheet, "QToolBar#NavigationBar QToolButton:%s" % state
-            )
-            background = declared_color(
-                block, r"background-color:\s*(#[0-9a-fA-F]{6})"
-            )
-            accent = declared_color(
-                block, r"border:\s*\d+px\s+solid\s+(#[0-9a-fA-F]{6})"
-            )
+            block = style_block(sheet, "QToolBar#NavigationBar QToolButton:%s" % state)
+            background = declared_color(block, r"background-color:\s*(#[0-9a-fA-F]{6})")
+            accent = declared_color(block, r"border:\s*\d+px\s+solid\s+(#[0-9a-fA-F]{6})")
             self.assertIsNotNone(background, ":%s declares no fill" % state)
             self.assertIsNotNone(accent, ":%s declares no accent border" % state)
 
@@ -290,9 +276,7 @@ class TestNavigationBarIcons(unittest.TestCase):
         """Recolouring the buttons must not reach the ribbon and the menus."""
         untouched = 0
         for _, action in self.buttons():
-            stock = count_in_band(
-                visible_hsv(image_of(action.icon())), CYAN_HUE_LOW, CYAN_HUE_HIGH
-            )
+            stock = count_in_band(visible_hsv(image_of(action.icon())), CYAN_HUE_LOW, CYAN_HUE_HIGH)
             if stock:
                 untouched += 1
         self.assertTrue(

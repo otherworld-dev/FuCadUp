@@ -92,7 +92,7 @@ class TestNavigationStyleDefault(unittest.TestCase):
 
 
 class TestReportBugUrl(unittest.TestCase):
-    """"Report an Issue" must point at this fork's tracker, not FreeCAD's.
+    """ "Report an Issue" must point at this fork's tracker, not FreeCAD's.
 
     Std_ReportBug's URL only exists as a C++ string literal inside
     CommandStd.cpp: it is not exposed as a status tip, a whatsThis, or any
@@ -233,8 +233,7 @@ class TestDatumScaleDefault(unittest.TestCase):
             3.0 * upstream,
             delta=0.5,
             msg="a fresh install draws the origin plane out to %.1f, where upstream's "
-            "scale gives %.1f: the default is not three times it"
-            % (by_default, upstream),
+            "scale gives %.1f: the default is not three times it" % (by_default, upstream),
         )
 
 
@@ -295,9 +294,10 @@ def differing_samples(first, second, tolerance=3):
         for x in range(0, first.width(), 2):
             a = first.pixelColor(x, y)
             b = second.pixelColor(x, y)
-            if max(
-                abs(a.red() - b.red()), abs(a.green() - b.green()), abs(a.blue() - b.blue())
-            ) > tolerance:
+            if (
+                max(abs(a.red() - b.red()), abs(a.green() - b.green()), abs(a.blue() - b.blue()))
+                > tolerance
+            ):
                 count += 1
     return count
 
@@ -446,7 +446,9 @@ class TestNaviCubeDefaults(unittest.TestCase):
             values,
             "the pack still sets NaviCube/Color, which nothing reads - the cube takes BaseColor",
         )
-        self.assertEqual(values.get("EmphaseColor"), accent, "cube edges and labels are not the accent")
+        self.assertEqual(
+            values.get("EmphaseColor"), accent, "cube edges and labels are not the accent"
+        )
         self.assertEqual(values.get("HiliteColor"), accent, "the cube hover is not the accent")
         self.assertEqual(values.get("InactiveOpacity"), "100", "the cube is not solid at rest")
         self.assertIn("BaseColor", values, "the pack leaves the cube faces at the light default")
