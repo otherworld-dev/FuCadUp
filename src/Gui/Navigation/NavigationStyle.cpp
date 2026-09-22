@@ -917,7 +917,7 @@ void NavigationStyle::reorientCamera(
 
 void NavigationStyle::panCamera(
     SoCamera* cam,
-    float aspectratio,
+    [[maybe_unused]] float aspectratio,  // vestigial - see the comment below
     const SbPlane& panplane,
     const SbVec2f& currpos,
     const SbVec2f& prevpos
@@ -931,7 +931,15 @@ void NavigationStyle::panCamera(
     }
 
 
-    // Find projection points for the last and current mouse coordinates.
+    // Find projection points for the last and current mouse coordinates. The viewport is read
+    // live here instead of trusting aspectratio, so a resize mid-drag is honoured immediately.
+    // This deliberately overrides some callers: GestureNavigationStyle's PanState, StickyPanState
+    // and GestureState, and SiemensNXNavigationStyle's PanState, each cache their ratio once in
+    // their boost::statechart state's constructor (gesture start) and pass that same, increasingly
+    // stale, value to every panCamera() call for the rest of the gesture - exactly the RDP-resize
+    // case this project exists to handle. A ratio cached at gesture start is itself wrong the
+    // moment the window resizes, so reading live here is the more correct of the two; the
+    // parameter stays for source compatibility with all 23 call sites (13 files) but is ignored.
     const SbViewportRegion& vp = viewer->getViewportRegion();
     SbViewVolume vv = mappedViewVolume(*cam, vp).volume;
 
