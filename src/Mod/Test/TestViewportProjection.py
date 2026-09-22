@@ -1,4 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: 2026 FreeCAD contributors
+# SPDX-FileNotice: Part of the FreeCAD project.
+
 """Tests that a world point projects to the pixel where it was rendered.
 
 The 3D view's shape is not fixed: Adam works over Remote Desktop, so the view
@@ -34,13 +37,28 @@ class ViewportProjectionCase(unittest.TestCase):
         self.view.fitAll()
         self._pump(300)
         self.viewer = self.view.getViewer()
+        self._original_window_size = FreeCADGui.getMainWindow().size()
         self.addCleanup(self._close)
+        self.addCleanup(self._restore_window_size)
 
     def _close(self):
         try:
             FreeCAD.closeDocument(self.doc.Name)
         except (ReferenceError, RuntimeError, NameError):
             pass
+
+    def _restore_window_size(self):
+        """_shape_view leaves the main window resized towards whatever the last test
+        asked for; left alone, that hands the next GUI test class in this process a
+        window shape it never asked for - e.g. the tall shape these tests need would
+        look like a real regression to a class that itself checks it isn't tall
+        (Task 6's pattern grip tests, which are exactly the ones that fail in a tall
+        window). Registered after _close, so addCleanup's LIFO order runs this first,
+        resizing while the document and its camera still exist - resizing after
+        _close raised a caught-but-logged "Could not find reference to 3D View
+        camera" exception during development, which this ordering avoids."""
+        FreeCADGui.getMainWindow().resize(self._original_window_size)
+        self._pump(300)
 
     def _pump(self, ms=100):
         loop = QtCore.QEventLoop()
@@ -116,6 +134,21 @@ class ViewportProjectionCase(unittest.TestCase):
         b = (gxx * ry - gyx * rx) / det
         return (ox + a * step, oy + b * step)
 
+    def _round_trip_error(self, point):
+        """How far, in mm, getPointOnViewport's screen->world round trip misses `point`
+        by: project it to a pixel, unproject that pixel back to world space via
+        projectPointToLine (the already-correct path), and compare against the world
+        point obtained by unprojecting the *independently calibrated* pixel instead.
+        Zero only when getPointOnViewport is the exact inverse of the screen->world
+        path - which every consumer of it relies on. Reused by Tasks 4 and 5."""
+        pixel = self.view.getPointOnViewport(point.x, point.y, point.z)
+        near, _far = self.view.projectPointToLine(int(pixel[0]), int(pixel[1]))
+        expected_pixel = self._calibrated_pixel(point)
+        back = self.view.projectPointToLine(
+            int(round(expected_pixel[0])), int(round(expected_pixel[1]))
+        )[0]
+        return (near - back).Length
+
     def _assert_projects_where_rendered(self, shape, point):
         achieved = self._shape_view(*shape)
         expected = self._calibrated_pixel(point)
@@ -137,15 +170,7 @@ class ViewportProjectionCase(unittest.TestCase):
         self._assert_projects_where_rendered((700, 1300), FreeCAD.Vector(10, 6, 4))
 
     def test_a_point_projects_where_it_is_rendered_in_a_square_view(self):
-        achieved = self._shape_view(1000, 1000)
-        point = FreeCAD.Vector(10, 6, 4)
-        expected = self._calibrated_pixel(point)
-        actual = self.view.getPointOnViewport(point.x, point.y, point.z)
-        self.assertLess(
-            ((actual[0] - expected[0]) ** 2 + (actual[1] - expected[1]) ** 2) ** 0.5,
-            TOLERANCE_PX,
-            "in a %dx%d viewport the projection moved" % achieved,
-        )
+        self._assert_projects_where_rendered((1000, 1000), FreeCAD.Vector(10, 6, 4))
 
     def test_the_centre_of_the_view_projects_to_the_centre_in_a_tall_view(self):
         """The one case needing no calibration at all: whatever the view's shape, the
@@ -166,17 +191,11 @@ class ViewportProjectionCase(unittest.TestCase):
         because that is what every consumer round-trips against."""
         self._shape_view(700, 1300)
         point = FreeCAD.Vector(10, 6, 4)
-        pixel = self.view.getPointOnViewport(point.x, point.y, point.z)
-        near, _far = self.view.projectPointToLine(int(pixel[0]), int(pixel[1]))
-        expected_pixel = self._calibrated_pixel(point)
-        back = self.view.projectPointToLine(
-            int(round(expected_pixel[0])), int(round(expected_pixel[1]))
-        )[0]
+        error = self._round_trip_error(point)
         self.assertLess(
-            (near - back).Length,
+            error,
             0.2,
-            "the round trip landed %.3f mm away from where the point is rendered"
-            % (near - back).Length,
+            "the round trip landed %.3f mm away from where the point is rendered" % error,
         )
 
     def test_the_screen_to_world_path_is_correct_in_a_tall_view(self):
