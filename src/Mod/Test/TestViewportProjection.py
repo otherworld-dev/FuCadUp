@@ -13,6 +13,7 @@ the one that was rendered and picked. These tests pin the projection down at thr
 viewport shapes so a regression shows up wherever the window happens to be.
 """
 
+import time
 import unittest
 
 import FreeCAD
@@ -163,11 +164,21 @@ class ViewportProjectionCase(unittest.TestCase):
 
     # -- helpers for driving real mouse/keyboard events -------------------------
 
-    def _viewport_widget(self):
+    def _viewport_widget(self, timeout_ms=1000):
         """The QWidget synthetic mouse/keyboard events must be delivered to for
         NavigationStyle/SoQTQuarterAdaptor to see them, same widget TestNavigationStyles
-        drives."""
-        return self.view.graphicsView().viewport()
+        drives. Retries like TestRubberbandSelection._refresh_view_widgets: this call
+        can be transiently dead right after _shape_view's resize."""
+        deadline = time.monotonic() + (timeout_ms / 1000.0)
+        while True:
+            try:
+                widget = self.view.graphicsView().viewport()
+                widget.rect()
+                return widget
+            except RuntimeError:
+                if time.monotonic() >= deadline:
+                    raise
+                self._pump(20)
 
     def _device_pixel_ratio(self, widget):
         if hasattr(widget, "devicePixelRatioF"):
@@ -187,7 +198,9 @@ class ViewportProjectionCase(unittest.TestCase):
 
     def _post(self, widget, event_type, pos, button, buttons, modifiers=QtCore.Qt.NoModifier):
         app = QtWidgets.QApplication.instance()
-        event = QtGui.QMouseEvent(event_type, pos, widget.mapToGlobal(pos), button, buttons, modifiers)
+        event = QtGui.QMouseEvent(
+            event_type, pos, widget.mapToGlobal(pos), button, buttons, modifiers
+        )
         app.sendEvent(widget, event)
 
     def _press_orbit(self, pixel, modifiers):
@@ -208,7 +221,12 @@ class ViewportProjectionCase(unittest.TestCase):
 
     def _release_orbit(self, widget, pos, modifiers):
         self._post(
-            widget, QtCore.QEvent.MouseButtonRelease, pos, QtCore.Qt.MiddleButton, QtCore.Qt.NoButton, modifiers
+            widget,
+            QtCore.QEvent.MouseButtonRelease,
+            pos,
+            QtCore.Qt.MiddleButton,
+            QtCore.Qt.NoButton,
+            modifiers,
         )
         self._pump(50)
 
@@ -260,6 +278,14 @@ class ViewportProjectionCase(unittest.TestCase):
         width, height = self._viewport_pixels()
         press_pixel = (int(width * 0.82), int(height * 0.12))  # off-centre, near the top
         expected = FreeCAD.Vector(self.view.getPointOnFocalPlane(*press_pixel))
+        # Guards against a leftover pickable (a prior test's object, the grid) silently
+        # diverting saveCursorPosition into ScenePointAtCursor instead of the branch
+        # under test - hiding the box is not enough on its own if something else is there.
+        self.assertIsNone(
+            self.view.getObjectInfo(press_pixel),
+            "something is pickable at the press point, so this would exercise "
+            "ScenePointAtCursor instead of FocalPointAtCursor",
+        )
 
         widget, pos = self._press_orbit(press_pixel, QtCore.Qt.ShiftModifier)
         try:
@@ -268,7 +294,8 @@ class ViewportProjectionCase(unittest.TestCase):
             self.assertLess(
                 (actual - expected).Length,
                 0.1,
-                "orbit pivot landed at %s but the cursor was over %s" % (tuple(actual), tuple(expected)),
+                "orbit pivot landed at %s but the cursor was over %s"
+                % (tuple(actual), tuple(expected)),
             )
         finally:
             self._release_orbit(widget, pos, QtCore.Qt.ShiftModifier)
@@ -276,12 +303,16 @@ class ViewportProjectionCase(unittest.TestCase):
     def test_arrow_key_pan_moves_the_same_ratio_on_both_axes_in_a_tall_view(self):
         """SoQTQuarterAdaptor::moveCameraScreen (:661) built its volume from
         getGLWidget()->width() / getGLWidget()->height() - an integer division that
-        reads 0 in a tall view (Coin then substitutes the camera's own square
-        aspectRatio) - and applied no 1/aspect scale either way, so an up/down pan
-        moved by a factor of the view's aspect ratio too little. Independently
-        verified: a fixed 0.1 normalized step should move the camera 1/aspect times
-        further along the view's tall axis than its narrow one, because the mapped
-        volume is taller in world units than it is wide."""
+        truncated to 1 for every ordinary wide window (1 <= aspect < 2) and to 0 in
+        a tall one (Coin then substitutes the camera's own square aspectRatio) - and
+        applied no 1/aspect scale either way, so a pan moved too little along
+        whichever axis the view's own aspect ratio expands: up/down in a tall view,
+        left/right in a wide one. This test only exercises the tall-view half (the
+        ratio it checks is symmetric, so a tall-view pass does not by itself prove
+        the wide-view case - see the "Feel changes" section of the task report).
+        Independently verified: a fixed 0.1 normalized step should move the camera
+        1/aspect times further along the view's tall axis than its narrow one,
+        because the mapped volume is taller in world units than it is wide."""
         achieved = self._shape_view(700, 1300)
         aspect = achieved[0] / float(achieved[1])
         widget = self._viewport_widget()
@@ -291,7 +322,9 @@ class ViewportProjectionCase(unittest.TestCase):
         def press(key):
             before = FreeCAD.Vector(*self.view.getCameraNode().position.getValue().getValue())
             for kind in (QtCore.QEvent.KeyPress, QtCore.QEvent.KeyRelease):
-                QtWidgets.QApplication.sendEvent(widget, QtGui.QKeyEvent(kind, key, QtCore.Qt.NoModifier))
+                QtWidgets.QApplication.sendEvent(
+                    widget, QtGui.QKeyEvent(kind, key, QtCore.Qt.NoModifier)
+                )
             self._pump(50)
             after = FreeCAD.Vector(*self.view.getCameraNode().position.getValue().getValue())
             return (after - before).Length
@@ -304,7 +337,10 @@ class ViewportProjectionCase(unittest.TestCase):
             up / right,
             1.0 / aspect,
             delta=0.15,
-            msg="an up-arrow pan moved %.4f%% of a right-arrow pan, expected about %.1f%% (1/aspect) in a %dx%d view"
+            msg=(
+                "an up-arrow pan moved %.4f%% of a right-arrow pan, expected about "
+                "%.1f%% (1/aspect) in a %dx%d view"
+            )
             % (100.0 * up / right, 100.0 / aspect, achieved[0], achieved[1]),
         )
 

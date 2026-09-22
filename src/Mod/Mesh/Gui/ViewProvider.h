@@ -291,7 +291,13 @@ public:
 private:
     static void renderGLCallback(void* ud, SoAction* a);
     static void boxZoom(const SbBox2s& box, const SbViewportRegion& vp, SoCamera* cam);
-    static void panCamera(SoCamera*, const SbViewportRegion&, const SbPlane&, const SbVec2f&, const SbVec2f&);
+    static void panCamera(
+        SoCamera*,
+        const SbViewportRegion&,
+        const SbPlane&,
+        const SbVec2f&,
+        const SbVec2f&
+    );
 
 protected:
     enum class HighlighMode

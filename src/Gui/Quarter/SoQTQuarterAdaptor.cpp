@@ -55,8 +55,9 @@
 # include <GL/gl.h>
 # endif
 
-#include "Inventor/ViewVolumeCorrection.h"
 #include "SoQTQuarterAdaptor.h"
+
+#include "Inventor/ViewVolumeCorrection.h"
 
 #ifdef BUILD_TRACY_FRAME_PROFILER
 #include <tracy/Tracy.hpp>
@@ -660,9 +661,12 @@ void SIM::Coin3D::Quarter::SoQTQuarterAdaptor::moveCameraScreen(const SbVec2f& s
 
     // The volume the scene was actually rendered through, and the viewport it maps
     // onto: getGLWidget()->width() / getGLWidget()->height() was integer division -
-    // square in a wide-or-square view, and 0 (which Coin reads as "use the camera's
-    // own aspectRatio") in a tall one - and, either way, missing the 1/aspect scale
-    // ADJUST_CAMERA applies, so an up/down pan moved too little in a tall viewport.
+    // truncating to 1 for every 1 <= aspect < 2 (an ordinary wide window included),
+    // and to 0 in a tall one, which Coin then reads as "use the camera's own
+    // aspectRatio" - and, either way, missing the 1/aspect scale ADJUST_CAMERA
+    // applies. Net effect: an up/down pan moved too little in a tall viewport, and
+    // a left/right pan moved too little in a wide one, both by the view's own
+    // aspect ratio - not a tall-view-only defect.
     Gui::MappedView mapped = Gui::mappedViewVolume(*cam, getSoRenderManager()->getViewportRegion());
     SbPlane panplane = mapped.volume.getPlane(cam->focalDistance.getValue());
 
