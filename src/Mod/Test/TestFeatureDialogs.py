@@ -44,7 +44,7 @@ import FreeCAD
 import FreeCADGui
 import Part
 from FreeCAD import Vector
-from PySide import QtWidgets
+from PySide import QtCore, QtWidgets
 
 PARTDESIGN_PARAMS = "User parameter:BaseApp/Preferences/Mod/PartDesign"
 DIAGNOSTICS_KEY = "ShowFeatureDiagnostics"
@@ -57,6 +57,9 @@ RECOMPUTE_BOX = "checkBoxUpdateView"
 DIRECTION_GROUP = "groupBoxDirection"
 ALONG_NORMAL_BOX = "checkBoxAlongDirection"
 DIRECTION_COMBO = "directionCB"
+
+# How far under the last field the buttons may sit and still read as its footer.
+MAX_BUTTON_GAP = 250
 
 
 class FeatureDialogTestCase(unittest.TestCase):
@@ -191,6 +194,42 @@ class TestDirectionControls(FeatureDialogTestCase):
         self.assertIsNotNone(
             self._visible(DIRECTION_GROUP),
             "The direction vector should appear once a custom direction is chosen",
+        )
+
+
+class TestDialogButtons(FeatureDialogTestCase):
+    """OK and Cancel read as the dialog's footer, not as something above it."""
+
+    def test_the_buttons_sit_below_the_dialog_content(self):
+        self._open_pad_dialog()
+
+        buttons = None
+        for box in self.window.findChildren(QtWidgets.QDialogButtonBox):
+            if box.isVisible():
+                buttons = box
+                break
+        self.assertIsNotNone(buttons, "Expected the task panel to show OK and Cancel")
+
+        form = self._visible(DIRECTION_COMBO)
+        self.assertIsNotNone(form, "Expected the feature's own form to be on screen")
+
+        buttons_top = buttons.mapToGlobal(QtCore.QPoint(0, 0)).y()
+        form_bottom = form.mapToGlobal(QtCore.QPoint(0, form.height())).y()
+
+        self.assertGreater(
+            buttons_top,
+            form_bottom,
+            "OK and Cancel are above the dialog they belong to",
+        )
+
+        # Below is not enough on its own. Adding the button box to the layout
+        # around the panel rather than to the panel itself also puts it below,
+        # but pinned to the foot of a full-height panel, which left it about
+        # fifteen hundred pixels from the card it belongs to.
+        self.assertLess(
+            buttons_top - form_bottom,
+            MAX_BUTTON_GAP,
+            "OK and Cancel are adrift from the dialog they belong to",
         )
 
 

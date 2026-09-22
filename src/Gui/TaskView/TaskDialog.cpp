@@ -46,7 +46,10 @@ using namespace Gui::TaskView;
 
 TaskDialog::TaskDialog()
     : QObject(nullptr)
-    , pos(North)
+    // South, not the North the core defaults to: a dialog that puts OK and
+    // Cancel above the fields they apply to reads as two separate things,
+    // and every dialog in the shell is meant to carry its buttons as a footer.
+    , pos(South)
     , escapeButton(true)
     , autoCloseTransaction(false)
     , autoCloseResetEdit(false)

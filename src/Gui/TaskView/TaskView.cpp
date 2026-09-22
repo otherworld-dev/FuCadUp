@@ -652,8 +652,13 @@ bool TaskView::showDialog(TaskDialog* dlg, App::Document* doc)
         for (const auto& it : cont) {
             outInfo.taskPanel->actionPanel->addWidget(it);
         }
-        // Add button box to the bottom of the main layout
-        outInfo.taskPanel->dialogLayout->addWidget(outInfo.ActiveCtrl);
+        // Into the panel with the content rather than into the layout around
+        // it. The scroll area below takes all the stretch, so a button box
+        // added there is pinned to the foot of the whole panel, which on a
+        // tall screen leaves it a long way from the dialog it belongs to.
+        // Added here it follows the last card, and the stretch below pushes
+        // the pair up together.
+        outInfo.taskPanel->actionPanel->addWidget(outInfo.ActiveCtrl);
     }
 
     outInfo.taskPanel->actionPanel->setScheme(QSint::ActionPanelScheme::defaultScheme());
