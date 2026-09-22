@@ -3,8 +3,12 @@
 """
 run_gui_tests.py
 
-List registered tests via `FuCadUp -t`, filter for GUI tests (names containing 'Gui'), and run each
-GUI test module using the specified FuCadUp executable.
+List registered tests via `FuCadUp -t` and run each registered module in its own process, using
+the specified FuCadUp executable.
+
+Modules are deliberately not filtered by name. The GUI binary is what registers the suites that
+need a display, and this fork's own suites are named TestRibbon, TestTimeline, TestPatternPanel
+and so on, so selecting for a 'Gui' substring silently skipped every one of them.
 
 Usage:
   run_gui_tests.py [FUCAD_EXEC]
@@ -116,9 +120,9 @@ def parse_registered_tests(output: str) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    """Entry point: run GUI test modules registered in the FuCadUp executable.
+    """Entry point: run every test module registered in the FuCadUp executable.
 
-    Returns the last non-zero exit code from any GUI test module, or 0 on success.
+    Returns the last non-zero exit code from any module, or 0 on success.
     """
     exec_arg = argv[1] if len(argv) > 1 else None
     fucad_exec = find_executable(exec_arg)
@@ -144,18 +148,13 @@ def main(argv: list[str]) -> int:
         print("No registered tests found; exiting with success.")
         return 0
 
-    gui_tests = [t for t in tests if "Gui" in t]
-    if not gui_tests:
-        print("No GUI tests found in registered tests; nothing to run.")
-        return 0
-
-    print("Found GUI test modules:")
-    for t in gui_tests:
+    print("Running these registered test modules:")
+    for t in tests:
         print("  ", t)
 
     last_rc = 0
-    for mod in gui_tests:
-        print(f"\nRunning GUI tests for module: {mod}")
+    for mod in tests:
+        print(f"\nRunning tests for module: {mod}")
         rc, out = run_and_capture([fucad_exec, "-t", mod])
         print(out)
         if rc != 0:

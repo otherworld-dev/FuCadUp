@@ -176,12 +176,16 @@ jobs:
 
       - name: FuCadUp GUI tests on build dir
         if: inputs.testOnBuildDir
-        timeout-minutes: 15
+        timeout-minutes: 25
         uses: ./.github/workflows/actions/runPythonTests
         with:
           testDescription: "GUI tests on build dir"
-          # Use Python wrapper to run only GUI-registered tests with the built FuCadUp executable
-          testCommand: xvfb-run python3 ./.github/scripts/run_gui_tests.py "${{ env.builddir }}"
+          # -t 0 runs every suite the GUI binary registers, which is the only way
+          # the fork's own suites (TestRibbon, TestTimeline, TestPatternPanel and
+          # the rest of the list in src/Mod/Test/InitGui.py) get run at all. The
+          # wrapper this replaces selected modules whose name contains "Gui", which
+          # none of them do.
+          testCommand: xvfb-run "${{ env.builddir }}/bin/FuCadUp" -t 0
           logFile: ${{ env.logdir }}TestGUIBuild.log
           reportFile: ${{env.reportdir}}${{ env.reportfilename }}
 
@@ -231,12 +235,12 @@ jobs:
           reportFile: ${{env.reportdir}}${{ env.reportfilename }}
 
       - name: FuCadUp GUI tests on install
-        timeout-minutes: 15
+        timeout-minutes: 25
         uses: ./.github/workflows/actions/runPythonTests
         with:
           testDescription: "GUI tests on install"
-          # Use Python wrapper to run only GUI-registered tests using the installed FuCadUp
-          testCommand: xvfb-run python3 ./.github/scripts/run_gui_tests.py "FuCadUp"
+          # Same full run as on the build dir, against the installed binary.
+          testCommand: xvfb-run FuCadUp -t 0
           logFile: ${{ env.logdir }}TestGUIInstall.log
           reportFile: ${{env.reportdir}}${{ env.reportfilename }}
 
