@@ -199,6 +199,8 @@ protected:
     void reject(App::Document* doc);
     void helpRequested(App::Document* doc);
     void clicked(QAbstractButton* button, App::Document* doc);
+    /// Re-measures the panel when the dialog in it changes size after it opens.
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     void triggerMinimumSizeHint();

@@ -21,6 +21,8 @@
  *                                                                         *
  ***************************************************************************/
 
+#include <algorithm>
+
 #include <QAbstractSpinBox>
 #include <QActionEvent>
 #include <QApplication>
@@ -29,6 +31,7 @@
 #include <QLineEdit>
 #include <QPointer>
 #include <QPushButton>
+#include <QScrollBar>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -438,8 +441,33 @@ QSize TaskView::minimumSizeHint() const
         spacing = 2 * layout->spacing();
     }
 
+    // The panel never scrolls sideways, so it has to be at least as wide as the dialog in
+    // it. A scroll area leaves its content's width out of its own hint, since in general
+    // it can scroll, and the fixed minimum it has here was only ever right for one font:
+    // under the wider default font on Linux the pattern panel's values ran off the edge,
+    // cut off with no way to scroll them back into view.
+    if (auto* panel = qobject_cast<TaskPanel*>(currentWidget())) {
+        QScrollArea* area = panel->scrollArea;
+        if (QWidget* content = area->widget()) {
+            const int needed = content->minimumSizeHint().width() + 2 * area->frameWidth()
+                + area->verticalScrollBar()->sizeHint().width();
+            ms.setWidth(std::max(ms.width(), needed));
+        }
+    }
+
     ms.setWidth(ms.width() + spacing);
     return ms;
+}
+
+bool TaskView::eventFilter(QObject* watched, QEvent* event)
+{
+    // A dialog can grow after it opens, as the pattern panel does once a second
+    // direction is picked, and the panel's width was only measured as dialogs came and
+    // went. Measuring again settles: a minimum that already fits changes nothing.
+    if (event->type() == QEvent::LayoutRequest) {
+        triggerMinimumSizeHint();
+    }
+    return QStackedWidget::eventFilter(watched, event);
 }
 
 void TaskView::slotActiveDocument(const App::Document& doc)
@@ -612,6 +640,7 @@ bool TaskView::showDialog(TaskDialog* dlg, App::Document* doc)
     outInfo.ActiveCtrl->decorateButtons();
 
     outInfo.taskPanel = new TaskPanel(this);
+    outInfo.taskPanel->actionPanel->installEventFilter(this);
     if (dlg->buttonPosition() == TaskDialog::North) {
         // Add button box to the top of the main layout
         outInfo.taskPanel->dialogLayout->insertWidget(0, outInfo.ActiveCtrl);
