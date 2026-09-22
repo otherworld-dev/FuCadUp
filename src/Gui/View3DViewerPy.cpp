@@ -225,6 +225,7 @@ Py::Object View3DInventorViewerPy::repr()
 }
 
 View3DInventorViewerPy::method_varargs_handler View3DInventorViewerPy::pycxx_handler = nullptr;
+View3DInventorViewerPy::method_varargs_handler View3DInventorViewerPy::pycxx_noargs_handler = nullptr;
 View3DInventorViewerPy::method_keyword_handler View3DInventorViewerPy::pycxx_keyword_handler = nullptr;
 
 PyObject* View3DInventorViewerPy::method_varargs_ext_handler(
@@ -234,6 +235,28 @@ PyObject* View3DInventorViewerPy::method_varargs_ext_handler(
 {
     try {
         return pycxx_handler(_self_and_name_tuple, _args);
+    }
+    catch (const Base::Exception& e) {
+        throw Py::RuntimeError(e.what());
+    }
+    catch (const std::exception& e) {
+        throw Py::RuntimeError(e.what());
+    }
+    catch (const Py::Exception&) {
+        throw;
+    }
+    catch (...) {
+        throw Py::RuntimeError("Unknown C++ exception");
+    }
+}
+
+PyObject* View3DInventorViewerPy::method_noargs_ext_handler(
+    PyObject* _self_and_name_tuple,
+    PyObject* _args
+)
+{
+    try {
+        return pycxx_noargs_handler(_self_and_name_tuple, _args);
     }
     catch (const Base::Exception& e) {
         throw Py::RuntimeError(e.what());
@@ -293,6 +316,17 @@ Py::Object View3DInventorViewerPy::getattr(const char* attr)
                 op->m_ml->ml_meth = reinterpret_cast<PyCFunction>(
                     reinterpret_cast<void (*)()>(method_keyword_ext_handler)
                 );
+            }
+            else if (op->m_ml->ml_flags & METH_NOARGS) {
+                // A single captured trampoline used to serve both conventions, so every
+                // method went through whichever one was looked up first. isSpinning() is
+                // the only no-args method here: a varargs call made after it crashed, and
+                // isSpinning() called after a varargs method built its argument tuple from
+                // the null that Python passes a no-args call.
+                if (!pycxx_noargs_handler) {
+                    pycxx_noargs_handler = op->m_ml->ml_meth;
+                }
+                op->m_ml->ml_meth = method_noargs_ext_handler;
             }
             else {
                 if (!pycxx_handler) {

@@ -94,9 +94,13 @@ public:
 private:
     using method_varargs_handler = PyObject* (*)(PyObject* _self, PyObject* _args);
     using method_keyword_handler = PyObject* (*)(PyObject* _self, PyObject* _args, PyObject* _keywords);
+    // PyCXX calls a no-args method through a different trampoline from a varargs one,
+    // so each convention keeps the one it was first found with. See getattr().
     static method_varargs_handler pycxx_handler;
+    static method_varargs_handler pycxx_noargs_handler;
     static method_keyword_handler pycxx_keyword_handler;
     static PyObject* method_varargs_ext_handler(PyObject* _self, PyObject* _args);
+    static PyObject* method_noargs_ext_handler(PyObject* _self, PyObject* _args);
     static PyObject* method_keyword_ext_handler(PyObject* _self, PyObject* _args, PyObject* _keywords);
 
 private:

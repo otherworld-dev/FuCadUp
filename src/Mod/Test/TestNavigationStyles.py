@@ -413,3 +413,25 @@ class TestNavigationIndicator(ViewerTestCase):
                     action.icon().pixmap(16, 16).isNull(),
                     "The indicator icon for " + action.data() + " did not render",
                 )
+
+
+class TestViewerMethodDispatch(ViewerTestCase):
+    """The viewer's Python methods must answer whatever was called before them.
+
+    View3DInventorViewerPy reroutes each method through its own handler to translate
+    C++ exceptions, and used to keep a single captured PyCXX trampoline for all of
+    them. PyCXX calls a no-args method through a different trampoline from a varargs
+    one, so every method went through whichever convention was looked up first in the
+    process: a varargs call made after isSpinning() crashed FuCadUp, and isSpinning()
+    called after a varargs method raised a TypeError about building a tuple from null.
+    isSpinning() is the viewer's only no-args method; setUp has already made a
+    varargs call by the time either test runs.
+    """
+
+    def test_a_no_args_method_answers_after_a_varargs_one(self):
+        self.assertIsInstance(self.viewer.isEnabledNaviCube(), bool)
+        self.assertIsInstance(self.viewer.isSpinning(), bool)
+
+    def test_a_varargs_method_answers_after_a_no_args_one(self):
+        self.assertIsInstance(self.viewer.isSpinning(), bool)
+        self.assertIsInstance(self.viewer.isEnabledNaviCube(), bool)
