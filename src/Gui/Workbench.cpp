@@ -785,6 +785,7 @@ MenuItem* StdWorkbench::setupMenuBar() const
           << "Std_ToggleTransparency"
           << "Separator"
           << "Std_Workbench"
+          << "Std_WorkbenchSwitcher"
           << "Std_ToolBarMenu"
           << "Std_DockViewMenu";
     if (DockWindowManager::instance()->isOverlayActivated()) {
@@ -1052,7 +1053,7 @@ MenuItem* NoneWorkbench::setupMenuBar() const
     // View
     auto view = new MenuItem(menuBar);
     view->setCommand("&View");
-    *view << "Std_Workbench";
+    *view << "Std_Workbench" << "Std_WorkbenchSwitcher";
 
     // Separator
     auto sep = new MenuItem(menuBar);

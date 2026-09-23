@@ -115,6 +115,7 @@
 #include "Ribbon/FramelessWindow.h"
 #include "Ribbon/RibbonBar.h"
 #include "Ribbon/RibbonManager.h"
+#include "Ribbon/WorkbenchSwitcher.h"
 #include "SelectionView.h"
 #include "SplashScreen.h"
 #include "StatusBarLabel.h"
@@ -741,6 +742,7 @@ MainWindow::~MainWindow()
     }
     Ribbon::RibbonManager::destruct();
     Ribbon::CommandPalette::destruct();
+    Ribbon::WorkbenchSwitcher::destruct();
     delete d->status;
     delete d;
     instance = nullptr;
