@@ -512,10 +512,16 @@ class TestExtrudeDrag(ExtrudePanelCase):
         return self.view.getPointOnScreen(point)
 
     def _qt_pos(self, pixels):
-        """The Qt widget position for Coin device pixels."""
+        """The Qt widget position for Coin device pixels.
+
+        The exact inverse of Quarter's own mapping (InputDevice.cpp), which counts a
+        Qt row y as Coin row height - 1 - y. Without the - 1 every synthetic event
+        landed a pixel off what the ray pick had found, enough to miss the arrow's
+        shaft at some view heights.
+        """
 
         ratio = self.viewport.devicePixelRatioF()
-        return QtCore.QPointF(pixels[0] / ratio, self.viewport.height() - pixels[1] / ratio)
+        return QtCore.QPointF(pixels[0] / ratio, self.viewport.height() - 1 - pixels[1] / ratio)
 
     def _arrow_grip(self):
         """A point on the length arrow, found by asking the scene what is under it."""
