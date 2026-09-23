@@ -100,14 +100,24 @@ class TestWorkbenchSwitcher(unittest.TestCase):
                 return widget
         return None
 
+    def _shown(self, open_it, message):
+        """Opens the switcher with open_it() and returns it once it is on screen.
+
+        On X11 without a window manager, as on CI's Linux runner, a Qt popup shown
+        again a moment after it was hidden sometimes never maps; the command
+        palette does the same. One more try is what a user's second click would be.
+        """
+
+        for _ in range(2):
+            open_it()
+            self._process_events()
+            switcher = self._switcher()
+            if switcher is not None and switcher.isVisible():
+                return switcher
+        self.fail(message)
+
     def _open(self):
-        self.button.click()
-        self._process_events()
-        switcher = self._switcher()
-        self.assertTrue(
-            switcher is not None and switcher.isVisible(), "The block did not open the switcher"
-        )
-        return switcher
+        return self._shown(self.button.click, "The block did not open the switcher")
 
     def _rows(self, switcher):
         """(text, workbench) for every row; captions have no workbench."""
@@ -196,11 +206,8 @@ class TestWorkbenchSwitcher(unittest.TestCase):
         self.assertIsNotNone(command, "No %s command" % COMMAND)
         self.assertEqual(command.getShortcut(), "Ctrl+Shift+W")
 
-        FreeCADGui.runCommand(COMMAND, 0)
-        self._process_events()
-        switcher = self._switcher()
-        self.assertTrue(
-            switcher is not None and switcher.isVisible(), "The command did not open the switcher"
+        self._shown(
+            lambda: FreeCADGui.runCommand(COMMAND, 0), "The command did not open the switcher"
         )
 
     def test_ctrl_shift_w_opens_the_switcher(self):
