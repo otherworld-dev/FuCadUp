@@ -133,17 +133,16 @@ class FeatureDialogTestCase(unittest.TestCase):
         # sure this one is the pad's.
         combo = self.window.findChild(QtWidgets.QComboBox, DIRECTION_COMBO)
         self.assertIsNotNone(combo, "The dialog that opened is not the pad's")
-        # On CI's Linux runner the pad's form was built but not on screen. Say what
-        # hid it, then put the Tasks panel on screen, since that is not what these
-        # tests are about.
-        hidden = self._hidden_ancestor(combo)
-        if hidden is not None:
-            FreeCAD.Console.PrintWarning(
-                "TestFeatureDialogs: the pad dialog opened inside a hidden %s\n" % hidden
-            )
-            FreeCADGui.Control.showTaskView()
-            self._process_events(100)
-        self.assertTrue(combo.isVisible(), "The pad dialog is not on screen")
+        # The Tasks panel lives in the right-hand overlay, which an active window
+        # keeps hidden until something needs it and then reveals after a short
+        # delay, so the form can be built well before it is on screen.
+        deadline = time.monotonic() + 3.0
+        while not combo.isVisible() and time.monotonic() < deadline:
+            self._process_events(20)
+        self.assertTrue(
+            combo.isVisible(),
+            "The pad dialog never came on screen; hidden by %s" % self._hidden_ancestor(combo),
+        )
 
     @staticmethod
     def _hidden_ancestor(widget):
