@@ -914,6 +914,7 @@ SET(View3D_CPP_SRCS
     View3DInventorViewer.cpp
     View3DSettings.cpp
     ViewportGrid.cpp
+    ViewCubeLayout.cpp
     View3DPy.cpp
     View3DViewerPy.cpp
     NaviCube.cpp
@@ -935,6 +936,7 @@ SET(View3D_SRCS
     View3DPy.h
     View3DSettings.h
     ViewportGrid.h
+    ViewCubeLayout.h
     View3DViewerPy.h
     NaviCube.h
 )
