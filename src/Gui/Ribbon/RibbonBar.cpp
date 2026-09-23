@@ -26,7 +26,6 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QKeyEvent>
-#include <QLabel>
 #include <QList>
 #include <QMenu>
 #include <QSignalBlocker>
@@ -42,6 +41,7 @@
 #include <Gui/MainWindow.h>
 
 #include "RibbonBar.h"
+#include "WorkbenchSwitcher.h"
 #include "RibbonPage.h"
 
 
@@ -60,7 +60,7 @@ constexpr const char* contextTabProperty = "contextTab";
 constexpr int workspaceBlockSideMargin = 8;
 constexpr int workspaceBlockVerticalMargin = 6;
 constexpr int workspaceSelectorMinimumWidth = 180;
-// The block names the workspace, so it reads a step larger than the
+// The block names where the user is, so it reads a step larger than the
 // captions under the panels.
 constexpr int workspaceSelectorPointSizeDelta = 2;
 constexpr int separatorWidth = 1;
@@ -240,19 +240,25 @@ QWidget* RibbonBar::createWorkspaceBlock(QWidget* parent)
     blockLayout->setContentsMargins(0, 0, 0, 0);
     blockLayout->setSpacing(0);
 
-    workspaceLabel = new QLabel(block);
-    workspaceLabel->setObjectName(QStringLiteral("RibbonWorkspaceSelector"));
-    // Sized for the longest workspace name, so the block never shifts the
-    // panels when the workspace changes.
-    workspaceLabel->setMinimumWidth(workspaceSelectorMinimumWidth);
-    workspaceLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
-    workspaceLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    workspaceButton = new QToolButton(block);
+    workspaceButton->setObjectName(QStringLiteral("RibbonWorkspaceSelector"));
+    workspaceButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    workspaceButton->setAutoRaise(true);
+    workspaceButton->setToolTip(tr("Switch workbench (Ctrl+Shift+W)"));
+    // Sized for the longest title, so the block never shifts the panels when
+    // the workbench changes.
+    workspaceButton->setMinimumWidth(workspaceSelectorMinimumWidth);
+    workspaceButton->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 
-    QFont labelFont = workspaceLabel->font();
+    QFont labelFont = workspaceButton->font();
     if (labelFont.pointSizeF() > 0.0) {
         labelFont.setPointSizeF(labelFont.pointSizeF() + workspaceSelectorPointSizeDelta);
-        workspaceLabel->setFont(labelFont);
+        workspaceButton->setFont(labelFont);
     }
+
+    connect(workspaceButton, &QToolButton::clicked, this, [this]() {
+        showWorkbenchSwitcher();
+    });
 
     auto* labelLayout = new QHBoxLayout();
     labelLayout->setContentsMargins(
@@ -262,7 +268,7 @@ QWidget* RibbonBar::createWorkspaceBlock(QWidget* parent)
         workspaceBlockVerticalMargin
     );
     labelLayout->setSpacing(0);
-    labelLayout->addWidget(workspaceLabel);
+    labelLayout->addWidget(workspaceButton);
 
     // The same rule a panel draws down its right edge, so the block reads as
     // the first panel of every page.
@@ -278,12 +284,18 @@ QWidget* RibbonBar::createWorkspaceBlock(QWidget* parent)
     return block;
 }
 
-void RibbonBar::setWorkspaceName(const QString& name)
+void RibbonBar::setWorkspaceTitle(const QString& title)
 {
-    if (workspaceLabel != nullptr) {
-        // The tab titles beside it are upper case, so the block matches them.
-        workspaceLabel->setText(name.toUpper());
+    if (workspaceButton != nullptr) {
+        // The tab titles beside it are upper case, so the block matches them. The
+        // small down arrow says the block opens something.
+        workspaceButton->setText(title.toUpper() + QStringLiteral("  ") + QChar(0x25BE));
     }
+}
+
+void RibbonBar::showWorkbenchSwitcher()
+{
+    WorkbenchSwitcher::instance()->popUp(workspaceButton);
 }
 
 void RibbonBar::clear()

@@ -40,6 +40,7 @@ SET(Test_SRCS
     TestOriginPlaneHover.py
     TestNavigationBarIcons.py
     TestFuCadIcons.py
+    TestWorkbenchSwitcher.py
     TestFusionShortcuts.py
     TestExtrudeFlip.py
     TestGizmoValueLabels.py
