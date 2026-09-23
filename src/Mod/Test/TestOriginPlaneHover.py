@@ -183,7 +183,9 @@ class TestOriginPlaneHover(unittest.TestCase):
 
         px, py = self.view.getPointOnScreen(FreeCAD.Vector(0.0, 0.0, 0.0))
         dpr = self._device_pixel_ratio()
-        return QtCore.QPointF(px / dpr, self.viewport.height() - py / dpr)
+        # The exact inverse of Quarter's mapping, which counts a Qt row y as Coin row
+        # height - 1 - y (see TestExtrudeFlip._qt_pos).
+        return QtCore.QPointF(px / dpr, self.viewport.height() - 1 - py / dpr)
 
     def _wait_for_view_to_settle(self, timeout_ms=3000):
         """Wait until the viewport size and the projected origin stop changing.

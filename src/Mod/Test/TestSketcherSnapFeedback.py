@@ -299,7 +299,11 @@ class TestSketcherSnapFeedback(unittest.TestCase):
     def _widget_point(self, u, v):
         px, py = self._project(u, v)
         dpr = self._device_pixel_ratio()
-        return QtCore.QPoint(int(round(px / dpr)), int(round(self.viewport.height() - py / dpr)))
+        # The exact inverse of Quarter's mapping, which counts a Qt row y as Coin row
+        # height - 1 - y (see TestExtrudeFlip._qt_pos).
+        return QtCore.QPoint(
+            int(round(px / dpr)), int(round(self.viewport.height() - 1 - py / dpr))
+        )
 
     def _grid_tolerance(self):
         """How far, in sketch units, the grid reaches for the pointer."""
