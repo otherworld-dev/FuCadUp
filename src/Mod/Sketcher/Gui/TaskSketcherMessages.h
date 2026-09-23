@@ -39,6 +39,11 @@ public:
     explicit TaskSketcherMessages(ViewProviderSketch* sketchView);
     ~TaskSketcherMessages() override;
 
+    /// What clicking the solver report's \a link selects, as a tooltip; empty for none.
+    static QString linkToolTip(const QString& link);
+    /// Selects what the solver report's \a link is about. Shared with SketchStatusChip.
+    static void runLink(const QString& link);
+
 private:
     void createSettingsButtonActions() override;
     void onLabelStatusLinkClicked(const QString&) override;

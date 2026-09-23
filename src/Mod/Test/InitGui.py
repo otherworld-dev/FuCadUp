@@ -127,4 +127,5 @@ FreeCAD.__unit_test__ += [
     "TestTimeline",
     "TestPartDesignDialogTitles",
     "TestRibbonStrings",
+    "TestSketchStatusChip",
 ]

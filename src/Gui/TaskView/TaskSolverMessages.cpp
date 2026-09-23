@@ -143,6 +143,12 @@ QToolButton* TaskSolverMessages::getSettingsButton()
     return ui->settingsButton;
 }
 
+void TaskSolverMessages::setStatusShown(bool shown)
+{
+    ui->labelStatus->setVisible(shown);
+    ui->labelStatusLink->setVisible(shown);
+}
+
 void TaskSolverMessages::onManualUpdateClicked(bool checked)
 {
     Q_UNUSED(checked);

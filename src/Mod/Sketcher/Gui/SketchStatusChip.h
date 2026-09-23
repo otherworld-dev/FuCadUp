@@ -65,14 +65,22 @@ public:
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
 
 private:
     explicit SketchStatusChip(QWidget* view);
 
-    void report(const QString& state, const QString& message, const QString& detail);
+    void report(
+        const QString& state,
+        const QString& message,
+        const QString& link,
+        const QString& detail
+    );
     void reposition();
 
     fastsignals::scoped_connection reporting;
+    /// What a click selects, the same as the task panel's link; empty when nothing does.
+    QString link;
 };
 
 }  // namespace SketcherGui

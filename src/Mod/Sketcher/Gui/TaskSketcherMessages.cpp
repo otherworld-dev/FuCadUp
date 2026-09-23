@@ -32,6 +32,7 @@
 #include <Mod/Sketcher/App/SketchObject.h>
 
 #include "Command.h"
+#include "SketchStatusChip.h"
 #include "TaskSketcherMessages.h"
 #include "ViewProviderSketch.h"
 
@@ -47,6 +48,10 @@ TaskSketcherMessages::TaskSketcherMessages(ViewProviderSketch* sketchView)
 {
     createSettingsButtonActions();
 
+    // The chip over the view carries the same report and takes the same clicks, so the
+    // panel keeps its line only while the chip is switched off.
+    setStatusShown(!SketchStatusChip::isEnabled());
+
     //NOLINTBEGIN
     connectionSetUp = sketchView->signalSetUp.connect(std::bind(
         &SketcherGui::TaskSketcherMessages::slotSetUp, this, sp::_1, sp::_2, sp::_3, sp::_4));
@@ -58,45 +63,55 @@ TaskSketcherMessages::~TaskSketcherMessages()
     connectionSetUp.disconnect();
 }
 
-void TaskSketcherMessages::updateToolTip(const QString& link)
+QString TaskSketcherMessages::linkToolTip(const QString& link)
 {
     if (link == QStringLiteral("#conflicting")) {
-        setLinkTooltip(tr("Selects these conflicting constraints"));
+        return tr("Selects these conflicting constraints");
+    }
+    if (link == QStringLiteral("#redundant")) {
+        return tr("Selects these redundant constraints");
+    }
+    if (link == QStringLiteral("#dofs")) {
+        return tr("The sketch has unconstrained elements giving rise to those "
+            "Degrees Of Freedom. Selects these unconstrained elements.");
+    }
+    if (link == QStringLiteral("#malformed")) {
+        return tr("Selects these malformed constraints");
+    }
+    if (link == QStringLiteral("#partiallyredundant")) {
+        return tr("Some constraints in combination are partially redundant. Selects these "
+               "partially redundant constraints.");
+    }
+    return {};
+}
+
+void TaskSketcherMessages::runLink(const QString& link)
+{
+    if (link == QStringLiteral("#conflicting")) {
+        Gui::Application::Instance->commandManager().runCommandByName("Sketcher_SelectConflictingConstraints");
     }
     else if (link == QStringLiteral("#redundant")) {
-        setLinkTooltip(tr("Selects these redundant constraints"));
+        Gui::Application::Instance->commandManager().runCommandByName("Sketcher_SelectRedundantConstraints");
     }
     else if (link == QStringLiteral("#dofs")) {
-        setLinkTooltip(tr("The sketch has unconstrained elements giving rise to those "
-            "Degrees Of Freedom. Selects these unconstrained elements."));
+        Gui::Application::Instance->commandManager().runCommandByName("Sketcher_SelectElementsWithDoFs");
     }
     else if (link == QStringLiteral("#malformed")) {
-        setLinkTooltip(tr("Selects these malformed constraints"));
+        Gui::Application::Instance->commandManager().runCommandByName("Sketcher_SelectMalformedConstraints");
     }
     else if (link == QStringLiteral("#partiallyredundant")) {
-        setLinkTooltip(
-            tr("Some constraints in combination are partially redundant. Selects these "
-               "partially redundant constraints."));
+        Gui::Application::Instance->commandManager().runCommandByName("Sketcher_SelectPartiallyRedundantConstraints");
     }
+}
+
+void TaskSketcherMessages::updateToolTip(const QString& link)
+{
+    setLinkTooltip(linkToolTip(link));
 }
 
 void TaskSketcherMessages::onLabelStatusLinkClicked(const QString& str)
 {
-    if (str == QStringLiteral("#conflicting")) {
-        Gui::Application::Instance->commandManager().runCommandByName("Sketcher_SelectConflictingConstraints");
-    }
-    else if (str == QStringLiteral("#redundant")) {
-        Gui::Application::Instance->commandManager().runCommandByName("Sketcher_SelectRedundantConstraints");
-    }
-    else if (str == QStringLiteral("#dofs")) {
-        Gui::Application::Instance->commandManager().runCommandByName("Sketcher_SelectElementsWithDoFs");
-    }
-    else if (str == QStringLiteral("#malformed")) {
-        Gui::Application::Instance->commandManager().runCommandByName("Sketcher_SelectMalformedConstraints");
-    }
-    else if (str == QStringLiteral("#partiallyredundant")) {
-        Gui::Application::Instance->commandManager().runCommandByName("Sketcher_SelectPartiallyRedundantConstraints");
-    }
+    runLink(str);
 }
 
 void TaskSketcherMessages::createSettingsButtonActions()

@@ -60,6 +60,8 @@ private:
 protected:
     void setLinkTooltip(const QString& tooltip);
     QToolButton* getSettingsButton();
+    /// Shows or hides the report and its link, leaving the update and settings buttons.
+    void setStatusShown(bool shown);
 
     Connection connectionSetUp;
 

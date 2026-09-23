@@ -22,6 +22,7 @@
  ***************************************************************************/
 
 #include <QEvent>
+#include <QMouseEvent>
 #include <QPointer>
 #include <QString>
 #include <QStyle>
@@ -34,6 +35,7 @@
 #include <Gui/View3DInventor.h>
 
 #include "SketchStatusChip.h"
+#include "TaskSketcherMessages.h"
 #include "ViewProviderSketch.h"
 
 using namespace SketcherGui;
@@ -97,9 +99,12 @@ void SketchStatusChip::showFor(ViewProviderSketch* sketch)
     // The badge is a child of the view, so leaving the sketch has to take it
     // away: the view outlives the editing session.
     chip->reporting = sketch->signalSetUp.connect(
-        [chip](const QString& state, const QString& message, const QString&, const QString& detail) {
-            chip->report(state, message, detail);
-        }
+        [chip](
+            const QString& state,
+            const QString& message,
+            const QString& link,
+            const QString& detail
+        ) { chip->report(state, message, link, detail); }
     );
 
     chip->show();
@@ -128,7 +133,12 @@ void SketchStatusChip::dismiss()
     liveChip = nullptr;
 }
 
-void SketchStatusChip::report(const QString& state, const QString& message, const QString& detail)
+void SketchStatusChip::report(
+    const QString& state,
+    const QString& message,
+    const QString& link,
+    const QString& detail
+)
 {
     // The solver report is two halves, a heading and the count that belongs to
     // it, which the task panel joins with a link between them.
@@ -139,6 +149,13 @@ void SketchStatusChip::report(const QString& state, const QString& message, cons
 
     setText(text);
     setProperty("severity", severityOf(state));
+
+    // A report with something to select takes a click, as the task panel's link does;
+    // one without lets the click through to the view underneath.
+    this->link = link;
+    setAttribute(Qt::WA_TransparentForMouseEvents, link.isEmpty());
+    setCursor(link.isEmpty() ? Qt::ArrowCursor : Qt::PointingHandCursor);
+    setToolTip(TaskSketcherMessages::linkToolTip(link));
 
     // A property a stylesheet selects on only takes effect once the style is
     // asked for the widget again.
@@ -157,6 +174,16 @@ void SketchStatusChip::reposition()
     }
 
     move((view->width() - width()) / 2, topInset);
+}
+
+void SketchStatusChip::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton && !link.isEmpty()) {
+        TaskSketcherMessages::runLink(link);
+        event->accept();
+        return;
+    }
+    QLabel::mouseReleaseEvent(event);
 }
 
 bool SketchStatusChip::eventFilter(QObject* watched, QEvent* event)
