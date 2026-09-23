@@ -16,7 +16,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
         <dc:title>PartDesign_MoveFace</dc:title>
-        <dc:description>A face of a solid carried off sideways</dc:description>
+        <dc:description>A face moved away from its solid</dc:description>
         <dc:publisher>
           <cc:Agent>
             <dc:title>FuCad</dc:title>
@@ -32,21 +32,10 @@
     </rdf:RDF>
   </metadata>
   <g id="layer1">
-    <path
-       id="solid"
-       d="M 4,22 22,12 40,16 22,26 Z M 4,22 22,26 V 50 L 4,46 Z M 22,26 40,16 V 40 L 22,50 Z"
-       style="fill:#a9c9e8;fill-opacity:1;stroke:#0b1521;stroke-width:3;stroke-linejoin:round" />
-    <path
-       id="moved"
-       d="M 42,30 60,20 V 44 L 42,54 Z"
-       style="fill:#f0a202;fill-opacity:1;stroke:#0b1521;stroke-width:3;stroke-linejoin:round" />
-    <path
-       id="travel"
-       d="M 30,58 H 46"
-       style="fill:none;stroke:#0b1521;stroke-width:4;stroke-linecap:round" />
-    <path
-       id="head"
-       d="m 44,52 8,6 -8,6 z"
-       style="fill:#0b1521;fill-opacity:1;stroke:#0b1521;stroke-width:2;stroke-linejoin:round" />
+    <path d="M 28.07,5.24 L 4.50,18.84 L 21.79,28.82 L 45.36,15.22 Z" style="fill:#d3e5f6;stroke:#0b1521;stroke-width:3.00;stroke-linejoin:round;stroke-linecap:round" />
+    <path d="M 4.50,40.62 L 21.79,50.60 L 21.79,28.82 L 4.50,18.84 Z" style="fill:#a9c9e8;stroke:#0b1521;stroke-width:3.00;stroke-linejoin:round;stroke-linecap:round" />
+    <path d="M 45.36,36.99 L 45.36,15.22 L 21.79,28.82 L 21.79,50.60 Z" style="fill:#7ea8d1;stroke:#0b1521;stroke-width:3.00;stroke-linejoin:round;stroke-linecap:round" />
+    <path d="M 59.50,45.16 L 59.50,23.38 L 35.93,36.99 L 35.93,58.76 Z" style="fill:#c47f00;stroke:#0b1521;stroke-width:3.00;stroke-linejoin:round;stroke-linecap:round" />
+    <path d="M 19.98,41.03 L 26.27,44.66 L 24.79,47.21 L 33.57,46.52 L 29.78,38.57 L 28.31,41.12 L 22.02,37.49 Z" style="fill:#f4f6f8;stroke:#0b1521;stroke-width:2.50;stroke-linejoin:round;stroke-linecap:round" />
   </g>
 </svg>
