@@ -111,6 +111,15 @@ void FinishModeAction::run()
         return;
     }
 
+    // An action's enabled state is only brought up to date by the command manager's
+    // periodic check, so a click soon after the mode started can find the finish
+    // command still disabled from before it. Ask the command itself.
+    if (Command* command = Application::Instance->commandManager().getCommandByName(
+            finishCommand.toLatin1().constData()
+        )) {
+        command->testActive();
+    }
+
     // The mode is over already, as on a page that has not been rebuilt yet, so
     // the command runs as it is.
     if (!finish || !finish->isEnabled()) {

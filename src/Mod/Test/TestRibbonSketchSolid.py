@@ -269,6 +269,24 @@ class TestRibbonSketchSolid(unittest.TestCase):
         )
         self.assertEqual(self._features("PartDesign::Pad")[0].Profile[0], self.sketch)
 
+    def test_extrude_finishes_the_sketch_before_the_actions_catch_up(self):
+        """The command manager brings the actions' enabled state up to date on a timer,
+        so a click soon after the sketch opened can find Extrude still enabled and
+        Leave Sketch still disabled from before it. The stand-in has to ask the finish
+        command rather than trust that, or it runs Extrude with the sketch still open."""
+
+        button = self._solid_button_while_sketching("PartDesign_Extrude")
+        # The state from before the sketch opened, with no events in between for the
+        # command manager to correct it.
+        FreeCADGui.Command.get("PartDesign_Extrude").getAction()[0].setEnabled(True)
+        FreeCADGui.Command.get("Sketcher_LeaveSketch").getAction()[0].setEnabled(False)
+        button.click()
+
+        self.assertTrue(
+            self._wait_until(lambda: not self._sketch_in_edit()),
+            "Clicking Extrude must finish the sketch however stale the actions are",
+        )
+
     def test_revolve_while_sketching_asks_nothing(self):
         """The sketch's task dialog must be gone before Revolve runs, or Revolve asks to close it."""
 
