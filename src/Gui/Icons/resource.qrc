@@ -305,6 +305,58 @@
         <file>zoom-out.svg</file>
         <file>zoom-selection.svg</file>
     </qresource>
+    <qresource prefix="/icons">
+        <!-- FuCad's flat solid modelling icons, found ahead of the stock ones; see
+             BitmapFactoryInst::instance() and fucad/fucad_icons.py. -->
+        <file>fucad/Assembly_CreateJointFixed.svg</file>
+        <file>fucad/Assembly_InsertLink.svg</file>
+        <file>fucad/Assembly_ToggleGrounded.svg</file>
+        <file>fucad/Geoassembly.svg</file>
+        <file>fucad/PartDesign_AdditiveBox.svg</file>
+        <file>fucad/PartDesign_AdditiveCone.svg</file>
+        <file>fucad/PartDesign_AdditiveCylinder.svg</file>
+        <file>fucad/PartDesign_AdditiveEllipsoid.svg</file>
+        <file>fucad/PartDesign_AdditiveHelix.svg</file>
+        <file>fucad/PartDesign_AdditiveLoft.svg</file>
+        <file>fucad/PartDesign_AdditivePipe.svg</file>
+        <file>fucad/PartDesign_AdditivePrism.svg</file>
+        <file>fucad/PartDesign_AdditiveSphere.svg</file>
+        <file>fucad/PartDesign_AdditiveTorus.svg</file>
+        <file>fucad/PartDesign_AdditiveWedge.svg</file>
+        <file>fucad/PartDesign_Body.svg</file>
+        <file>fucad/PartDesign_Boolean.svg</file>
+        <file>fucad/PartDesign_Chamfer.svg</file>
+        <file>fucad/PartDesign_CoordinateSystem.svg</file>
+        <file>fucad/PartDesign_Draft.svg</file>
+        <file>fucad/PartDesign_Fillet.svg</file>
+        <file>fucad/PartDesign_Groove.svg</file>
+        <file>fucad/PartDesign_Hole.svg</file>
+        <file>fucad/PartDesign_Line.svg</file>
+        <file>fucad/PartDesign_LinearPattern.svg</file>
+        <file>fucad/PartDesign_Mirrored.svg</file>
+        <file>fucad/PartDesign_MultiTransform.svg</file>
+        <file>fucad/PartDesign_Pad.svg</file>
+        <file>fucad/PartDesign_Plane.svg</file>
+        <file>fucad/PartDesign_Pocket.svg</file>
+        <file>fucad/PartDesign_Point.svg</file>
+        <file>fucad/PartDesign_PolarPattern.svg</file>
+        <file>fucad/PartDesign_Revolution.svg</file>
+        <file>fucad/PartDesign_SubtractiveBox.svg</file>
+        <file>fucad/PartDesign_SubtractiveCone.svg</file>
+        <file>fucad/PartDesign_SubtractiveCylinder.svg</file>
+        <file>fucad/PartDesign_SubtractiveEllipsoid.svg</file>
+        <file>fucad/PartDesign_SubtractivePrism.svg</file>
+        <file>fucad/PartDesign_SubtractiveSphere.svg</file>
+        <file>fucad/PartDesign_SubtractiveTorus.svg</file>
+        <file>fucad/PartDesign_SubtractiveWedge.svg</file>
+        <file>fucad/PartDesign_Thickness.svg</file>
+        <file>fucad/Part_SectionCut.svg</file>
+        <file>fucad/Sketcher_NewSketch.svg</file>
+        <file>fucad/Sketcher_Sketch.svg</file>
+        <file>fucad/Std_Import.svg</file>
+        <file>fucad/image-plane.svg</file>
+        <file>fucad/umf-measurement.svg</file>
+    </qresource>
     <qresource prefix="/icons/FuCadUp-default">
         <file>index.theme</file>
     </qresource>
