@@ -520,6 +520,18 @@ class TestTimeline(unittest.TestCase):
         self.assertEqual(strip.focusPolicy(), QtCore.Qt.NoFocus)
         self.assertEqual(self.widget.focusPolicy(), QtCore.Qt.NoFocus)
 
+        # Start with the keyboard in the 3D view, so the check below is about what the
+        # click did rather than about wherever the focus happened to be.
+        mdi = self.window.findChild(QtWidgets.QMdiArea)
+        if mdi is not None and mdi.activeSubWindow() is not None:
+            mdi.activeSubWindow().widget().setFocus()
+            self._process_events()
+        focus = QtWidgets.QApplication.focusWidget()
+        self.assertFalse(
+            focus is not None and self.widget.isAncestorOf(focus),
+            "The keyboard was already inside the timeline before the click",
+        )
+
         before = self.body.Tip
         self._click(self._marker_for("Sketch001"))
 
