@@ -581,3 +581,66 @@ class TestTimeline(unittest.TestCase):
 
         selected = [obj.Name for obj in FreeCADGui.Selection.getSelection()]
         self.assertEqual(selected, [self.pad.Name])
+
+
+class TestTimelineDock(unittest.TestCase):
+    """The timeline is a strip along the bottom, as Fusion draws it, not a captioned dock.
+
+    Its dock drew a title bar, so "Timeline" sat in the middle of the strip with the
+    dock's own buttons at the far end. The dock still has to answer the View menu,
+    since nothing else is left on screen to bring it back with.
+    """
+
+    def setUp(self):
+        window = FreeCADGui.getMainWindow()
+        if window is None:
+            raise unittest.SkipTest("The timeline dock needs a main window")
+
+        self.dock = None
+        for dock in window.findChildren(QtWidgets.QDockWidget):
+            widget = dock.widget()
+            if widget is not None and widget.metaObject().className() == TIMELINE_CLASS:
+                self.dock = dock
+                break
+        if self.dock is None:
+            raise unittest.SkipTest("The timeline dock is not installed in this test environment")
+
+        self.was_visible = self.dock.isVisible()
+        self.dock.show()
+        self._process_events()
+
+    def tearDown(self):
+        self.dock.setVisible(self.was_visible)
+        self._process_events()
+
+    def _process_events(self, wait_ms=50):
+        FreeCADGui.updateGui()
+        app = QtWidgets.QApplication.instance()
+        app.processEvents()
+        time.sleep(wait_ms / 1000.0)
+        app.processEvents()
+
+    def test_the_dock_draws_no_title_bar(self):
+        bar = self.dock.titleBarWidget()
+        self.assertIsNotNone(bar, "the dock draws Qt's own title bar")
+        self.assertNotEqual(
+            bar.metaObject().className(),
+            "Gui::OverlayTitleBar",
+            "the dock draws the overlay's title bar",
+        )
+        # Measured from the strip rather than the bar: an empty title widget has no size
+        # hint, so Qt lays it out at a height of -1, which draws nothing.
+        self.assertEqual(
+            self.dock.widget().geometry().top(), 0, "the dock's title bar still takes up room"
+        )
+
+    def test_the_view_menu_still_hides_and_shows_it(self):
+        action = self.dock.toggleViewAction()
+
+        action.trigger()
+        self._process_events()
+        self.assertFalse(self.dock.isVisible(), "the View menu did not hide the timeline")
+
+        action.trigger()
+        self._process_events()
+        self.assertTrue(self.dock.isVisible(), "the View menu did not bring the timeline back")

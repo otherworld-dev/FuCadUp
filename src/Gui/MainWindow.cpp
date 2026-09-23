@@ -929,6 +929,15 @@ bool MainWindow::setupTimelineView()
         return false;
     }
 
+    // A strip along the bottom, as Fusion draws it, rather than a captioned dock: the
+    // title bar put "Timeline" and the dock's buttons across the middle of the strip.
+    // An empty widget rather than none, since Qt draws its own title bar for none, and
+    // not an OverlayTitleBar, which the overlay manager would rebuild. The View menu
+    // still shows and hides the strip through the dock's toggle action.
+    auto* noTitle = new QWidget(dock);
+    noTitle->setObjectName(QStringLiteral("TimelineNoTitleBar"));
+    dock->setTitleBarWidget(noTitle);
+
     dock->toggleViewAction()->setData(QStringLiteral("Std_TimelineView"));
     dock->setVisible(true);
     OverlayManager::instance()->refresh(dock);
