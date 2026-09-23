@@ -70,10 +70,17 @@ class FeatureDialogTestCase(unittest.TestCase):
         if self.window is None:
             raise unittest.SkipTest("No main window in this test environment")
 
+        # Without PartDesign's GUI loaded the pad gets a plain view provider, whose
+        # edit mode is the transform dragger: a dialog opens, but not the pad's.
+        import PartDesignGui  # noqa: F401
+
+        FreeCADGui.activateWorkbench("PartDesignWorkbench")
+
         self.params = FreeCAD.ParamGet(PARTDESIGN_PARAMS)
         self.had_diagnostics = self.params.GetBool(DIAGNOSTICS_KEY, False)
 
         self.doc = FreeCAD.newDocument("FeatureDialogs")
+        FreeCADGui.ActiveDocument = FreeCADGui.getDocument(self.doc.Name)
         body = self.doc.addObject("PartDesign::Body", "Body")
         sketch = self.doc.addObject("Sketcher::SketchObject", "Sketch")
         body.addObject(sketch)
@@ -120,6 +127,12 @@ class FeatureDialogTestCase(unittest.TestCase):
             self._process_events(20)
         self.assertTrue(FreeCADGui.Control.activeDialog(), "The pad dialog did not open")
         self._process_events(100)
+        # The checks that a control is not offered pass on any dialog at all, so make
+        # sure this one is the pad's.
+        self.assertIsNotNone(
+            self.window.findChild(QtWidgets.QComboBox, DIRECTION_COMBO),
+            "The dialog that opened is not the pad's",
+        )
 
     def _visible(self, object_name):
         """The named widget if the dialog is showing it, otherwise None."""
