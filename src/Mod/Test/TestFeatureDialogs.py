@@ -75,6 +75,8 @@ class FeatureDialogTestCase(unittest.TestCase):
         import PartDesignGui  # noqa: F401
 
         FreeCADGui.activateWorkbench("PartDesignWorkbench")
+        self.window.raise_()
+        self.window.activateWindow()
 
         self.params = FreeCAD.ParamGet(PARTDESIGN_PARAMS)
         self.had_diagnostics = self.params.GetBool(DIAGNOSTICS_KEY, False)
@@ -129,10 +131,29 @@ class FeatureDialogTestCase(unittest.TestCase):
         self._process_events(100)
         # The checks that a control is not offered pass on any dialog at all, so make
         # sure this one is the pad's.
-        self.assertIsNotNone(
-            self.window.findChild(QtWidgets.QComboBox, DIRECTION_COMBO),
-            "The dialog that opened is not the pad's",
-        )
+        combo = self.window.findChild(QtWidgets.QComboBox, DIRECTION_COMBO)
+        self.assertIsNotNone(combo, "The dialog that opened is not the pad's")
+        # On CI's Linux runner the pad's form was built but not on screen. Say what
+        # hid it, then put the Tasks panel on screen, since that is not what these
+        # tests are about.
+        hidden = self._hidden_ancestor(combo)
+        if hidden is not None:
+            FreeCAD.Console.PrintWarning(
+                "TestFeatureDialogs: the pad dialog opened inside a hidden %s\n" % hidden
+            )
+            FreeCADGui.Control.showTaskView()
+            self._process_events(100)
+        self.assertTrue(combo.isVisible(), "The pad dialog is not on screen")
+
+    @staticmethod
+    def _hidden_ancestor(widget):
+        """The nearest widget at or above this one that is hidden, described, or None."""
+
+        while widget is not None:
+            if widget.isHidden():
+                return "%s %r" % (widget.metaObject().className(), widget.objectName())
+            widget = widget.parentWidget()
+        return None
 
     def _visible(self, object_name):
         """The named widget if the dialog is showing it, otherwise None."""
