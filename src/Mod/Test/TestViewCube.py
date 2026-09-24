@@ -99,3 +99,91 @@ class TestCubeStyle(ViewCubeTestBase):
             process_events()
         self.assertEqual(self.cube_type(), "SoViewCube")
         self.assertGreater(self.cube_node().viewportRect.getValue()[2], 0.0)
+
+
+class TestHoverFade(ViewCubeTestBase):
+    """The controls fade in over about 150 ms and out over about 250 ms."""
+
+    def setUp(self):
+        super().setUp()
+        from PySide import QtCore, QtGui
+
+        self.QtCore, self.QtGui = QtCore, QtGui
+        self.group.SetInt("CubeStyle", 0)
+        self.viewer.setNaviCubeCorner(1)  # top right
+        self.view.viewFront()
+        for _ in range(20):
+            process_events()
+        self.viewport = self.view.graphicsView().viewport()
+
+    def _cube_centre(self):
+        size = self.group.GetInt("CubeSize", 150)
+        offset_x = self.group.GetInt("OffsetX", 0)
+        offset_y = self.group.GetInt("OffsetY", 0)
+        ratio = self.viewport.devicePixelRatioF()
+        centre_x = self.viewport.width() - (offset_x / ratio + 0.55 * size)
+        centre_y = offset_y / ratio + 0.55 * size
+        return self.QtCore.QPoint(round(centre_x), round(centre_y))
+
+    def _away(self):
+        return self.QtCore.QPoint(20, self.viewport.height() - 20)
+
+    def _move(self, pos):
+        QtCore, QtGui = self.QtCore, self.QtGui
+        event = QtGui.QMouseEvent(
+            QtCore.QEvent.MouseMove,
+            QtCore.QPointF(pos),
+            QtCore.QPointF(self.viewport.mapToGlobal(pos)),
+            QtCore.Qt.NoButton,
+            QtCore.Qt.NoButton,
+            QtCore.Qt.NoModifier,
+        )
+        QtGui.QGuiApplication.sendEvent(self.viewport, event)
+
+    def _wait_for(self, predicate, timeout=0.6):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            process_events(5)
+            if predicate():
+                return True
+        return predicate()
+
+    def _opacity(self):
+        return self.cube_node().controlsOpacity.getValue()
+
+    def test_entering_the_cube_fades_the_controls_in(self):
+        self._move(self._away())
+        self.assertTrue(self._wait_for(lambda: self._opacity() == 0.0))
+        self._move(self._cube_centre())
+        self.assertTrue(self.cube_node().controlsLive.getValue(), "controls not live on entering")
+        seen = []
+        self._wait_for(lambda: seen.append(self._opacity()) or seen[-1] >= 0.999, timeout=0.4)
+        self.assertGreaterEqual(seen[-1], 0.999, "the controls did not reach full opacity in 400 ms")
+        self.assertTrue(
+            any(0.0 < value < 0.999 for value in seen),
+            "the controls jumped straight to full opacity instead of fading in: %r" % seen,
+        )
+
+    def test_a_fading_control_cannot_be_clicked(self):
+        self._move(self._cube_centre())
+        self._wait_for(lambda: self._opacity() >= 0.999)
+        self._move(self._away())
+        # The node's fields are written as the cube is drawn, so wait for the next frame.
+        self.assertTrue(
+            self._wait_for(lambda: not self.cube_node().controlsLive.getValue(), timeout=0.1),
+            "the controls still answer clicks after leaving the cube",
+        )
+        self.assertGreater(
+            self._opacity(), 0.0, "the controls were already gone: this did not catch a fade"
+        )
+        self.assertTrue(self._wait_for(lambda: self._opacity() == 0.0, timeout=0.5))
+
+    def test_leaving_the_view_fades_the_controls_out(self):
+        self._move(self._cube_centre())
+        self._wait_for(lambda: self._opacity() >= 0.999)
+        leave = self.QtCore.QEvent(self.QtCore.QEvent.Leave)
+        self.QtGui.QGuiApplication.sendEvent(self.viewport, leave)
+        self.assertTrue(
+            self._wait_for(lambda: self._opacity() == 0.0, timeout=0.5),
+            "the controls stayed up after the pointer left the view",
+        )

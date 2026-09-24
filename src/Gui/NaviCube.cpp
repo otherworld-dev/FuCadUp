@@ -27,6 +27,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <numbers>
 #include <set>
@@ -53,6 +54,9 @@
 #include <QImage>
 #include <QMenu>
 #include <QPainterPath>
+#include <QPointer>
+#include <QVariantAnimation>
+#include <QWidget>
 
 #include <App/Application.h>
 #include <Base/Color.h>
@@ -121,6 +125,29 @@ void writeSharedFields(Node* node, const SharedCubeFields& f)
     node->cameraOrientation = f.cameraOrientation;
     node->cameraIsOrthographic = f.orthographic;
 }
+constexpr int fadeInMs = 150;
+constexpr int fadeOutMs = 250;
+
+/// Tells the cube when the pointer leaves the 3D view, which no SoEvent reports.
+class NaviCubeLeaveFilter: public QObject
+{
+public:
+    explicit NaviCubeLeaveFilter(std::function<void()> onLeave)
+        : onLeave(std::move(onLeave))
+    {}
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override
+    {
+        if (event->type() == QEvent::Leave) {
+            onLeave();
+        }
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    std::function<void()> onLeave;
+};
 }  // namespace
 
 class NaviCubeImplementation
@@ -249,6 +276,12 @@ private:
     SoNode* activeNode() const;
     void setActiveLabelImage(PickId id, const SbVec2s& size, const unsigned char* pixels);
     PickId pickActive(const SbVec2s& point) const;
+    void setHovering(bool on);
+    void ensureLeaveFilter();
+    float fade = 0.0F;  // 0..1: how far the hover controls and full opacity have faded in
+    std::unique_ptr<QVariantAnimation> hoverFade;
+    std::unique_ptr<NaviCubeLeaveFilter> leaveFilter;
+    QPointer<QWidget> filteredWidget;
 
     map<PickId, LabelTexture> labelTextures;
 
@@ -455,6 +488,10 @@ NaviCubeImplementation::NaviCubeImplementation(Gui::View3DInventorViewer* viewer
 
 NaviCubeImplementation::~NaviCubeImplementation()
 {
+    if (filteredWidget && leaveFilter) {
+        filteredWidget->removeEventFilter(leaveFilter.get());
+    }
+    hoverFade.reset();
     delete menu;
     if (coinRoot) {
         coinRoot->unref();
@@ -515,6 +552,63 @@ PickId NaviCubeImplementation::pickActive(const SbVec2s& point) const
 {
     return style == NaviCube::Style::Classic ? soNaviCube->pickAt(point)
                                              : soViewCube->pickAt(point);
+}
+
+void NaviCubeImplementation::setHovering(bool on)
+{
+    if (on == hovering) {
+        return;
+    }
+    hovering = on;
+    if (on) {
+        ensureLeaveFilter();
+    }
+    if (!hoverFade) {
+        hoverFade = std::make_unique<QVariantAnimation>();
+        QObject::connect(
+            hoverFade.get(),
+            &QVariantAnimation::valueChanged,
+            [this](const QVariant& value) {
+                fade = static_cast<float>(value.toDouble());
+                requestRedraw();
+            }
+        );
+    }
+    hoverFade->stop();
+    const float target = on ? 1.0F : 0.0F;
+    const int duration = static_cast<int>(std::abs(target - fade) * (on ? fadeInMs : fadeOutMs));
+    if (duration <= 0) {
+        fade = target;
+        requestRedraw();
+        return;
+    }
+    hoverFade->setStartValue(static_cast<double>(fade));
+    hoverFade->setEndValue(static_cast<double>(target));
+    hoverFade->setDuration(duration);
+    hoverFade->start();
+    requestRedraw();
+}
+
+void NaviCubeImplementation::ensureLeaveFilter()
+{
+    // The GL widget can be replaced after the cube is built, so check it each time.
+    QWidget* widget = viewer->getGLWidget();
+    if (!widget || widget == filteredWidget) {
+        return;
+    }
+    if (!leaveFilter) {
+        leaveFilter = std::make_unique<NaviCubeLeaveFilter>([this]() {
+            if (!mouseDown) {
+                setHovering(false);
+                setHilite(PickId::None);
+            }
+        });
+    }
+    if (filteredWidget) {
+        filteredWidget->removeEventFilter(leaveFilter.get());
+    }
+    widget->installEventFilter(leaveFilter.get());
+    filteredWidget = widget;
 }
 
 void NaviCube::setStyle(Style style)
@@ -579,7 +673,13 @@ void NaviCubeImplementation::syncNodeState(SoAction* action)
         - viewportHeight / 2;
 
     if (
-        !populateRenderParams(hovering ? 1.0F : inactiveOpacity, posX, posY, viewportWidth, viewportHeight)
+        !populateRenderParams(
+            inactiveOpacity + (1.0F - inactiveOpacity) * fade,
+            posX,
+            posY,
+            viewportWidth,
+            viewportHeight
+        )
     ) {
         return;
     }
@@ -983,7 +1083,7 @@ bool NaviCubeImplementation::populateRenderParams(
     }
     else {
         writeSharedFields(soViewCube, fields);
-        soViewCube->controlsOpacity = hovering ? 1.0F : 0.0F;
+        soViewCube->controlsOpacity = fade;
         soViewCube->controlsLive = hovering;
     }
 
@@ -1385,13 +1485,10 @@ void NaviCubeImplementation::updateCameraRotationDrag(short x, short y)
 bool NaviCubeImplementation::mouseMoved(short x, short y, bool repositionModifier)
 {
     qreal physicalCubeWidgetSize = getPhysicalCubeWidgetSize();
-    bool hovering = mouseDown
-        || (std::abs(x) <= physicalCubeWidgetSize / 2 && std::abs(y) <= physicalCubeWidgetSize / 2);
-
-    if (hovering != this->hovering) {
-        this->hovering = hovering;
-        viewer->getSoRenderManager()->scheduleRedraw();
-    }
+    setHovering(
+        mouseDown
+        || (std::abs(x) <= physicalCubeWidgetSize / 2 && std::abs(y) <= physicalCubeWidgetSize / 2)
+    );
 
     if (!dragStarted) {
         PickId pick = pickFace(x, y);
