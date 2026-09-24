@@ -187,3 +187,37 @@ class TestHoverFade(ViewCubeTestBase):
             self._wait_for(lambda: self._opacity() == 0.0, timeout=0.5),
             "the controls stayed up after the pointer left the view",
         )
+
+
+class TestCubeStylePreference(unittest.TestCase):
+    """The preferences dialog is modal and its .ui is compiled into the binary, so this reads
+    the page's source; test_the_style_swaps_live covers what the parameter then does."""
+
+    def _repo_root(self):
+        import os
+
+        here = os.path.dirname(os.path.abspath(__file__))
+        while True:
+            if os.path.exists(os.path.join(here, ".git")):
+                return here
+            parent = os.path.dirname(here)
+            if parent == here:
+                return None
+            here = parent
+
+    def test_the_navigation_page_offers_the_cube_style(self):
+        import os
+        import xml.etree.ElementTree as ElementTree
+
+        root = self._repo_root()
+        if root is None:
+            self.skipTest("not running from a source checkout")
+        path = os.path.join(root, "src", "Gui", "PreferencePages", "DlgSettingsNavigation.ui")
+        tree = ElementTree.parse(path)
+        combo = next((w for w in tree.iter("widget") if w.get("name") == "naviCubeStyle"), None)
+        self.assertIsNotNone(combo, "the Navigation page has no cube style combo")
+        props = {p.get("name"): p for p in combo.findall("property")}
+        self.assertEqual(props["prefEntry"].find("cstring").text, "CubeStyle")
+        self.assertEqual(props["prefPath"].find("cstring").text, "NaviCube")
+        items = [i.find("property/string").text for i in combo.findall("item")]
+        self.assertEqual(items, ["FuCadUp", "Classic"], "item order must match CubeStyle 0 and 1")

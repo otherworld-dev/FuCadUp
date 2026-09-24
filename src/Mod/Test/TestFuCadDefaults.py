@@ -425,7 +425,7 @@ class TestNaviCubeDefaults(unittest.TestCase):
                 "fallback apart" % family,
             )
 
-    def test_the_fucad_dark_pack_dresses_the_cube_dark(self):
+    def test_the_fucad_dark_pack_dresses_the_cube_smoked(self):
         import xml.etree.ElementTree as ElementTree
 
         path = os.path.join(
@@ -452,11 +452,18 @@ class TestNaviCubeDefaults(unittest.TestCase):
             "the pack still sets NaviCube/Color, which nothing reads - the cube takes BaseColor",
         )
         self.assertEqual(
-            values.get("EmphaseColor"), accent, "cube edges and labels are not the accent"
+            values.get("EmphaseColor"),
+            "2829625599",
+            "cube edges, labels and controls are not the light grey #a8a8a8",
         )
         self.assertEqual(values.get("HiliteColor"), accent, "the cube hover is not the accent")
         self.assertEqual(values.get("InactiveOpacity"), "100", "the cube is not solid at rest")
         self.assertIn("BaseColor", values, "the pack leaves the cube faces at the light default")
+        self.assertEqual(
+            values.get("BaseColor"),
+            "707406520",
+            "the cube faces are not the smoked #2a2a2a at 72% alpha",
+        )
         base = int(values["BaseColor"])
         brightest = max((base >> 24) & 0xFF, (base >> 16) & 0xFF, (base >> 8) & 0xFF)
         self.assertLess(brightest, 80, "the cube faces are not dark: BaseColor %08x" % base)
