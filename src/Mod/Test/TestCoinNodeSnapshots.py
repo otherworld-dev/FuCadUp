@@ -2215,6 +2215,63 @@ class CoinNodeSnapshotTestCase(unittest.TestCase):
             f"grid should not fall back to Coin's default material color: {actual_path}",
         )
 
+    def test_so_fc_color_bar_follows_the_render_size(self):
+        """Lay the color bar out again when it is drawn at another size.
+
+        The bar kept the label width it first measured and reused it at every later size.
+        Labels are a fixed number of pixels, so a width measured in a larger view is too
+        narrow for a smaller one and pushed the bar off to the right with its labels cut
+        off. Setting a scene graph redraws the on-screen view before a capture, so at 150%
+        display scaling every snapshot after the first was measured at 768 px, not 512.
+        """
+        _require_gui()
+        if bool(os.environ.get("CI", "").strip()) and not sys.platform.startswith("linux"):
+            self.skipTest("baselines are rendered on Linux; other CI platforms only smoke-test")
+        try:
+            baseline_dir = _baseline_dir()
+        except FileNotFoundError as exc:
+            raise unittest.SkipTest(str(exc)) from exc
+
+        width = _SNAPSHOT_WIDTH
+        height = _SNAPSHOT_HEIGHT
+        out_dir = Path(
+            os.environ.get(
+                "FC_VISUAL_OUT_DIR",
+                os.path.join(tempfile.gettempdir(), "FreeCADTesting", "CoinNodeSnapshots"),
+            )
+        )
+        name = "SoFCColorBarAfterLargerRender"
+        actual_path = out_dir / "actual" / f"{name}.png"
+        expected_path = out_dir / "expected" / f"{name}.png"
+        expected_path.parent.mkdir(parents=True, exist_ok=True)
+        expected_path.write_bytes((baseline_dir / "SoFCColorBar.png").read_bytes())
+
+        scene = _make_snapshot_scene("SoFCColorBar")
+        with _ViewerSnapshotHarness(width, height) as harness:
+            harness.viewer.setSceneGraph(scene.root)
+            larger = harness.viewer.renderToImage(
+                width=4 * width, height=4 * height, samples=0, includeViewerLighting=False
+            )
+            self.assertFalse(larger.isNull(), "the larger render did not produce an image")
+            _render_png(
+                harness,
+                scene.root,
+                actual_path,
+                width,
+                height,
+                framing_policy=scene.framing_policy,
+            )
+
+        ok, msg = _compare_images(
+            expected_path,
+            actual_path,
+            out_dir / "diff" / f"{name}.png",
+            tolerance=_PIXEL_TOLERANCE,
+            ignore_alpha=_IGNORE_ALPHA,
+            max_mismatched_pixels=int((width * height) * (_MAX_MISMATCH_PCT / 100.0)),
+        )
+        self.assertTrue(ok, f"after a {4 * width} px render the bar was laid out wrongly: {msg}")
+
     def test_coin_node_snapshots(self):
         """Render each configured node and compare against baseline images."""
         is_ci = bool(os.environ.get("CI", "").strip())

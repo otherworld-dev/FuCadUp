@@ -90,6 +90,9 @@ new view cube. The fork is up to date with FreeCAD as of 9 September 2026.
   unit schema's default (10 mm, or 1 inch in an imperial schema).
 - Changing the unit system from the status bar with a document open left the 3D view's
   grid at its old spacing until something else rebuilt it.
+- The colour bar (FEM results and other colour scales) kept the label width it first
+  measured, so after the view changed size, or an image was saved at another size, the
+  bar could sit too far right with its labels cut off. This is a FreeCAD bug.
 - A zero-length camera move (for example `viewPosition` with a duration of 0) hung the
   application whenever view animations were turned on. This is a FreeCAD bug.
 - Calling a 3D viewer method with arguments after `isSpinning()` from Python crashed the
