@@ -229,8 +229,8 @@ void SoViewCube::ensureSceneGraph() const
         cam->focalDistance = std::abs(overlayCubeZ);
     }
     ortho->height = 2.0F * overlayOrthoExtent;
-    persp->heightAngle
-        = 2.0F * std::atan(std::tan(std::numbers::pi_v<float> / 8.0F) * overlayFovScale);
+    persp->heightAngle = 2.0F
+        * std::atan(std::tan(std::numbers::pi_v<float> / 8.0F) * overlayFovScale);
     cameraSwitch->addChild(ortho);
     cameraSwitch->addChild(persp);
     cameraSwitch->whichChild = 0;
@@ -299,32 +299,32 @@ void SoViewCube::buildCube(SoSeparator* cube) const
         cube->addChild(sep);
     }
 
-    const auto addLines = [cube](SoMaterial*& material, SoDrawStyle** style,
-                                 const std::vector<SbVec3f>& points) {
-        auto* sep = new SoSeparator;
-        // Only the tiles answer picks: a line the ray passes near would otherwise win as the
-        // nearest hit and hide the tile under it.
-        auto* unpickable = new SoPickStyle;
-        unpickable->style = SoPickStyle::UNPICKABLE;
-        sep->addChild(unpickable);
-        material = new SoMaterial;
-        sep->addChild(material);
-        auto* drawStyle = new SoDrawStyle;
-        drawStyle->lineWidth = 1.0F;
-        sep->addChild(drawStyle);
-        if (style) {
-            *style = drawStyle;
-        }
-        std::vector<int32_t> index;
-        for (int32_t i = 0; i + 1 < static_cast<int32_t>(points.size()); i += 2) {
-            index.insert(index.end(), {i, i + 1, -1});
-        }
-        auto* lines = new SoIndexedLineSet;
-        lines->vertexProperty = makeVertices(points);
-        lines->coordIndex.setValues(0, static_cast<int>(index.size()), index.data());
-        sep->addChild(lines);
-        cube->addChild(sep);
-    };
+    const auto addLines =
+        [cube](SoMaterial*& material, SoDrawStyle** style, const std::vector<SbVec3f>& points) {
+            auto* sep = new SoSeparator;
+            // Only the tiles answer picks: a line the ray passes near would otherwise win as the
+            // nearest hit and hide the tile under it.
+            auto* unpickable = new SoPickStyle;
+            unpickable->style = SoPickStyle::UNPICKABLE;
+            sep->addChild(unpickable);
+            material = new SoMaterial;
+            sep->addChild(material);
+            auto* drawStyle = new SoDrawStyle;
+            drawStyle->lineWidth = 1.0F;
+            sep->addChild(drawStyle);
+            if (style) {
+                *style = drawStyle;
+            }
+            std::vector<int32_t> index;
+            for (int32_t i = 0; i + 1 < static_cast<int32_t>(points.size()); i += 2) {
+                index.insert(index.end(), {i, i + 1, -1});
+            }
+            auto* lines = new SoIndexedLineSet;
+            lines->vertexProperty = makeVertices(points);
+            lines->coordIndex.setValues(0, static_cast<int>(index.size()), index.data());
+            sep->addChild(lines);
+            cube->addChild(sep);
+        };
 
     {
         // Guide lines: the borders of each face's centre tile, run out to the face's edges.

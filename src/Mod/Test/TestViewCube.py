@@ -158,7 +158,9 @@ class TestHoverFade(ViewCubeTestBase):
         self.assertTrue(self.cube_node().controlsLive.getValue(), "controls not live on entering")
         seen = []
         self._wait_for(lambda: seen.append(self._opacity()) or seen[-1] >= 0.999, timeout=0.4)
-        self.assertGreaterEqual(seen[-1], 0.999, "the controls did not reach full opacity in 400 ms")
+        self.assertGreaterEqual(
+            seen[-1], 0.999, "the controls did not reach full opacity in 400 ms"
+        )
         self.assertTrue(
             any(0.0 < value < 0.999 for value in seen),
             "the controls jumped straight to full opacity instead of fading in: %r" % seen,

@@ -534,11 +534,7 @@ void NaviCubeImplementation::setStyle(NaviCube::Style newStyle)
     requestRedraw();
 }
 
-void NaviCubeImplementation::setActiveLabelImage(
-    PickId id,
-    const SbVec2s& size,
-    const unsigned char* pixels
-)
+void NaviCubeImplementation::setActiveLabelImage(PickId id, const SbVec2s& size, const unsigned char* pixels)
 {
     if (style == NaviCube::Style::Classic) {
         soNaviCube->setLabelImage(id, size, 4, pixels);
@@ -550,8 +546,7 @@ void NaviCubeImplementation::setActiveLabelImage(
 
 PickId NaviCubeImplementation::pickActive(const SbVec2s& point) const
 {
-    return style == NaviCube::Style::Classic ? soNaviCube->pickAt(point)
-                                             : soViewCube->pickAt(point);
+    return style == NaviCube::Style::Classic ? soNaviCube->pickAt(point) : soViewCube->pickAt(point);
 }
 
 void NaviCubeImplementation::setHovering(bool on)
@@ -565,14 +560,10 @@ void NaviCubeImplementation::setHovering(bool on)
     }
     if (!hoverFade) {
         hoverFade = std::make_unique<QVariantAnimation>();
-        QObject::connect(
-            hoverFade.get(),
-            &QVariantAnimation::valueChanged,
-            [this](const QVariant& value) {
-                fade = static_cast<float>(value.toDouble());
-                requestRedraw();
-            }
-        );
+        QObject::connect(hoverFade.get(), &QVariantAnimation::valueChanged, [this](const QVariant& value) {
+            fade = static_cast<float>(value.toDouble());
+            requestRedraw();
+        });
     }
     hoverFade->stop();
     const float target = on ? 1.0F : 0.0F;
@@ -672,15 +663,13 @@ void NaviCubeImplementation::syncNodeState(SoAction* action)
     const int posY = static_cast<int>(relPos[1] * posAreaSize[1]) + posAreaBase[1]
         - viewportHeight / 2;
 
-    if (
-        !populateRenderParams(
+    if (!populateRenderParams(
             inactiveOpacity + (1.0F - inactiveOpacity) * fade,
             posX,
             posY,
             viewportWidth,
             viewportHeight
-        )
-    ) {
+        )) {
         return;
     }
 
@@ -1058,8 +1047,8 @@ bool NaviCubeImplementation::populateRenderParams(
             static_cast<float>(viewportHeight)
         ),
         .cameraOrientation = cam->orientation.getValue(),
-        .orthographic
-        = cam->getTypeId().isDerivedFrom(SoOrthographicCamera::getClassTypeId()) != FALSE,
+        .orthographic = cam->getTypeId().isDerivedFrom(SoOrthographicCamera::getClassTypeId())
+            != FALSE,
     };
 
     if (style == NaviCube::Style::Classic) {
@@ -1150,13 +1139,14 @@ bool NaviCubeImplementation::isInsideWidgetArea(short x, short y)
     return halfWidgetSize > 0 && std::abs(x) <= halfWidgetSize && std::abs(y) <= halfWidgetSize;
 }
 
-NaviCubeImplementation::MouseDragMode
-NaviCubeImplementation::resolveDragMode(PickId pick, bool repositionModifier) const
+NaviCubeImplementation::MouseDragMode NaviCubeImplementation::resolveDragMode(
+    PickId pick,
+    bool repositionModifier
+) const
 {
     if (pick != PickId::None) {
         const FaceType faceType = getFaceType(pick);
-        if (faceType != FaceType::Main && faceType != FaceType::Edge
-            && faceType != FaceType::Corner) {
+        if (faceType != FaceType::Main && faceType != FaceType::Edge && faceType != FaceType::Corner) {
             return MouseDragMode::None;
         }
     }

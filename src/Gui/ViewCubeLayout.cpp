@@ -103,14 +103,8 @@ int roundAxis(float value)
 
 const std::array<PickId, 6>& mainFaces()
 {
-    static const std::array<PickId, 6> faces {
-        PickId::Top,
-        PickId::Front,
-        PickId::Left,
-        PickId::Rear,
-        PickId::Right,
-        PickId::Bottom
-    };
+    static const std::array<PickId, 6>
+        faces {PickId::Top, PickId::Front, PickId::Left, PickId::Rear, PickId::Right, PickId::Bottom};
     return faces;
 }
 
@@ -168,7 +162,8 @@ const std::array<Tile, tileCount>& tiles()
                         n + frame.u * static_cast<float>(col - 1)
                         + frame.v * static_cast<float>(row - 1)
                     );
-                    t.corners = {at(col, row), at(col + 1, row), at(col + 1, row + 1), at(col, row + 1)};
+                    t.corners
+                        = {at(col, row), at(col + 1, row), at(col + 1, row + 1), at(col, row + 1)};
                 }
             }
         }
