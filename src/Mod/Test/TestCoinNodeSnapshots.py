@@ -152,6 +152,7 @@ _SNAPSHOT_FIXTURES = {
     "SoViewCube": _SnapshotFixture(),
     "SoViewCubeHiliteEdge": _SnapshotFixture(),
     "SoViewCubeHiliteCorner": _SnapshotFixture(),
+    "SoViewCubeFaceOnControls": _SnapshotFixture(),
     **{name: _SnapshotFixture(required_modules=("PartGui",)) for name in _PART_GUI_NODES},
     **{name: _SnapshotFixture(required_modules=("MeshGui",)) for name in _MESH_GUI_NODES},
 }
@@ -878,7 +879,12 @@ def _make_scene_for_node(type_name: str, fixture: _SnapshotFixture):
         root.addChild(cube)
         return root
 
-    if type_name in ("SoViewCube", "SoViewCubeHiliteEdge", "SoViewCubeHiliteCorner"):
+    if type_name in (
+        "SoViewCube",
+        "SoViewCubeHiliteEdge",
+        "SoViewCubeHiliteCorner",
+        "SoViewCubeFaceOnControls",
+    ):
         # A visible background, as the faces are see-through.
         grad = _instantiate("SoFCBackgroundGradient")
         _configure_background_gradient(
@@ -907,7 +913,14 @@ def _make_scene_for_node(type_name: str, fixture: _SnapshotFixture):
             overlay,
             overlay,
         )
-        cube.cameraOrientation.setValue(cam.orientation.getValue())
+        if type_name == "SoViewCubeFaceOnControls":
+            # Looking straight at FRONT, pointer over the cube, home hovered (PickId::Home = 34).
+            cube.controlsOpacity.setValue(1.0)
+            cube.controlsLive.setValue(True)
+            cube.hiliteId.setValue(34)
+            cube.cameraOrientation.setValue(coin.SbRotation(coin.SbVec3f(1, 0, 0), 1.5707964))
+        else:
+            cube.cameraOrientation.setValue(cam.orientation.getValue())
         root.addChild(cube)
         return root
 

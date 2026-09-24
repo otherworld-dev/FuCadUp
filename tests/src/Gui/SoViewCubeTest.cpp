@@ -120,3 +120,29 @@ TEST_F(SoViewCubeTest, theHighlightLightsTheTilesOfAnEdge)
     cube->hiliteId = static_cast<int>(PickId::Home);
     EXPECT_EQ(cube->hilitedTileCount(), 0);
 }
+
+TEST_F(SoViewCubeTest, controlsShowOnlyOnceTheyHaveFadedIn)
+{
+    cube->cameraOrientation = isoView();
+    cube->controlsOpacity = 0.0F;
+    EXPECT_EQ(cube->visibleControlCount(), 0);
+    cube->controlsOpacity = 0.4F;
+    EXPECT_EQ(cube->visibleControlCount(), 4);
+}
+
+TEST_F(SoViewCubeTest, theTrianglesJoinTheControlsWhenFaceOn)
+{
+    cube->cameraOrientation = frontView();
+    cube->controlsOpacity = 1.0F;
+    EXPECT_EQ(cube->visibleControlCount(), 8);
+}
+
+TEST_F(SoViewCubeTest, pickIgnoresControlsThatAreNotLive)
+{
+    // Fading out: still drawn, no longer clickable; the click falls through to the cube or nothing.
+    cube->cameraOrientation = frontView();
+    cube->controlsOpacity = 0.6F;
+    cube->controlsLive = FALSE;
+    EXPECT_EQ(cube->pickAt(at(0.5F, 0.15F)), PickId::None);
+    EXPECT_EQ(cube->pickAt(at(0.92F, 0.92F)), PickId::None);
+}

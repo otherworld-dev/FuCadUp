@@ -409,8 +409,162 @@ void SoViewCube::buildCube(SoSeparator* cube) const
     }
 }
 
-void SoViewCube::buildControls(SoSeparator* /*parent*/) const
-{}
+namespace
+{
+
+// A control's icon in its rect's own 0..1 square, y down: line strips, or one filled triangle.
+std::vector<std::vector<SbVec2f>> iconStrokes(SoNaviCube::PickId id)
+{
+    using PickId = SoNaviCube::PickId;
+    const float pi = std::numbers::pi_v<float>;
+    // A roll arrow: an arc over the top of the rect, mirrored for the clockwise one.
+    const auto arc = [pi](bool clockwise) {
+        std::vector<SbVec2f> points;
+        for (int i = 0; i <= 8; ++i) {
+            const float a = (20.0F + 140.0F * static_cast<float>(i) / 8.0F) * pi / 180.0F;
+            const float x = 0.5F + 0.4F * std::cos(a);
+            points.emplace_back(clockwise ? 1.0F - x : x, 0.75F - 0.4F * std::sin(a));
+        }
+        return points;
+    };
+    // Two barbs at the arc's end, turned 35 degrees either side of the way back along it.
+    const auto head = [pi](const std::vector<SbVec2f>& arcPoints) {
+        const SbVec2f tip = arcPoints.back();
+        SbVec2f back = arcPoints[arcPoints.size() - 2] - tip;
+        back.normalize();
+        const auto turn = [&back, pi](float degrees) {
+            const float r = degrees * pi / 180.0F;
+            return SbVec2f(
+                back[0] * std::cos(r) - back[1] * std::sin(r),
+                back[0] * std::sin(r) + back[1] * std::cos(r)
+            );
+        };
+        return std::vector<SbVec2f> {tip + turn(35.0F) * 0.22F, tip, tip + turn(-35.0F) * 0.22F};
+    };
+
+    switch (id) {
+        case PickId::Home:
+            return {
+                {{0.1F, 0.5F}, {0.5F, 0.12F}, {0.9F, 0.5F}},
+                {{0.22F, 0.42F}, {0.22F, 0.88F}, {0.78F, 0.88F}, {0.78F, 0.42F}}
+            };
+        case PickId::ArrowLeft: {
+            auto a = arc(false);
+            return {a, head(a)};
+        }
+        case PickId::ArrowRight: {
+            auto a = arc(true);
+            return {a, head(a)};
+        }
+        case PickId::ViewMenu:
+            return {{{0.2F, 0.35F}, {0.5F, 0.65F}, {0.8F, 0.35F}}};
+        case PickId::ArrowNorth:
+            return {{{0.5F, 0.1F}, {0.9F, 0.9F}, {0.1F, 0.9F}}};
+        case PickId::ArrowSouth:
+            return {{{0.5F, 0.9F}, {0.1F, 0.1F}, {0.9F, 0.1F}}};
+        case PickId::ArrowWest:
+            return {{{0.1F, 0.5F}, {0.9F, 0.1F}, {0.9F, 0.9F}}};
+        case PickId::ArrowEast:
+            return {{{0.9F, 0.5F}, {0.1F, 0.9F}, {0.1F, 0.1F}}};
+        default:
+            return {};
+    }
+}
+
+bool isTriangle(SoNaviCube::PickId id)
+{
+    using PickId = SoNaviCube::PickId;
+    return id == PickId::ArrowNorth || id == PickId::ArrowSouth || id == PickId::ArrowEast
+        || id == PickId::ArrowWest;
+}
+
+}  // namespace
+
+void SoViewCube::buildControls(SoSeparator* parent) const
+{
+    controlsSwitch = new SoSwitch;
+    controlsSwitch->whichChild = SO_SWITCH_NONE;
+    auto* sep = new SoSeparator;
+    controlsSwitch->addChild(sep);
+
+    // Its own camera: overlay units straight through, x 0..1 right, y 0..1 up.
+    auto* cam = new SoOrthographicCamera;
+    cam->viewportMapping = SoCamera::LEAVE_ALONE;
+    cam->aspectRatio = 1.0F;
+    cam->position = SbVec3f(0.5F, 0.5F, 1.0F);
+    cam->height = 1.0F;
+    cam->nearDistance = 0.5F;
+    cam->farDistance = 1.5F;
+    sep->addChild(cam);
+
+    auto* depth = new SoDepthBuffer;
+    depth->test = FALSE;
+    depth->write = FALSE;
+    sep->addChild(depth);
+    auto* style = new SoDrawStyle;
+    style->lineWidth = 1.5F;
+    sep->addChild(style);
+    auto* hints = new SoShapeHints;
+    hints->vertexOrdering = SoShapeHints::UNKNOWN_ORDERING;
+    sep->addChild(hints);
+
+    trianglesSwitch = new SoSwitch;
+    trianglesSwitch->whichChild = SO_SWITCH_NONE;
+
+    size_t slot = 0;
+    for (const auto& rect : Layout::controlRects(true)) {
+        ControlNodes& nodes = controls[slot++];
+        nodes.pickId = rect.pickId;
+        auto* control = new SoSeparator;
+        nodes.material = new SoMaterial;
+        control->addChild(nodes.material);
+
+        const auto toOverlay = [&rect](const SbVec2f& p) {
+            const float x = rect.left + p[0] * (rect.right - rect.left);
+            const float yDown = rect.top + p[1] * (rect.bottom - rect.top);
+            return SbVec3f(x, 1.0F - yDown, 0.0F);
+        };
+        const auto strokes = iconStrokes(rect.pickId);
+        if (isTriangle(rect.pickId)) {
+            std::vector<SbVec3f> points;
+            for (const auto& p : strokes.front()) {
+                points.push_back(toOverlay(p));
+            }
+            auto* face = new SoFaceSet;
+            face->numVertices.set1Value(0, 3);
+            face->vertexProperty = makeVertices(points);
+            control->addChild(face);
+            trianglesSwitch->addChild(control);
+        }
+        else {
+            std::vector<SbVec3f> points;
+            std::vector<int32_t> index;
+            for (const auto& stroke : strokes) {
+                for (const auto& p : stroke) {
+                    index.push_back(static_cast<int32_t>(points.size()));
+                    points.push_back(toOverlay(p));
+                }
+                index.push_back(-1);
+            }
+            auto* lines = new SoIndexedLineSet;
+            lines->vertexProperty = makeVertices(points);
+            lines->coordIndex.setValues(0, static_cast<int>(index.size()), index.data());
+            control->addChild(lines);
+            sep->addChild(control);
+        }
+    }
+    sep->addChild(trianglesSwitch);
+    parent->addChild(controlsSwitch);
+}
+
+int SoViewCube::visibleControlCount() const
+{
+    updateSceneGraph();
+    if (controlsSwitch->whichChild.getValue() != SO_SWITCH_ALL) {
+        return 0;
+    }
+    return trianglesSwitch->whichChild.getValue() == SO_SWITCH_ALL ? 8 : 4;
+}
 
 void SoViewCube::setLabelImage(
     PickId id,
@@ -485,6 +639,21 @@ void SoViewCube::updateSceneGraph() const
     for (LabelNodes& nodes : labels) {
         nodes.material->diffuseColor = emphase;
         nodes.material->transparency = transparency(emphaseAlpha.getValue() * op);
+    }
+
+    // The hover controls: on once they start fading in; the triangles only when face-on.
+    const float shown = std::clamp(controlsOpacity.getValue(), 0.0F, 1.0F);
+    controlsSwitch->whichChild = shown > 0.001F ? SO_SWITCH_ALL : SO_SWITCH_NONE;
+    trianglesSwitch->whichChild = Layout::faceOn(cam) != PickId::None ? SO_SWITCH_ALL
+                                                                      : SO_SWITCH_NONE;
+    for (ControlNodes& nodes : controls) {
+        if (!nodes.material) {
+            continue;
+        }
+        const bool hot = nodes.pickId == hilite;
+        nodes.material->diffuseColor = hot ? hiliteColor.getValue() : emphase;
+        const float alpha = (hot ? hiliteAlpha.getValue() : emphaseAlpha.getValue()) * op * shown;
+        nodes.material->transparency = transparency(alpha);
     }
 }
 

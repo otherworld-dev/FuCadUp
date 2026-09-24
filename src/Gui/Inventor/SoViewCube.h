@@ -91,6 +91,8 @@ public:
     [[nodiscard]] PickId pickAt(const SbVec2s& point) const;
     //! Test hook: how many tiles currently wear the highlight.
     [[nodiscard]] int hilitedTileCount() const;
+    //! Test hook: how many controls are switched on (4, or 8 with the face-on triangles).
+    [[nodiscard]] int visibleControlCount() const;
 
 protected:
     ~SoViewCube() override;
