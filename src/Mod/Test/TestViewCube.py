@@ -91,14 +91,32 @@ class TestCubeStyle(ViewCubeTestBase):
         self.assertGreater(cube.opacity.getValue(), 0.0)
 
     def test_a_swapped_in_cube_is_drawn_straight_away(self):
-        """The node swapped in gets the controller's viewport and state without a mouse move."""
-        self.group.SetInt("CubeStyle", 1)
-        process_events()
-        self.group.SetInt("CubeStyle", 0)
-        for _ in range(5):
-            process_events()
-        self.assertEqual(self.cube_type(), "SoViewCube")
-        self.assertGreater(self.cube_node().viewportRect.getValue()[2], 0.0)
+        """The node swapped in gets the controller's viewport and state without a mouse move.
+
+        Each direction starts from a view whose other node has never been drawn, so an
+        unfed node still has its constructor's empty viewport."""
+        for start, swapped_in in ((0, "SoNaviCube"), (1, "SoViewCube")):
+            with self.subTest(start=start):
+                self.group.SetInt("CubeStyle", start)
+                doc = FreeCAD.newDocument("TestViewCubeSwap")
+                try:
+                    view = FreeCADGui.getDocument(doc.Name).ActiveView
+                    for _ in range(10):
+                        process_events()
+                    root = view.getViewer().getNaviCubeNode()
+                    self.group.SetInt("CubeStyle", 1 - start)
+                    for _ in range(5):
+                        process_events()
+                    node = root.getChild(1)
+                    self.assertEqual(node.getTypeId().getName().getString(), swapped_in)
+                    self.assertGreater(
+                        node.viewportRect.getValue()[2],
+                        0.0,
+                        "the %s swapped in was never given the controller's viewport" % swapped_in,
+                    )
+                    self.assertGreater(node.opacity.getValue(), 0.0)
+                finally:
+                    FreeCAD.closeDocument(doc.Name)
 
 
 class TestHoverFade(ViewCubeTestBase):
@@ -179,6 +197,46 @@ class TestHoverFade(ViewCubeTestBase):
             self._opacity(), 0.0, "the controls were already gone: this did not catch a fade"
         )
         self.assertTrue(self._wait_for(lambda: self._opacity() == 0.0, timeout=0.5))
+
+    def _click(self, pos):
+        QtCore, QtGui = self.QtCore, self.QtGui
+        for kind, buttons in (
+            (QtCore.QEvent.MouseButtonPress, QtCore.Qt.LeftButton),
+            (QtCore.QEvent.MouseButtonRelease, QtCore.Qt.NoButton),
+        ):
+            event = QtGui.QMouseEvent(
+                kind,
+                QtCore.QPointF(pos),
+                QtCore.QPointF(self.viewport.mapToGlobal(pos)),
+                QtCore.Qt.LeftButton,
+                buttons,
+                QtCore.Qt.NoModifier,
+            )
+            QtGui.QGuiApplication.sendEvent(self.viewport, event)
+            process_events(20)
+
+    def test_a_step_triangle_stays_until_the_pointer_leaves_the_cube(self):
+        """After one 45-degree step the view is no longer face-on, but the triangles the user
+        is clicking stay, so the next click steps again rather than snapping to a tile."""
+        size = self.group.GetInt("CubeSize", 150)
+        centre = self._cube_centre()
+        north = self.QtCore.QPoint(centre.x(), round(centre.y() - size / 2 + 0.15 * size))
+        self._move(centre)
+        self._move(north)
+        self.assertEqual(
+            self.cube_node().hiliteId.getValue(), 27, "the North triangle is not under the pointer"
+        )
+        self._click(north)
+        for _ in range(20):
+            process_events()
+        self.assertTrue(
+            self.cube_node().trianglesLatched.getValue(), "the triangles went after one step"
+        )
+        self._move(self._away())
+        self.assertTrue(
+            self._wait_for(lambda: not self.cube_node().trianglesLatched.getValue(), timeout=0.3),
+            "the triangles stayed latched after the pointer left the cube",
+        )
 
     def test_leaving_the_view_fades_the_controls_out(self):
         self._move(self._cube_centre())

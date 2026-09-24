@@ -85,6 +85,8 @@ public:
     SoSFFloat controlsOpacity;
     //! Whether the hover controls answer clicks; false as soon as they start fading out.
     SoSFBool controlsLive;
+    //! Keep the step triangles up after one was clicked, until the pointer leaves the cube.
+    SoSFBool trianglesLatched;
 
     void setLabelImage(PickId id, const SbVec2s& size, int numComponents, const unsigned char* pixels);
     void clearLabelTextures();
@@ -121,6 +123,8 @@ private:
     void updateSceneGraph() const;
     void beginOverlayPass(SoGLRenderAction* action, int x, int y, int width, int height);
     [[nodiscard]] int labelSlot(PickId face) const;
+    //! Square on to a face, or latched by the controller after a triangle click.
+    [[nodiscard]] bool trianglesShown() const;
 
     mutable SoSeparator* sceneRoot {nullptr};
     mutable SoSeparator* pickRoot {nullptr};

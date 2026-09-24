@@ -90,6 +90,8 @@ GuiExport std::vector<int> tilesFor(PickId id);
 GuiExport SbVec3f towardViewer(const SbRotation& cameraOrientation);
 /// The main face the camera looks straight at, or None.
 GuiExport PickId faceOn(const SbRotation& cameraOrientation, float toleranceDeg = faceOnToleranceDeg);
+/// Face-on with the face square on screen, not rolled into a diamond: when the triangles show.
+GuiExport bool squareOn(const SbRotation& cameraOrientation, float toleranceDeg = faceOnToleranceDeg);
 /// 1.0 for a face turned to the viewer, down to 0.85 for one side-on or turned away.
 GuiExport float faceShade(PickId face, const SbRotation& cameraOrientation);
 /// The controls on show; the four triangles only when looking straight at a face.

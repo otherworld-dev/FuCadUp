@@ -278,6 +278,7 @@ private:
     PickId pickActive(const SbVec2s& point) const;
     void setHovering(bool on);
     void ensureLeaveFilter();
+    bool trianglesLatched = false;  // a step triangle was clicked; keep them until hover ends
     float fade = 0.0F;  // 0..1: how far the hover controls and full opacity have faded in
     std::unique_ptr<QVariantAnimation> hoverFade;
     std::unique_ptr<NaviCubeLeaveFilter> leaveFilter;
@@ -555,6 +556,9 @@ void NaviCubeImplementation::setHovering(bool on)
         return;
     }
     hovering = on;
+    if (!on) {
+        trianglesLatched = false;
+    }
     if (on) {
         ensureLeaveFilter();
     }
@@ -1074,6 +1078,7 @@ bool NaviCubeImplementation::populateRenderParams(
         writeSharedFields(soViewCube, fields);
         soViewCube->controlsOpacity = fade;
         soViewCube->controlsLive = hovering;
+        soViewCube->trianglesLatched = trianglesLatched;
     }
 
     return true;
@@ -1365,6 +1370,12 @@ bool NaviCubeImplementation::mouseReleased(short x, short y)
 
             // Handle the flat buttons
             resetClickState();
+            if (pickId == PickId::ArrowNorth || pickId == PickId::ArrowSouth
+                || pickId == PickId::ArrowEast || pickId == PickId::ArrowWest) {
+                // A 45-degree step leaves the face-on view the triangles belong to; keep them so
+                // the next click steps again, as the classic cube's arrows always allowed.
+                trianglesLatched = true;
+            }
             SbRotation rotation = getFaceRotation(pickId);
             if (pickId == PickId::Backside) {
                 rotation.scaleAngle(pi);

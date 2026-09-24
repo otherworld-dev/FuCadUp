@@ -4,6 +4,7 @@
 
 #include <numbers>
 
+#include <Inventor/SbMatrix.h>
 #include <Inventor/SbRotation.h>
 #include <Inventor/SbVec2s.h>
 #include <Inventor/SoDB.h>
@@ -182,4 +183,64 @@ TEST_F(SoViewCubeTest, anIsometricViewPicksTheCornerItLooksAt)
         cube->cameraOrientation = isoView();
         EXPECT_EQ(cube->pickAt(at(0.5F, 0.5F)), PickId::FrontTopRight) << "ortho " << ortho;
     }
+}
+
+namespace
+{
+// A camera looking at the cube from towardsViewer with the given up direction on screen.
+SbRotation camera(const SbVec3f& towardsViewer, const SbVec3f& up)
+{
+    SbVec3f back = towardsViewer;
+    back.normalize();
+    SbVec3f upOnScreen = up - back * up.dot(back);
+    upOnScreen.normalize();
+    const SbVec3f right = upOnScreen.cross(back);
+    const SbMatrix m(
+        right[0],
+        right[1],
+        right[2],
+        0.0F,
+        upOnScreen[0],
+        upOnScreen[1],
+        upOnScreen[2],
+        0.0F,
+        back[0],
+        back[1],
+        back[2],
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        1.0F
+    );
+    return SbRotation(m);
+}
+}  // namespace
+
+TEST_F(SoViewCubeTest, aRolledFaceKeepsItsCornerTilesFromTheTriangles)
+{
+    // Rolled 45 degrees about the view axis, FRONT is a diamond whose top tip reaches up to
+    // 0.163 of the overlay: under where the North triangle sits when the face is square on.
+    cube->cameraOrientation = camera(SbVec3f(0, -1, 0), SbVec3f(1, 0, 1));
+    cube->controlsLive = TRUE;
+    cube->controlsOpacity = 1.0F;
+    const PickId tip = cube->pickAt(at(0.5F, 0.18F));
+    EXPECT_NE(tip, PickId::ArrowNorth);
+    EXPECT_NE(tip, PickId::None);
+    EXPECT_EQ(cube->visibleControlCount(), 4);
+}
+
+TEST_F(SoViewCubeTest, latchedTrianglesStayAfterAStepTurnsTheViewAway)
+{
+    // One 45-degree step up from FRONT: no longer face-on, but the triangles the user was
+    // clicking stay put, so a second click steps again instead of snapping to a tile.
+    cube->cameraOrientation = camera(SbVec3f(0, -1, 1), SbVec3f(0, 1, 1));
+    cube->controlsLive = TRUE;
+    cube->controlsOpacity = 1.0F;
+    cube->trianglesLatched = FALSE;
+    EXPECT_NE(cube->pickAt(at(0.5F, 0.15F)), PickId::ArrowNorth);
+    EXPECT_EQ(cube->visibleControlCount(), 4);
+    cube->trianglesLatched = TRUE;
+    EXPECT_EQ(cube->pickAt(at(0.5F, 0.15F)), PickId::ArrowNorth);
+    EXPECT_EQ(cube->visibleControlCount(), 8);
 }

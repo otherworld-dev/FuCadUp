@@ -8,6 +8,7 @@
 #include <numbers>
 #include <set>
 
+#include <Inventor/SbMatrix.h>
 #include <Inventor/SbRotation.h>
 #include <Inventor/SbVec3f.h>
 
@@ -176,4 +177,68 @@ TEST(ViewCubeLayout, controlsStayOutsideTheIsometricSilhouette)
         EXPECT_GT(std::hypot(nx - 0.5F, ny - 0.5F), reach)
             << "control " << static_cast<int>(r.pickId) << " sits on the cube";
     }
+}
+
+namespace
+{
+// A camera looking at the cube from towardsViewer with the given up direction on screen.
+SbRotation camera(const SbVec3f& towardsViewer, const SbVec3f& up)
+{
+    SbVec3f back = towardsViewer;
+    back.normalize();
+    SbVec3f upOnScreen = up - back * up.dot(back);
+    upOnScreen.normalize();
+    const SbVec3f right = upOnScreen.cross(back);
+    // Inventor's row-vector matrices: each row is where a camera axis points.
+    const SbMatrix m(
+        right[0],
+        right[1],
+        right[2],
+        0.0F,
+        upOnScreen[0],
+        upOnScreen[1],
+        upOnScreen[2],
+        0.0F,
+        back[0],
+        back[1],
+        back[2],
+        0.0F,
+        0.0F,
+        0.0F,
+        0.0F,
+        1.0F
+    );
+    return SbRotation(m);
+}
+
+// Looking at FRONT, rolled about the view axis by the given angle.
+SbRotation frontRolled(float degrees)
+{
+    const float r = degrees * pi / 180.0F;
+    return camera(SbVec3f(0, -1, 0), SbVec3f(std::sin(r), 0, std::cos(r)));
+}
+}  // namespace
+
+TEST(ViewCubeLayout, theTestCameraLooksWhereItIsTold)
+{
+    const SbRotation cam = frontRolled(30.0F);
+    SbVec3f back;
+    SbVec3f up;
+    cam.multVec(SbVec3f(0, 0, 1), back);
+    cam.multVec(SbVec3f(0, 1, 0), up);
+    EXPECT_NEAR(back[1], -1.0F, 1e-5F);
+    EXPECT_NEAR(up[0], 0.5F, 1e-5F);
+    EXPECT_NEAR(up[2], std::cos(pi / 6.0F), 1e-5F);
+}
+
+TEST(ViewCubeLayout, trianglesOnlyShowWhenTheFaceIsSquareOnScreen)
+{
+    // Rolled 45 degrees the face is a diamond whose tips reach under the triangles.
+    for (float roll : {0.0F, 0.5F, 90.0F, 180.0F, 270.0F}) {
+        EXPECT_TRUE(Layout::squareOn(frontRolled(roll))) << "roll " << roll;
+    }
+    for (float roll : {5.0F, 30.0F, 45.0F, 60.0F, 135.0F}) {
+        EXPECT_FALSE(Layout::squareOn(frontRolled(roll))) << "roll " << roll;
+    }
+    EXPECT_FALSE(Layout::squareOn(isoView()));
 }

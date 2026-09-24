@@ -206,6 +206,18 @@ PickId faceOn(const SbRotation& cameraOrientation, float toleranceDeg)
     return PickId::None;
 }
 
+bool squareOn(const SbRotation& cameraOrientation, float toleranceDeg)
+{
+    if (faceOn(cameraOrientation, toleranceDeg) == PickId::None) {
+        return false;
+    }
+    // Rolled off a right angle, the face is a diamond whose tips reach under the triangles.
+    SbVec3f up;
+    cameraOrientation.multVec(SbVec3f(0.0F, 1.0F, 0.0F), up);
+    const float threshold = std::cos(toleranceDeg * std::numbers::pi_v<float> / 180.0F);
+    return std::max({std::abs(up[0]), std::abs(up[1]), std::abs(up[2])}) >= threshold;
+}
+
 float faceShade(PickId face, const SbRotation& cameraOrientation)
 {
     const float facing = std::max(0.0F, faceNormal(face).dot(towardViewer(cameraOrientation)));

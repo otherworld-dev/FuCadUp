@@ -180,6 +180,7 @@ SoViewCube::SoViewCube()
     SO_NODE_ADD_FIELD(viewportRect, (SbVec4f(0.0F, 0.0F, 0.0F, 0.0F)));
     SO_NODE_ADD_FIELD(controlsOpacity, (0.0F));
     SO_NODE_ADD_FIELD(controlsLive, (FALSE));
+    SO_NODE_ADD_FIELD(trianglesLatched, (FALSE));
 }
 
 SoViewCube::~SoViewCube()
@@ -197,6 +198,11 @@ SoViewCube::~SoViewCube()
     if (sceneRoot) {
         sceneRoot->unref();
     }
+}
+
+bool SoViewCube::trianglesShown() const
+{
+    return trianglesLatched.getValue() || Layout::squareOn(cameraOrientation.getValue());
 }
 
 int SoViewCube::labelSlot(PickId face) const
@@ -649,8 +655,7 @@ void SoViewCube::updateSceneGraph() const
     // The hover controls: on once they start fading in; the triangles only when face-on.
     const float shown = std::clamp(controlsOpacity.getValue(), 0.0F, 1.0F);
     controlsSwitch->whichChild = shown > 0.001F ? SO_SWITCH_ALL : SO_SWITCH_NONE;
-    trianglesSwitch->whichChild = Layout::faceOn(cam) != PickId::None ? SO_SWITCH_ALL
-                                                                      : SO_SWITCH_NONE;
+    trianglesSwitch->whichChild = trianglesShown() ? SO_SWITCH_ALL : SO_SWITCH_NONE;
     for (ControlNodes& nodes : controls) {
         if (!nodes.material) {
             continue;
@@ -694,8 +699,7 @@ SoViewCube::PickId SoViewCube::pickAt(const SbVec2s& point) const
     if (controlsLive.getValue()) {
         const float x = (static_cast<float>(local[0]) + 0.5F) / width;
         const float y = 1.0F - (static_cast<float>(local[1]) + 0.5F) / height;
-        const bool faceOnView = Layout::faceOn(cameraOrientation.getValue()) != PickId::None;
-        const PickId control = Layout::controlAt(x, y, faceOnView);
+        const PickId control = Layout::controlAt(x, y, trianglesShown());
         if (control != PickId::None) {
             return control;
         }
