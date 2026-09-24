@@ -302,6 +302,11 @@ void SoViewCube::buildCube(SoSeparator* cube) const
     const auto addLines = [cube](SoMaterial*& material, SoDrawStyle** style,
                                  const std::vector<SbVec3f>& points) {
         auto* sep = new SoSeparator;
+        // Only the tiles answer picks: a line the ray passes near would otherwise win as the
+        // nearest hit and hide the tile under it.
+        auto* unpickable = new SoPickStyle;
+        unpickable->style = SoPickStyle::UNPICKABLE;
+        sep->addChild(unpickable);
         material = new SoMaterial;
         sep->addChild(material);
         auto* drawStyle = new SoDrawStyle;

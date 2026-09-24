@@ -146,3 +146,40 @@ TEST_F(SoViewCubeTest, pickIgnoresControlsThatAreNotLive)
     EXPECT_EQ(cube->pickAt(at(0.5F, 0.15F)), PickId::None);
     EXPECT_EQ(cube->pickAt(at(0.92F, 0.92F)), PickId::None);
 }
+
+TEST_F(SoViewCubeTest, everyPointInsideTheCubePicksATile)
+{
+    // The guide lines and edges cross the faces; a click on one must still pick the tile
+    // under it. An isometric cube's outline keeps 0.357 of the overlay around its centre
+    // (0.4124 * cos 30) in orthographic, about 0.27 in perspective, where the far corners
+    // draw closer in; face-on, the face reaches 0.238 either way.
+    for (SbBool ortho : {TRUE, FALSE}) {
+        cube->cameraIsOrthographic = ortho;
+        for (const SbRotation& view : {isoView(), frontView()}) {
+            cube->cameraOrientation = view;
+            const float reach = view == frontView() ? 0.2F : (ortho ? 0.3F : 0.25F);
+            for (int i = -10; i <= 10; ++i) {
+                for (int j = -10; j <= 10; ++j) {
+                    const float dx = reach * static_cast<float>(i) / 10.0F;
+                    const float dy = reach * static_cast<float>(j) / 10.0F;
+                    if (dx * dx + dy * dy > reach * reach) {
+                        continue;
+                    }
+                    EXPECT_NE(cube->pickAt(at(0.5F + dx, 0.5F + dy)), PickId::None)
+                        << "ortho " << ortho << " at " << 0.5F + dx << ", " << 0.5F + dy;
+                }
+            }
+        }
+    }
+}
+
+TEST_F(SoViewCubeTest, anIsometricViewPicksTheCornerItLooksAt)
+{
+    // Looking down from front-right-top, the corner shared by FRONT, TOP and RIGHT is
+    // the cube's centre on screen.
+    for (SbBool ortho : {TRUE, FALSE}) {
+        cube->cameraIsOrthographic = ortho;
+        cube->cameraOrientation = isoView();
+        EXPECT_EQ(cube->pickAt(at(0.5F, 0.5F)), PickId::FrontTopRight) << "ortho " << ortho;
+    }
+}
