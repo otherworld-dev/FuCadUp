@@ -74,7 +74,7 @@ DRAG_TRAVEL_PX = 12.0
 MIN_DRAG_TRAVEL_WIDGET_PX = 5
 
 
-class TestSketcherSnapFeedback(unittest.TestCase):
+class SketchSnapCase(unittest.TestCase):
     """A sketch in edit mode on the XY plane, seen square-on at a known zoom."""
 
     def setUp(self):
@@ -152,9 +152,12 @@ class TestSketcherSnapFeedback(unittest.TestCase):
             name: self.params.GetBool(name, True)
             for name in ("Snap", "SnapToObjects", "SnapToGrid")
         }
+        # A preference the profile never had is removed again afterwards, not written
+        # back with the test's value, which would pin the user to it from then on.
+        stored = set(self.params.GetFloats())
         self.saved_floats = {
-            "GridSnapTolerance": self.params.GetFloat("GridSnapTolerance", GRID_SNAP_TOLERANCE),
-            "SnapRadius": self.params.GetFloat("SnapRadius", SNAP_RADIUS),
+            name: self.params.GetFloat(name) if name in stored else None
+            for name in ("GridSnapTolerance", "SnapRadius")
         }
         for name in self.saved_bools:
             self.params.SetBool(name, True)
@@ -165,7 +168,10 @@ class TestSketcherSnapFeedback(unittest.TestCase):
         for name, value in self.saved_bools.items():
             self.params.SetBool(name, value)
         for name, value in self.saved_floats.items():
-            self.params.SetFloat(name, value)
+            if value is None:
+                self.params.RemFloat(name)
+            else:
+                self.params.SetFloat(name, value)
 
     def _discard_document(self):
         if getattr(self, "doc", None) is not None:
@@ -470,7 +476,9 @@ class TestSketcherSnapFeedback(unittest.TestCase):
 
         return self.sketch.Geometry[0].EndPoint
 
-    # -- tests -----------------------------------------------------------
+
+class TestSketcherSnapFeedback(SketchSnapCase):
+    """The snap glyphs, and a drag that stays off the grid."""
 
     def test_snapping_to_the_grid_draws_a_marker_of_its_own(self):
         grid_x, grid_y = self._grid_point()
@@ -631,3 +639,121 @@ class TestSketcherLeaveSketch(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _SnapBandInScreenPixels:
+    """The grid snap band is GridSnapTolerance pixels on screen, whatever the view's shape.
+
+    The sketcher converted its pixel settings to sketch units through the camera's view
+    volume before viewport mapping, which for a view wider than tall is narrower than what
+    is drawn by the view's aspect ratio. A 15 px band was 8 px in a 16:9 view, and less
+    still in a wider one, while a tall view was right. Mixed into a SketchSnapCase with
+    VIEW_SIZE set to the shape to check.
+    """
+
+    VIEW_SIZE = (0, 0)
+
+    def _prepare_the_sketch_view(self):
+        self._original_window_size = FreeCADGui.getMainWindow().size()
+        self._shape_view(*self.VIEW_SIZE)
+        super()._prepare_the_sketch_view()
+
+    def tearDown(self):
+        super().tearDown()
+        self._restore_window_size()
+
+    def _abandon_set_up(self):
+        super()._abandon_set_up()
+        self._restore_window_size()
+
+    def _restore_window_size(self):
+        size = getattr(self, "_original_window_size", None)
+        if size is not None:
+            FreeCADGui.getMainWindow().resize(size)
+            self._process_events(300)
+
+    def _shape_view(self, width, height):
+        """Reshape the 3D view towards width x height, as TestViewportProjection does.
+
+        A maximised main window may refuse the resize, so the MDI sub-window is tried
+        next. The test fails rather than skips if neither gives the wanted shape, since a
+        skipped wide case would say nothing about the defect it is here for.
+        """
+
+        from PySide import QtWidgets
+
+        wanted_wide = width > height
+        window = FreeCADGui.getMainWindow()
+        window.resize(width, height)
+        self._process_events(400)
+        self._refresh_view_widgets()
+        if (self.viewport.width() > self.viewport.height()) != wanted_wide:
+            mdi_area = window.findChild(QtWidgets.QMdiArea)
+            sub_window = mdi_area.activeSubWindow() if mdi_area is not None else None
+            if sub_window is not None:
+                sub_window.resize(width, height)
+                self._process_events(400)
+                self._refresh_view_widgets()
+
+        size = self.viewport.size()
+        self.assertEqual(
+            size.width() > size.height(),
+            wanted_wide,
+            "the window manager gave a {}x{} view, not the {} shape this test needs".format(
+                size.width(), size.height(), "wide" if wanted_wide else "tall"
+            ),
+        )
+
+    def _line_marker_at(self, u, v):
+        """The glyph after moving the pointer to (u, v), or None, giving the frame a retry."""
+
+        for _ in range(3):
+            self._move_pointer(u, v)
+            marker = self._snap_marker()
+            if marker is not None:
+                return marker
+        return None
+
+    def test_the_grid_reaches_as_many_screen_pixels_as_the_preference_says(self):
+        grid_x, grid_y = self._grid_point()
+        half = GRID_SIZE / 2.0
+        # Half a cell up, so only the vertical line through grid_x is within reach.
+        v = grid_y + half
+        self._require_on_screen([(grid_x, v), (grid_x + half, v)])
+
+        units_per_pixel = self._units_per_pixel()
+        pitch_px = GRID_SIZE / units_per_pixel
+        band_px = min(GRID_SNAP_TOLERANCE, pitch_px / 3.0)
+        # Well inside and well outside the band; both stay short of the half pitch, so
+        # the line they are measured from is the nearest one either way.
+        inside = 0.75 * band_px * units_per_pixel
+        outside = 1.25 * band_px * units_per_pixel
+        self.assertLess(outside, half)
+
+        self._start_line_tool()
+
+        marker = self._line_marker_at(grid_x + inside, v)
+        self.assertIsNotNone(
+            marker,
+            "{:.1f} screen pixels from a grid line is inside a {:.0f} px band, so the "
+            "pointer must snap ({}x{} view)".format(
+                0.75 * band_px, band_px, self.viewport.width(), self.viewport.height()
+            ),
+        )
+        self.assertAlmostEqual(marker[0], grid_x, delta=0.01)
+
+        self.assertIsNone(
+            self._line_marker_at(grid_x + outside, v),
+            "{:.1f} screen pixels from a grid line is outside a {:.0f} px band, so the "
+            "pointer must move freely ({}x{} view)".format(
+                1.25 * band_px, band_px, self.viewport.width(), self.viewport.height()
+            ),
+        )
+
+
+class TestSnapBandInAWideView(_SnapBandInScreenPixels, SketchSnapCase):
+    VIEW_SIZE = (1800, 700)
+
+
+class TestSnapBandInATallView(_SnapBandInScreenPixels, SketchSnapCase):
+    VIEW_SIZE = (800, 1300)

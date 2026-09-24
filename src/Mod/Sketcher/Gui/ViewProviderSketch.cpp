@@ -77,6 +77,7 @@
 #include <Gui/Selection/SoFCUnifiedSelection.h>
 // #include <Gui/Inventor/SoFCSwitch.h>
 #include <Gui/Navigation/NavigationAnimation.h>
+#include <Gui/Inventor/ViewVolumeCorrection.h>
 #include <Gui/Utilities.h>
 #include <Gui/View3DInventor.h>
 #include <Gui/View3DInventorViewer.h>
@@ -3779,14 +3780,22 @@ float ViewProviderSketch::getSketchUnitsPerPixel() const
     if (mdi && mdi->isDerivedFrom<Gui::View3DInventor>()) {
         Gui::View3DInventorViewer* viewer = static_cast<Gui::View3DInventor*>(mdi)->getViewer();
         SoCamera* camera = viewer->getSoRenderManager()->getCamera();
-        const SbVec2s viewportSize =
-            viewer->getSoRenderManager()->getViewportRegion().getViewportSizePixels();
-        if (camera && viewportSize[0] > 0) {
-            // Coin measures a normalised radius along the viewport's width, so a radius of 1
-            // is the world-space width of the whole viewport at the sketch origin's depth.
-            const float viewportWidth = camera->getViewVolume(camera->aspectRatio.getValue())
-                                            .getWorldToScreenScale(SbVec3f(0.f, 0.f, 0.f), 1.0f);
-            return viewportWidth / static_cast<float>(viewportSize[0]);
+        if (camera) {
+            // The volume as it is rendered. camera->getViewVolume(aspect) is the volume before
+            // viewport mapping, which under ADJUST_CAMERA is too narrow by the view's aspect
+            // ratio whenever the view is wider than tall, so every pixel setting (snap radius,
+            // grid snap tolerance) came out that many times smaller on screen.
+            const Gui::MappedView mapped =
+                Gui::mappedViewVolume(*camera, viewer->getSoRenderManager()->getViewportRegion());
+            const SbVec2s viewportSize = mapped.viewport.getViewportSizePixels();
+            if (viewportSize[0] > 0) {
+                // Coin measures a normalised radius along the viewport's width, so a radius
+                // of 1 is the world-space width of the whole viewport at the sketch origin's
+                // depth.
+                const float viewportWidth =
+                    mapped.volume.getWorldToScreenScale(SbVec3f(0.f, 0.f, 0.f), 1.0f);
+                return viewportWidth / static_cast<float>(viewportSize[0]);
+            }
         }
     }
     return 0.f;

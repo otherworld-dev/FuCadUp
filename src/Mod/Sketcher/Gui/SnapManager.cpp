@@ -134,13 +134,11 @@ void SnapManager::ParameterObserver::updateSnapRadiusParameter(const std::string
     client.snapRadiusPixels = std::max(1.0, hGrp->GetFloat(parametername.c_str(), 8.0));
 }
 
-void SnapManager::ParameterObserver::updateGridSnapToleranceParameter(
-    const std::string& parametername
-)
+void SnapManager::ParameterObserver::updateGridSnapToleranceParameter(const std::string& parametername)
 {
     ParameterGrp::handle hGrp = getParameterGrpHandle();
 
-    client.gridSnapTolerancePixels = std::max(0.0, hGrp->GetFloat(parametername.c_str(), 15.0));
+    client.gridSnapTolerancePixels = std::max(0.0, hGrp->GetFloat(parametername.c_str(), 8.0));
 }
 
 void SnapManager::ParameterObserver::subscribeToParameters()
