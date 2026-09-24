@@ -149,6 +149,9 @@ _SNAPSHOT_FIXTURES = {
     "SoNaviCube": _SnapshotFixture(),
     "SoNaviCubeTranslucent": _SnapshotFixture(),
     "SoNaviCubeHiliteFront": _SnapshotFixture(),
+    "SoViewCube": _SnapshotFixture(),
+    "SoViewCubeHiliteEdge": _SnapshotFixture(),
+    "SoViewCubeHiliteCorner": _SnapshotFixture(),
     **{name: _SnapshotFixture(required_modules=("PartGui",)) for name in _PART_GUI_NODES},
     **{name: _SnapshotFixture(required_modules=("MeshGui",)) for name in _MESH_GUI_NODES},
 }
@@ -871,6 +874,39 @@ def _make_scene_for_node(type_name: str, fixture: _SnapshotFixture):
         )
 
         # Mimic what the controller does: orient the cube from the viewer camera.
+        cube.cameraOrientation.setValue(cam.orientation.getValue())
+        root.addChild(cube)
+        return root
+
+    if type_name in ("SoViewCube", "SoViewCubeHiliteEdge", "SoViewCubeHiliteCorner"):
+        # A visible background, as the faces are see-through.
+        grad = _instantiate("SoFCBackgroundGradient")
+        _configure_background_gradient(
+            grad,
+            coin.SbColor(0.15, 0.15, 0.20),
+            coin.SbColor(0.45, 0.45, 0.55),
+        )
+        root.addChild(grad)
+
+        cube = _instantiate("SoViewCube")
+        cube.opacity.setValue(1.0)
+        cube.borderWidth.setValue(1.0)
+        cube.cameraIsOrthographic.setValue(True)
+        # Gui::SoNaviCube::PickId: FrontTop = 7, FrontTopRight = 19 (see SoNaviCube.h).
+        if type_name == "SoViewCubeHiliteEdge":
+            cube.hiliteId.setValue(7)
+        elif type_name == "SoViewCubeHiliteCorner":
+            cube.hiliteId.setValue(19)
+        width = float(_SNAPSHOT_WIDTH)
+        height = float(_SNAPSHOT_HEIGHT)
+        overlay = max(64.0, min(width, height) * 0.60)
+        margin = 8.0
+        cube.viewportRect.setValue(
+            width - overlay - margin,
+            height - overlay - margin,
+            overlay,
+            overlay,
+        )
         cube.cameraOrientation.setValue(cam.orientation.getValue())
         root.addChild(cube)
         return root
