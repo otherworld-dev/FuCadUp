@@ -122,6 +122,7 @@ FreeCAD.__unit_test__ += [
     "TestShellVocabulary",
     "TestFeatureDialogs",
     "TestFuCadDefaults",
+    "TestViewCube",
     "TestSketcherSnapFeedback",
     "TestSketchPlanePick",
     "TestMarkingMenu",

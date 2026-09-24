@@ -47,6 +47,12 @@ public:
         BottomLeftCorner,
         BottomRightCorner
     };
+    //! Which cube is drawn: FuCadUp's flat tiled one, or FreeCAD's chamfered one.
+    enum class Style
+    {
+        FuCadUp = 0,
+        Classic = 1
+    };
     NaviCube(Gui::View3DInventorViewer* viewer);
     virtual ~NaviCube();
     void createContextMenu(const std::vector<std::string>& cmd);
@@ -58,6 +64,8 @@ public:
     void setDraggable(bool draggable);
     void setSize(int size);
     void setChamfer(float size);
+    void setStyle(Style style);
+    Style style() const;
     void setNaviRotateToNearest(bool toNearest);
     void setNaviStepByTurn(int steps);
     void setFont(std::string font);

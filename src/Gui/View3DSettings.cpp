@@ -589,6 +589,7 @@ void NaviCubeSettings::applySettings()
     parameterChanged("OffsetX");  // Updates OffsetY too
     parameterChanged("CubeSize");
     parameterChanged("ChamferSize");
+    parameterChanged("CubeStyle");
     parameterChanged("NaviRotateToNearest");
     parameterChanged("NaviStepByTurn");
     parameterChanged("BorderWidth");
@@ -617,6 +618,11 @@ void NaviCubeSettings::parameterChanged(const char* Name)
         // Flatter than upstream's 0.12, which reads as a faceted ball, yet wide enough
         // that the corner and edge views it carves out can still be clicked.
         nc->setChamfer(hGrp->GetFloat("ChamferSize", 0.06f));
+    }
+    else if (strcmp(Name, "CubeStyle") == 0) {
+        // 0: FuCadUp's flat tiled cube (the default); 1: FreeCAD's classic chamfered cube.
+        const long value = hGrp->GetInt("CubeStyle", 0);
+        nc->setStyle(value == 1 ? NaviCube::Style::Classic : NaviCube::Style::FuCadUp);
     }
     else if (strcmp(Name, "CubeSize") == 0) {
         nc->setSize(hGrp->GetInt("CubeSize", 150));
