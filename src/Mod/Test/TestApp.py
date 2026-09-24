@@ -22,6 +22,8 @@
 # ***************************************************************************/
 
 import FreeCAD
+import faulthandler
+import os
 import sys
 import unittest
 
@@ -92,7 +94,35 @@ def TestText(s):
     return retval
 
 
+# Kept open for the life of the run: faulthandler writes to the file descriptor, not to
+# the Python object, and would lose it to garbage collection.
+_watchdogFile = None
+
+
+def _armWatchdog():
+    """Dump every thread's stack to FREECAD_TEST_WATCHDOG_FILE once the run has taken
+    FREECAD_TEST_WATCHDOG seconds.
+
+    A runner that kills a hung test run (.github/scripts/run_gui_tests.py) otherwise
+    learns only that it hung, not where. The dump comes from a thread of its own, so
+    it still works while the main thread is blocked inside native code, and it goes
+    to a file because in the GUI sys.stderr is the Report view, which has no file
+    descriptor.
+    """
+    global _watchdogFile
+    try:
+        seconds = float(os.environ.get("FREECAD_TEST_WATCHDOG", "0"))
+    except ValueError:
+        return
+    path = os.environ.get("FREECAD_TEST_WATCHDOG_FILE")
+    if seconds <= 0 or not path:
+        return
+    _watchdogFile = open(path, "w")
+    faulthandler.dump_traceback_later(seconds, file=_watchdogFile)
+
+
 def RunConfiguredTextTest():
+    _armWatchdog()
     test_cases = FreeCAD.ConfigGet("TestCase").split(",")
     if len(test_cases) == 1:
         return TestText(test_cases[0])
