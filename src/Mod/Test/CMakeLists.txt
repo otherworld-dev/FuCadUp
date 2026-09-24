@@ -53,6 +53,7 @@ SET(Test_SRCS
     TestShellVocabulary.py
     TestFeatureDialogs.py
     TestFuCadDefaults.py
+    TestViewCube.py
     TestSketcherSnapFeedback.py
     TestSketchPlanePick.py
     TestMarkingMenu.py

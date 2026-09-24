@@ -31,6 +31,7 @@
 #include "Navigation/NavigationStyle.h"
 #include "View3DViewerPy.h"
 #include "View3DInventorViewer.h"
+#include "NaviCube.h"
 
 
 using namespace Gui;
@@ -180,6 +181,11 @@ void View3DInventorViewerPy::init_type()
         "isEnabledNaviCube",
         &View3DInventorViewerPy::isEnabledNaviCube,
         "isEnabledNaviCube() -> bool: check whether the navi cube is enabled."
+    );
+    add_varargs_method(
+        "getNaviCubeNode",
+        &View3DInventorViewerPy::getNaviCubeNode,
+        "getNaviCubeNode() -> SoSeparator: the navigation cube's root node, or None."
     );
     add_varargs_method(
         "setNaviCubeCorner",
@@ -849,6 +855,31 @@ Py::Object View3DInventorViewerPy::isEnabledNaviCube(const Py::Tuple& args)
     }
     bool ok = _viewer->isEnabledNaviCube();
     return Py::Boolean(ok);
+}
+
+Py::Object View3DInventorViewerPy::getNaviCubeNode(const Py::Tuple& args)
+{
+    if (!PyArg_ParseTuple(args.ptr(), "")) {
+        throw Py::Exception();
+    }
+    NaviCube* cube = _viewer->getNaviCube();
+    SoNode* node = cube ? cube->getCoinNode() : nullptr;
+    if (!node) {
+        return Py::None();
+    }
+    try {
+        PyObject* proxy = Base::Interpreter().createSWIGPointerObj(
+            "pivy.coin",
+            "SoSeparator *",
+            static_cast<void*>(node),
+            1
+        );
+        node->ref();
+        return Py::Object(proxy, true);
+    }
+    catch (const Base::Exception& e) {
+        throw Py::RuntimeError(e.what());
+    }
 }
 
 Py::Object View3DInventorViewerPy::setNaviCubeCorner(const Py::Tuple& args)

@@ -240,6 +240,7 @@ class TestDatumScaleDefault(unittest.TestCase):
 # The cube as upstream ships it, and the shape the fork draws instead
 # (NaviCubeSettings::parameterChanged in View3DSettings.cpp).
 UPSTREAM_CUBE_SHAPE = {
+    "CubeStyle": 1,
     "ChamferSize": 0.12,
     "CubeSize": 132,
     "ShowCS": True,
@@ -247,6 +248,7 @@ UPSTREAM_CUBE_SHAPE = {
     "FontWeight": 0,
 }
 FORK_CUBE_SHAPE = {
+    "CubeStyle": 1,
     "ChamferSize": 0.06,
     "CubeSize": 150,
     "ShowCS": False,
@@ -311,6 +313,9 @@ class TestNaviCubeDefaults(unittest.TestCase):
     be read from Python, as the chamfer is a private member of SoNaviCube rather
     than a field.
 
+    These render the Classic cube (CubeStyle 1), whose chamfer and fonts they were
+    written for; TestViewCube covers the FuCadUp cube.
+
     Every cube preference the user has set is put aside for the test and restored
     afterwards.
     """
@@ -372,7 +377,7 @@ class TestNaviCubeDefaults(unittest.TestCase):
             time.sleep(0.02)
 
     def test_a_fresh_install_draws_the_fork_cube_shape(self):
-        by_default = self.render()
+        by_default = self.render(CubeStyle=1)
         fork = self.render(**FORK_CUBE_SHAPE)
         upstream = self.render(**UPSTREAM_CUBE_SHAPE)
 
@@ -390,8 +395,8 @@ class TestNaviCubeDefaults(unittest.TestCase):
 
     def test_a_bevel_below_the_old_floor_still_changes_the_cube(self):
         """SoNaviCube used to clamp the chamfer to 0.05, so anything sharper was ignored."""
-        at_old_floor = self.render(ChamferSize=0.05)
-        below_it = self.render(ChamferSize=0.02)
+        at_old_floor = self.render(CubeStyle=1, ChamferSize=0.05)
+        below_it = self.render(CubeStyle=1, ChamferSize=0.02)
 
         self.assertGreater(
             differing_samples(at_old_floor, below_it),

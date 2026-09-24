@@ -34,6 +34,7 @@
 
 #include <boost/math/constants/constants.hpp>
 
+#include <Inventor/SbRotation.h>
 #include <Inventor/SbVec3f.h>
 #include <Inventor/SbVec4f.h>
 #include <Inventor/actions/SoAction.h>
@@ -66,6 +67,7 @@
 #include "Navigation/NavigationAnimation.h"
 #include "Navigation/NavigationStyle.h"
 #include "Inventor/SoNaviCube.h"
+#include "Inventor/SoViewCube.h"
 #include "View3DInventorViewer.h"
 #include "View3DInventor.h"
 #include "ViewParams.h"
@@ -84,6 +86,42 @@ enum class FaceType
     Corner,
     Button
 };
+
+namespace
+{
+struct SharedCubeFields
+{
+    float size;
+    float opacity;
+    float borderWidth;
+    int hiliteId;
+    QColor base;
+    QColor emphase;
+    QColor hilite;
+    SbVec4f viewportRect;
+    SbRotation cameraOrientation;
+    bool orthographic;
+};
+
+// Both cube nodes take the same fields from the controller.
+template<class Node>
+void writeSharedFields(Node* node, const SharedCubeFields& f)
+{
+    node->size = f.size;
+    node->opacity = f.opacity;
+    node->borderWidth = f.borderWidth;
+    node->hiliteId = f.hiliteId;
+    node->baseColor.setValue(f.base.redF(), f.base.greenF(), f.base.blueF());
+    node->baseAlpha = static_cast<float>(f.base.alphaF());
+    node->emphaseColor.setValue(f.emphase.redF(), f.emphase.greenF(), f.emphase.blueF());
+    node->emphaseAlpha = static_cast<float>(f.emphase.alphaF());
+    node->hiliteColor.setValue(f.hilite.redF(), f.hilite.greenF(), f.hilite.blueF());
+    node->hiliteAlpha = static_cast<float>(f.hilite.alphaF());
+    node->viewportRect = f.viewportRect;
+    node->cameraOrientation = f.cameraOrientation;
+    node->cameraIsOrthographic = f.orthographic;
+}
+}  // namespace
 
 class NaviCubeImplementation
 {
@@ -197,6 +235,20 @@ private:
     Gui::View3DInventorViewer* viewer;
 
     Gui::SoNaviCube* soNaviCube = nullptr;
+    Gui::SoViewCube* soViewCube = nullptr;
+    NaviCube::Style style = NaviCube::Style::FuCadUp;
+
+public:
+    void setStyle(NaviCube::Style newStyle);
+    NaviCube::Style currentStyle() const
+    {
+        return style;
+    }
+
+private:
+    SoNode* activeNode() const;
+    void setActiveLabelImage(PickId id, const SbVec2s& size, const unsigned char* pixels);
+    PickId pickActive(const SbVec2s& point) const;
 
     map<PickId, LabelTexture> labelTextures;
 
@@ -385,6 +437,8 @@ NaviCubeImplementation::NaviCubeImplementation(Gui::View3DInventorViewer* viewer
 {
     soNaviCube = new Gui::SoNaviCube();
     soNaviCube->ref();
+    soViewCube = new Gui::SoViewCube();
+    soViewCube->ref();
 
     coinRoot = new SoSeparator();
     coinRoot->ref();
@@ -393,7 +447,7 @@ NaviCubeImplementation::NaviCubeImplementation(Gui::View3DInventorViewer* viewer
     actionSync = new SoCallback();
     actionSync->setCallback(NaviCubeImplementation::traversalCallback, this);
     coinRoot->addChild(actionSync);
-    coinRoot->addChild(soNaviCube);
+    coinRoot->addChild(activeNode());
 
     this->viewer = viewer;
     menu = createNaviCubeMenu();
@@ -412,11 +466,65 @@ NaviCubeImplementation::~NaviCubeImplementation()
         soNaviCube->unref();
         soNaviCube = nullptr;
     }
+    if (soViewCube) {
+        soViewCube->clearLabelTextures();
+        soViewCube->unref();
+        soViewCube = nullptr;
+    }
 }
 
 SoNode* NaviCubeImplementation::getCoinNode() const
 {
     return coinRoot;
+}
+
+SoNode* NaviCubeImplementation::activeNode() const
+{
+    return style == NaviCube::Style::Classic ? static_cast<SoNode*>(soNaviCube)
+                                             : static_cast<SoNode*>(soViewCube);
+}
+
+void NaviCubeImplementation::setStyle(NaviCube::Style newStyle)
+{
+    if (newStyle == style) {
+        return;
+    }
+    SoNode* old = activeNode();
+    style = newStyle;
+    coinRoot->replaceChild(old, activeNode());
+    // The new node has not had the label textures yet.
+    prepared = false;
+    requestRedraw();
+}
+
+void NaviCubeImplementation::setActiveLabelImage(
+    PickId id,
+    const SbVec2s& size,
+    const unsigned char* pixels
+)
+{
+    if (style == NaviCube::Style::Classic) {
+        soNaviCube->setLabelImage(id, size, 4, pixels);
+    }
+    else {
+        soViewCube->setLabelImage(id, size, 4, pixels);
+    }
+}
+
+PickId NaviCubeImplementation::pickActive(const SbVec2s& point) const
+{
+    return style == NaviCube::Style::Classic ? soNaviCube->pickAt(point)
+                                             : soViewCube->pickAt(point);
+}
+
+void NaviCube::setStyle(Style style)
+{
+    naviCubeImplementation->setStyle(style);
+}
+
+NaviCube::Style NaviCube::style() const
+{
+    return naviCubeImplementation->currentStyle();
 }
 
 void NaviCubeImplementation::traversalCallback(void* userdata, SoAction* action)
@@ -477,14 +585,14 @@ void NaviCubeImplementation::syncNodeState(SoAction* action)
     }
 
     if (!isGLRender) {
-        soNaviCube->touch();
+        activeNode()->touch();
     }
 }
 
 void NaviCubeImplementation::requestRedraw(bool touchNode)
 {
-    if (touchNode && soNaviCube) {
-        soNaviCube->touch();
+    if (touchNode && activeNode()) {
+        activeNode()->touch();
     }
     if (viewer) {
         if (auto* rm = viewer->getSoRenderManager()) {
@@ -791,7 +899,7 @@ void NaviCubeImplementation::createCubeFaceTextures()
             std::memcpy(dst, src, static_cast<size_t>(w) * 4U);
         }
 
-        soNaviCube->setLabelImage(pickId, SbVec2s(w, h), 4, pixels.data());
+        setActiveLabelImage(pickId, SbVec2s(w, h), pixels.data());
     }
 }
 
@@ -835,44 +943,49 @@ bool NaviCubeImplementation::populateRenderParams(
         return false;
     }
 
-    soNaviCube->size = static_cast<float>(cubeWidgetSize);
-    soNaviCube->opacity = opacity;
-    soNaviCube->borderWidth = static_cast<float>(borderWidth);
-    soNaviCube->showCoordinateSystem = showCS;
-    soNaviCube->hiliteId = static_cast<int>(hiliteId);
-    soNaviCube->baseColor.setValue(baseColor.redF(), baseColor.greenF(), baseColor.blueF());
-    soNaviCube->baseAlpha = static_cast<float>(baseColor.alphaF());
-    soNaviCube->emphaseColor.setValue(emphaseColor.redF(), emphaseColor.greenF(), emphaseColor.blueF());
-    soNaviCube->emphaseAlpha = static_cast<float>(emphaseColor.alphaF());
-    soNaviCube->hiliteColor.setValue(hiliteColor.redF(), hiliteColor.greenF(), hiliteColor.blueF());
-    soNaviCube->hiliteAlpha = static_cast<float>(hiliteColor.alphaF());
-    soNaviCube->axisXColor.setValue(
-        static_cast<float>(xColor.r),
-        static_cast<float>(xColor.g),
-        static_cast<float>(xColor.b)
-    );
-    soNaviCube->axisYColor.setValue(
-        static_cast<float>(yColor.r),
-        static_cast<float>(yColor.g),
-        static_cast<float>(yColor.b)
-    );
-    soNaviCube->axisZColor.setValue(
-        static_cast<float>(zColor.r),
-        static_cast<float>(zColor.g),
-        static_cast<float>(zColor.b)
-    );
+    const SharedCubeFields fields {
+        .size = static_cast<float>(cubeWidgetSize),
+        .opacity = opacity,
+        .borderWidth = static_cast<float>(borderWidth),
+        .hiliteId = static_cast<int>(hiliteId),
+        .base = baseColor,
+        .emphase = emphaseColor,
+        .hilite = hiliteColor,
+        .viewportRect = SbVec4f(
+            static_cast<float>(viewportX),
+            static_cast<float>(viewportY),
+            static_cast<float>(viewportWidth),
+            static_cast<float>(viewportHeight)
+        ),
+        .cameraOrientation = cam->orientation.getValue(),
+        .orthographic
+        = cam->getTypeId().isDerivedFrom(SoOrthographicCamera::getClassTypeId()) != FALSE,
+    };
 
-    SbVec4f rect(
-        static_cast<float>(viewportX),
-        static_cast<float>(viewportY),
-        static_cast<float>(viewportWidth),
-        static_cast<float>(viewportHeight)
-    );
-    soNaviCube->viewportRect = rect;
-    soNaviCube->cameraOrientation = cam->orientation.getValue();
-    soNaviCube->cameraIsOrthographic = cam->getTypeId().isDerivedFrom(
-        SoOrthographicCamera::getClassTypeId()
-    );
+    if (style == NaviCube::Style::Classic) {
+        writeSharedFields(soNaviCube, fields);
+        soNaviCube->showCoordinateSystem = showCS;
+        soNaviCube->axisXColor.setValue(
+            static_cast<float>(xColor.r),
+            static_cast<float>(xColor.g),
+            static_cast<float>(xColor.b)
+        );
+        soNaviCube->axisYColor.setValue(
+            static_cast<float>(yColor.r),
+            static_cast<float>(yColor.g),
+            static_cast<float>(yColor.b)
+        );
+        soNaviCube->axisZColor.setValue(
+            static_cast<float>(zColor.r),
+            static_cast<float>(zColor.g),
+            static_cast<float>(zColor.b)
+        );
+    }
+    else {
+        writeSharedFields(soViewCube, fields);
+        soViewCube->controlsOpacity = hovering ? 1.0F : 0.0F;
+        soViewCube->controlsLive = hovering;
+    }
 
     return true;
 }
@@ -922,7 +1035,7 @@ PickId NaviCubeImplementation::pickFace(short x, short y)
 
     const int center = viewportSize / 2;
     const SbVec2s point(static_cast<short>(2 * x + center), static_cast<short>(2 * y + center));
-    const PickId picked = soNaviCube->pickAt(point);
+    const PickId picked = pickActive(point);
 
     return picked;
 }
@@ -1197,8 +1310,11 @@ void NaviCubeImplementation::setHilite(PickId hilite)
 {
     if (hilite != hiliteId) {
         hiliteId = hilite;
-        if (soNaviCube) {
+        if (style == NaviCube::Style::Classic) {
             soNaviCube->hiliteId = static_cast<int>(hiliteId);
+        }
+        else {
+            soViewCube->hiliteId = static_cast<int>(hiliteId);
         }
         viewer->getSoRenderManager()->scheduleRedraw();
     }
