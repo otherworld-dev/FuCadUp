@@ -131,4 +131,5 @@ FreeCAD.__unit_test__ += [
     "TestPartDesignDialogTitles",
     "TestRibbonStrings",
     "TestSketchStatusChip",
+    "TestGridUnits",
 ]

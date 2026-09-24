@@ -27,7 +27,6 @@
 #include <Inventor/SbVec3f.h>
 #include <Inventor/sensors/SoNodeSensor.h>
 
-#include <Base/Parameter.h>
 #include <FCGlobal.h>
 
 class SoSeparator;
@@ -117,11 +116,11 @@ struct GuiExport ViewportGridLayout
  * its own.
  * @author FuCad contributors
  */
-class GuiExport ViewportGrid: public ParameterGrp::ObserverType
+class GuiExport ViewportGrid
 {
 public:
     explicit ViewportGrid(View3DInventorViewer* viewer);
-    ~ViewportGrid() override;
+    ~ViewportGrid();
 
     ViewportGrid(const ViewportGrid&) = delete;
     ViewportGrid& operator=(const ViewportGrid&) = delete;
@@ -157,9 +156,6 @@ public:
      */
     void rebuild(bool cameraDriven = false);
 
-    /// The unit schema changed, so the base spacing is due to be read again.
-    void OnChange(ParameterGrp::SubjectType& rCaller, ParameterGrp::MessageType reason) override;
-
 private:
     static void cameraChanged(void* data, SoSensor* sensor);
 
@@ -173,12 +169,8 @@ private:
     View3DInventorViewer* viewer;
     SoSeparator* root;
     SoNodeSensor cameraSensor;
-    /// Watched for "UserSchema", which is how the unit schema changes.
-    ParameterGrp::handle unitParameters;
     /// 10 mm for a metric unit schema, 25.4 mm (1 in) for an imperial one.
     double baseSpacing;
-    /// Set by the observer, acted on by the next syncViewport(); see OnChange().
-    bool baseSpacingStale {false};
     bool enabled {true};
     bool suspended {false};
     SbVec3f lastFocalPoint {0.0F, 0.0F, 0.0F};

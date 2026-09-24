@@ -60,6 +60,7 @@ SET(Test_SRCS
     TestMarkingMenu.py
     TestTimeline.py
     TestPartDesignDialogTitles.py
+    TestGridUnits.py
     TestRibbonStrings.py
     TestSketchStatusChip.py
     # Not a suite: pins the preferences a GUI test depends on and puts them back.
