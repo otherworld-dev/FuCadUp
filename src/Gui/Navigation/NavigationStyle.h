@@ -313,6 +313,10 @@ protected:
     void lookAtPoint(const SbVec2s screenpos);
     void lookAtPoint(const SbVec3f& position);
 
+    /** \a vpaspect is accepted for source compatibility with all 23 existing call sites but is no
+     * longer read - the viewport is fetched live from \c viewer instead, so a resize mid-gesture
+     * is honoured rather than a value some callers cache once at gesture start. See the comment
+     * above the viewport read in the .cpp for why that is deliberate. */
     void panCamera(
         SoCamera* camera,
         float vpaspect,

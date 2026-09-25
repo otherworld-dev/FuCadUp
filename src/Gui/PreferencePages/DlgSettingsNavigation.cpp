@@ -116,6 +116,7 @@ void DlgSettingsNavigation::saveSettings()
     ui->prefCubeSize->onSave();
     ui->naviCubeBaseColor->onSave();
     ui->naviCubeInactiveOpacity->onSave();
+    ui->naviCubeStyle->onSave();
     ui->legacySpaceMouseDevices->onSave();
     if (property("LegacySpaceMouse").toBool() != ui->legacySpaceMouseDevices->isChecked()) {
         requireRestart();
@@ -167,6 +168,7 @@ void DlgSettingsNavigation::loadSettings()
     ui->prefCubeSize->onRestore();
     ui->naviCubeBaseColor->onRestore();
     ui->naviCubeInactiveOpacity->onRestore();
+    ui->naviCubeStyle->onRestore();
     ui->legacySpaceMouseDevices->onRestore();
     setProperty("LegacySpaceMouse", ui->legacySpaceMouseDevices->isChecked());
 
@@ -349,12 +351,14 @@ void DlgSettingsNavigation::changeEvent(QEvent* e)
         int navigation = ui->comboNavigationStyle->currentIndex();
         int orbit = ui->comboOrbitStyle->currentIndex();
         int corner = ui->naviCubeCorner->currentIndex();
+        int cubeStyle = ui->naviCubeStyle->currentIndex();
         ui->retranslateUi(this);
         retranslate();
         translateOrientations();
         ui->comboNavigationStyle->setCurrentIndex(navigation);
         ui->comboOrbitStyle->setCurrentIndex(orbit);
         ui->naviCubeCorner->setCurrentIndex(corner);
+        ui->naviCubeStyle->setCurrentIndex(cubeStyle);
     }
     else {
         QWidget::changeEvent(e);

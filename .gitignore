@@ -74,8 +74,9 @@ tsupdate_stdout.log
 *.egg-info
 .pixi
 
-# Claude Code
+# Claude
 .claude/
 CLAUDE.md
-.claudeignore
+.mcp.json
 .superpowers/
+docs/superpowers/

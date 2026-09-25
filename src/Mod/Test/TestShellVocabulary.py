@@ -21,19 +21,19 @@
 
 """GUI regression tests for the vocabulary the shell puts on screen.
 
-A workbench is an implementation detail of the core this forks from, so no
-workbench name belongs in the shell. Two places used to leak one. The block at
-the left of the ribbon held the core's own workbench chooser, so it read
-"Part Design" whilst the tab beside it read SOLID, two names for one mode. And
-a tab the workspace does not describe is generated from the active workbench
-and titled after it, so hiding a tab without care puts the workbench name back
-on screen in place of the one that was removed.
+A workbench is an implementation detail of the core this forks from, so where
+the ribbon has a name of its own for one, that is the name the shell shows. Two
+places used to leak the core's. The block at the left of the ribbon held the
+core's own workbench chooser, so it read "Part Design" whilst the tab beside it
+read SOLID, two names for one mode. And a tab the workspace does not describe is
+generated from the active workbench and titled after it, so hiding a tab without
+care puts the workbench name back on screen in place of the one that was removed.
 
-The workspace block therefore names the workspace the ribbon loaded, and never
-follows the workbench. The tabs that are only command lists over an upstream
-workbench are not offered by default, but the tab defined for one comes back
-whilst its workbench is active, which keeps the generated tab from appearing in
-its place.
+The block now opens the workbench switcher and names the area on screen the way
+the tabs do: SOLID in Part Design, MESH in Mesh. The tabs that are only command
+lists over an upstream workbench are not offered by default, but the tab defined
+for one comes back whilst its workbench is active, which keeps the generated tab
+from appearing in its place, and leaves again with it however the user leaves.
 
 The start page is held to the same rule, being the first screen a user meets.
 
@@ -50,9 +50,6 @@ from PySide import QtWidgets
 
 MAIN_WINDOW_PARAMS = "User parameter:BaseApp/Preferences/MainWindow"
 
-# src/Gui/Ribbon/Workspaces/Design.json carries this as its "name".
-WORKSPACE_NAME = "Design"
-
 # The tab the fork has designed, and one it has not, see the same file.
 DESIGNED_TAB = "SOLID"
 PASSTHROUGH_TAB = "MESH"
@@ -61,8 +58,8 @@ PASSTHROUGH_WORKBENCH = "MeshWorkbench"
 # Every tab that is only a command list over an upstream workbench.
 PASSTHROUGH_TABS = ("SURFACE", "MESH", "DRAWING", "MANUFACTURE", "SIMULATION")
 
-# What the workspace block must never show, being workbench menu text.
-WORKBENCH_NAMES = ("Part Design", "Sketcher", "Mesh")
+# The core's names for the workbench behind SOLID, which the block must not show.
+WORKBENCH_NAMES = ("Part Design", "Sketcher")
 
 
 class RibbonWorkspaceTestCase(unittest.TestCase):
@@ -124,19 +121,29 @@ class RibbonWorkspaceTestCase(unittest.TestCase):
                 texts.append(child.currentText())
             elif isinstance(child, (QtWidgets.QLabel, QtWidgets.QAbstractButton)):
                 texts.append(child.text())
+        # Without the arrow that says the block opens something.
+        texts = [text.replace("\u25be", "").strip() for text in texts]
         return [text for text in texts if text]
+
+    def _wait_for_block(self, title, timeout_ms=3000):
+        deadline = time.monotonic() + (timeout_ms / 1000.0)
+        while True:
+            texts = self._workspace_texts() or []
+            if title in [text.upper() for text in texts] or time.monotonic() >= deadline:
+                return texts
+            self._process_events(20)
 
 
 class TestWorkspaceBlock(RibbonWorkspaceTestCase):
-    """The block at the left of the ribbon names a workspace, not a workbench."""
+    """The block at the left of the ribbon names the area on screen, as the tabs do."""
 
-    def test_the_block_names_the_workspace(self):
+    def test_the_block_names_the_area_on_screen(self):
         texts = self._workspace_texts()
         self.assertIsNotNone(texts, "Expected a RibbonWorkspaceBlock in the ribbon")
         self.assertIn(
-            WORKSPACE_NAME.upper(),
+            DESIGNED_TAB,
             [text.upper() for text in texts],
-            "The workspace block should name the loaded workspace, showed " + repr(texts),
+            "The block should name the SOLID area in Part Design, showed " + repr(texts),
         )
 
     def test_the_block_shows_no_workbench_name(self):
@@ -150,17 +157,14 @@ class TestWorkspaceBlock(RibbonWorkspaceTestCase):
                 "The workspace block showed the workbench name " + repr(name),
             )
 
-    def test_the_block_does_not_follow_the_active_workbench(self):
-        before = self._workspace_texts()
-        self.assertIsNotNone(before, "Expected a RibbonWorkspaceBlock in the ribbon")
-
+    def test_the_block_follows_the_workbench(self):
         FreeCADGui.activateWorkbench(PASSTHROUGH_WORKBENCH)
-        self._process_events(200)
+        texts = self._wait_for_block(PASSTHROUGH_TAB)
 
-        self.assertEqual(
-            before,
-            self._workspace_texts(),
-            "Switching workbench changed what the workspace block shows",
+        self.assertIn(
+            PASSTHROUGH_TAB,
+            [text.upper() for text in texts],
+            "The block should name the MESH area whilst Mesh is active, showed " + repr(texts),
         )
 
 
@@ -211,6 +215,26 @@ class TestPassthroughTabs(RibbonWorkspaceTestCase):
             PASSTHROUGH_TAB,
             titles,
             "The passthrough tab stayed behind after its workbench was left",
+        )
+
+    def test_a_passthrough_tab_leaves_when_another_tab_is_clicked(self):
+        """Clicking SOLID leaves Mesh too, and used to leave the MESH tab behind."""
+
+        FreeCADGui.activateWorkbench(PASSTHROUGH_WORKBENCH)
+        self._wait_for_tab(PASSTHROUGH_TAB, present=True)
+
+        self.tab_bar.setCurrentIndex(self._tab_titles().index(DESIGNED_TAB))
+        titles = self._wait_for_tab(PASSTHROUGH_TAB, present=False)
+
+        self.assertNotIn(
+            PASSTHROUGH_TAB,
+            titles,
+            "The passthrough tab stayed behind after another tab was clicked",
+        )
+        self.assertEqual(
+            self.tab_bar.tabText(self.tab_bar.currentIndex()),
+            DESIGNED_TAB,
+            "The tab that was clicked should still be the current one",
         )
 
 

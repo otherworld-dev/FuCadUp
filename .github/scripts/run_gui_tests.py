@@ -37,6 +37,7 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -178,27 +179,55 @@ def _kill_process_tree(proc: subprocess.Popen) -> None:
     proc.kill()
 
 
-def run_module(fucad_exec: str, module: str, timeout: float) -> tuple[int, str, bool]:
-    """Run one test module in its own process and return (returncode, output, timed_out)."""
-    try:
-        proc = subprocess.Popen(
-            [fucad_exec, "-t", module],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            errors="replace",
-            start_new_session=(os.name == "posix"),
-        )
-    except FileNotFoundError:
-        return 127, f"Executable not found: {fucad_exec}\n", False
+def watchdog_delay(timeout: float) -> float:
+    """How long into a run TestApp dumps its stacks: late enough that only a module that is
+    about to be killed gets one, early enough that the dump is written before the kill."""
+    return max(timeout - 15.0, timeout * 0.9)
 
+
+def run_module(fucad_exec: str, module: str, timeout: float) -> tuple[int, str, bool]:
+    """Run one test module in its own process and return (returncode, output, timed_out).
+
+    A hung module's output ends with the Python stack of every thread shortly before it was
+    killed (TestApp._armWatchdog), so the log says where it was stuck and not just that it was.
+    """
+    fd, stacks_path = tempfile.mkstemp(prefix="fucad-test-stacks-", suffix=".txt")
+    os.close(fd)
+    env = dict(os.environ)
+    env["FREECAD_TEST_WATCHDOG"] = f"{watchdog_delay(timeout):.0f}"
+    env["FREECAD_TEST_WATCHDOG_FILE"] = stacks_path
     try:
-        out, _ = proc.communicate(timeout=timeout)
-        return proc.returncode, out or "", False
-    except subprocess.TimeoutExpired:
-        _kill_process_tree(proc)
-        out, _ = proc.communicate()
-        return proc.returncode, out or "", True
+        try:
+            proc = subprocess.Popen(
+                [fucad_exec, "-t", module],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                errors="replace",
+                start_new_session=(os.name == "posix"),
+                env=env,
+            )
+        except FileNotFoundError:
+            return 127, f"Executable not found: {fucad_exec}\n", False
+
+        try:
+            out, _ = proc.communicate(timeout=timeout)
+            return proc.returncode, out or "", False
+        except subprocess.TimeoutExpired:
+            _kill_process_tree(proc)
+            out, _ = proc.communicate()
+            stacks = Path(stacks_path).read_text(errors="replace").strip()
+            if stacks:
+                out = (out or "") + (
+                    f"\n--- Python stacks {watchdog_delay(timeout):.0f}s into the run ---\n"
+                    f"{stacks}\n"
+                )
+            return proc.returncode, out or "", True
+    finally:
+        try:
+            os.unlink(stacks_path)
+        except OSError:
+            pass
 
 
 def classify(returncode: int, output: str, timed_out: bool) -> str:

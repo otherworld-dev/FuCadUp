@@ -45,7 +45,7 @@ FILTER_CHORDS = (
 
 # The commands that can dimension the radius of a selected circle from a "K, x"
 # chord, most specific first; see _live_radius_chord below.
-RADIUS_COMMANDS = ("Sketcher_CompConstrainRadDia", "Sketcher_ConstrainRadius")
+RADIUS_COMMANDS = ("Sketcher_ConstrainRadiam", "Sketcher_ConstrainRadius")
 
 
 class TestFusionShortcuts(unittest.TestCase):
@@ -209,6 +209,19 @@ class TestFusionShortcuts(unittest.TestCase):
         found = [action.shortcut().toString() for action in actions]
         self.assertEqual(found, [chord for _, chord in FILTER_CHORDS])
 
+    def test_k_c_is_bound_in_the_default_dimensioning_mode(self):
+        """K, C dimensions a circle without SeparatedDimensioningTools switched on.
+
+        It used to sit on Sketcher_CompConstrainRadDia, a drop-down that only builds
+        an action in the separated mode, so in the default mode the chord did nothing.
+        """
+
+        hGeneral = FreeCAD.ParamGet(SKETCHER_PARAMS + "/dimensioning")
+        if hGeneral.GetBool("SeparatedDimensioningTools", False):
+            self.skipTest("SeparatedDimensioningTools is on in this profile")
+        self.assertEqual(self._shortcut_of("Sketcher_ConstrainRadiam"), "K, C")
+        self.assertEqual(self._live_radius_chord(), ("Sketcher_ConstrainRadiam", "K, C"))
+
     def test_placement_and_measure_inactive_inside_sketch(self):
         body = self.doc.addObject("PartDesign::Body", "Body")
         sketch = body.newObject("Sketcher::SketchObject", "Sketch")
@@ -261,12 +274,10 @@ class TestFusionShortcuts(unittest.TestCase):
     def _live_radius_chord(self):
         """A "K, x" chord that is really bound, and the command it belongs to.
 
-        DefaultShortcuts.cpp puts Sketcher_CompConstrainRadDia on "K, C", but a
-        command only carries a shortcut once something has built its action, and
-        nothing puts that grouped command in a menu, a toolbar or the ribbon - the
-        radius dimension is reached through Sketcher_ConstrainRadius, which keeps
-        its own "K, R". Follow whichever is live rather than pressing a chord that
-        is bound to nothing.
+        DefaultShortcuts.cpp puts Sketcher_ConstrainRadiam on "K, C", but a
+        command only carries a shortcut once something has built its action, so
+        fall back to Sketcher_ConstrainRadius, which keeps its own "K, R", rather
+        than pressing a chord that is bound to nothing.
         """
 
         for command in RADIUS_COMMANDS:

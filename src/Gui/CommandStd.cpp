@@ -50,6 +50,8 @@
 #include "MainWindow.h"
 #include "OnlineDocumentation.h"
 #include "Ribbon/CommandPalette.h"
+#include "Ribbon/RibbonBar.h"
+#include "Ribbon/WorkbenchSwitcher.h"
 #include "Selection.h"
 #include "WhatsThis.h"
 #include "Workbench.h"
@@ -906,6 +908,37 @@ void StdCmdCommandPalette::activated(int)
 }
 
 //===========================================================================
+// Std_WorkbenchSwitcher
+//===========================================================================
+DEF_STD_CMD(StdCmdWorkbenchSwitcher)
+
+StdCmdWorkbenchSwitcher::StdCmdWorkbenchSwitcher()
+    : Command("Std_WorkbenchSwitcher")
+{
+    sGroup = "View";
+    sMenuText = QT_TR_NOOP("Switch Workbench");
+    sToolTipText = QT_TR_NOOP(
+        "Lists the ribbon's areas, the recent workbenches and every other one. Type to "
+        "narrow the list and press Enter to switch."
+    );
+    sWhatsThis = "Std_WorkbenchSwitcher";
+    sStatusTip = sToolTipText;
+    sAccel = "Ctrl+Shift+W";
+    eType = 0;
+}
+
+void StdCmdWorkbenchSwitcher::activated(int)
+{
+    // Under the ribbon's block when there is a ribbon, so the list opens where
+    // the mouse would have opened it; under the cursor otherwise.
+    if (auto* bar = getMainWindow()->findChild<Ribbon::RibbonBar*>()) {
+        bar->showWorkbenchSwitcher();
+        return;
+    }
+    Ribbon::WorkbenchSwitcher::instance()->popUp(nullptr);
+}
+
+//===========================================================================
 // StdCmdUserEditMode
 //===========================================================================
 class StdCmdUserEditMode: public Gui::Command
@@ -1129,6 +1162,7 @@ void CreateStdCommands()
     rcCmdMgr.addCommand(new StdCmdDlgCustomize());
     rcCmdMgr.addCommand(new StdCmdCommandLine());
     rcCmdMgr.addCommand(new StdCmdCommandPalette());
+    rcCmdMgr.addCommand(new StdCmdWorkbenchSwitcher());
     rcCmdMgr.addCommand(new StdCmdWorkbench());
     rcCmdMgr.addCommand(new StdCmdRecentFiles());
     rcCmdMgr.addCommand(new StdCmdRecentMacros());

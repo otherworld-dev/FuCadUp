@@ -608,7 +608,7 @@ void SoFCColorBar::setMode(ColorScaleMode mode)
 float SoFCColorBar::getBoundingWidth(const SbVec2s& size)
 {
     const float ratio = static_cast<float>(size[0]) / static_cast<float>(size[1]);
-    if (ratio >= 1.0F && boxWidth >= 0.0F) {
+    if (ratio >= 1.0F && boxWidth >= 0.0F && boxWidthSize == size) {
         return boxWidth;
     }
 
@@ -631,6 +631,7 @@ float SoFCColorBar::getBoundingWidth(const SbVec2s& size)
     group->unref();
 
     boxWidth = maximum[0] - minimum[0];
+    boxWidthSize = size;
     return boxWidth;
 }
 

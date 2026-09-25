@@ -22,7 +22,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 #include <locale>
 #include <sstream>
 #include <string>
@@ -40,7 +39,6 @@
 #include <Inventor/nodes/SoTransparencyType.h>
 #include <Inventor/nodes/SoVertexProperty.h>
 
-#include <App/Application.h>
 #include <Base/Console.h>
 #include <Base/UnitsApi.h>
 
@@ -62,10 +60,6 @@ constexpr double imperialBaseSpacing = 25.4;
 constexpr int subdivision = 10;
 constexpr int pixelThreshold = 15;
 
-// Where the unit schema is kept; "UserSchema" is the key App::Application and
-// MainWindow's unit chooser both write.
-const char* const unitPreferences = "User parameter:BaseApp/Preferences/Units";
-const char* const unitSchemaKey = "UserSchema";
 // How far beyond the visible area the lines reach, so that a pan of less than
 // a tenth of the view needs no rebuild.
 constexpr double extentFactor = 1.5;
@@ -132,8 +126,8 @@ double ViewportGridLayout::spacingFor(
     // A subdivision of one cannot serve as a scale factor, so the sketch grid
     // steps by ten in that case and this follows suit.
     const int factor = subdivision <= 1 ? 10 : subdivision;
-    const double exponent
-        = 1.0 + std::floor(std::log(visibleExtent / lines / baseSpacing) / std::log(factor));
+    const double exponent = 1.0
+        + std::floor(std::log(visibleExtent / lines / baseSpacing) / std::log(factor));
     const double spacing = baseSpacing * std::pow(factor, exponent);
 
     if (!std::isfinite(spacing) || spacing <= 0.0) {
@@ -183,7 +177,6 @@ int ViewportGridLayout::lineCount() const
 ViewportGrid::ViewportGrid(View3DInventorViewer* viewer)
     : viewer(viewer)
     , root(new SoSeparator)
-    , unitParameters(App::GetApplication().GetParameterGroupByPath(unitPreferences))
     , baseSpacing(gridBaseSpacing())
 {
     root->ref();
@@ -191,29 +184,13 @@ ViewportGrid::ViewportGrid(View3DInventorViewer* viewer)
 
     cameraSensor.setFunction(&ViewportGrid::cameraChanged);
     cameraSensor.setData(this);
-
-    unitParameters->Attach(this);
 }
 
 ViewportGrid::~ViewportGrid()
 {
-    unitParameters->Detach(this);
     cameraSensor.detach();
     root->removeAllChildren();
     root->unref();
-}
-
-void ViewportGrid::OnChange(ParameterGrp::SubjectType&, ParameterGrp::MessageType reason)
-{
-    // A null reason means the whole group changed, so it counts too.
-    if (reason && std::strcmp(reason, unitSchemaKey) != 0) {
-        return;
-    }
-
-    // Base::UnitsApi::setSchema() runs after the parameter has been written (see
-    // MainWindow's unit chooser and DlgSettingsUnits), so reading the new spacing
-    // here would still see the old schema. Leave it to the next frame instead.
-    baseSpacingStale = true;
 }
 
 SoSeparator* ViewportGrid::getNode() const
@@ -266,14 +243,14 @@ void ViewportGrid::syncViewport()
         return;
     }
 
-    if (baseSpacingStale) {
-        baseSpacingStale = false;
-        const double spacing = gridBaseSpacing();
-        if (spacing != baseSpacing) {
-            baseSpacing = spacing;
-            rebuild();
-            return;
-        }
+    // The unit schema is asked for directly rather than watched through the
+    // "UserSchema" preference: with a document open the status-bar unit chooser
+    // only sets the document's UnitSystem, and switching documents or editing
+    // that property never touch the preference either.
+    if (const double spacing = gridBaseSpacing(); spacing != baseSpacing) {
+        baseSpacing = spacing;
+        rebuild();
+        return;
     }
 
     // Switching between orthographic and perspective replaces the camera; the
@@ -317,8 +294,8 @@ bool ViewportGrid::cameraMovedEnough()
     const bool below = cameraBelowPlane();
 
     const bool zoomed = std::fabs(maxDimension - lastMaxDimension) > 0.0F;
-    const bool panned
-        = (focalPoint - lastFocalPoint).length() > focalPointMoveFraction * maxDimension;
+    const bool panned = (focalPoint - lastFocalPoint).length()
+        > focalPointMoveFraction * maxDimension;
     const bool crossedPlane = below != lastCameraBelowPlane;
 
     if (!zoomed && !panned && !crossedPlane) {

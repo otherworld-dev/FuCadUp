@@ -149,6 +149,10 @@ _SNAPSHOT_FIXTURES = {
     "SoNaviCube": _SnapshotFixture(),
     "SoNaviCubeTranslucent": _SnapshotFixture(),
     "SoNaviCubeHiliteFront": _SnapshotFixture(),
+    "SoViewCube": _SnapshotFixture(),
+    "SoViewCubeHiliteEdge": _SnapshotFixture(),
+    "SoViewCubeHiliteCorner": _SnapshotFixture(),
+    "SoViewCubeFaceOnControls": _SnapshotFixture(),
     **{name: _SnapshotFixture(required_modules=("PartGui",)) for name in _PART_GUI_NODES},
     **{name: _SnapshotFixture(required_modules=("MeshGui",)) for name in _MESH_GUI_NODES},
 }
@@ -872,6 +876,51 @@ def _make_scene_for_node(type_name: str, fixture: _SnapshotFixture):
 
         # Mimic what the controller does: orient the cube from the viewer camera.
         cube.cameraOrientation.setValue(cam.orientation.getValue())
+        root.addChild(cube)
+        return root
+
+    if type_name in (
+        "SoViewCube",
+        "SoViewCubeHiliteEdge",
+        "SoViewCubeHiliteCorner",
+        "SoViewCubeFaceOnControls",
+    ):
+        # A visible background, as the faces are see-through.
+        grad = _instantiate("SoFCBackgroundGradient")
+        _configure_background_gradient(
+            grad,
+            coin.SbColor(0.15, 0.15, 0.20),
+            coin.SbColor(0.45, 0.45, 0.55),
+        )
+        root.addChild(grad)
+
+        cube = _instantiate("SoViewCube")
+        cube.opacity.setValue(1.0)
+        cube.borderWidth.setValue(1.0)
+        cube.cameraIsOrthographic.setValue(True)
+        # Gui::SoNaviCube::PickId: FrontTop = 7, FrontTopRight = 19 (see SoNaviCube.h).
+        if type_name == "SoViewCubeHiliteEdge":
+            cube.hiliteId.setValue(7)
+        elif type_name == "SoViewCubeHiliteCorner":
+            cube.hiliteId.setValue(19)
+        width = float(_SNAPSHOT_WIDTH)
+        height = float(_SNAPSHOT_HEIGHT)
+        overlay = max(64.0, min(width, height) * 0.60)
+        margin = 8.0
+        cube.viewportRect.setValue(
+            width - overlay - margin,
+            height - overlay - margin,
+            overlay,
+            overlay,
+        )
+        if type_name == "SoViewCubeFaceOnControls":
+            # Looking straight at FRONT, pointer over the cube, home hovered (PickId::Home = 34).
+            cube.controlsOpacity.setValue(1.0)
+            cube.controlsLive.setValue(True)
+            cube.hiliteId.setValue(34)
+            cube.cameraOrientation.setValue(coin.SbRotation(coin.SbVec3f(1, 0, 0), 1.5707964))
+        else:
+            cube.cameraOrientation.setValue(cam.orientation.getValue())
         root.addChild(cube)
         return root
 
@@ -2165,6 +2214,63 @@ class CoinNodeSnapshotTestCase(unittest.TestCase):
             0,
             f"grid should not fall back to Coin's default material color: {actual_path}",
         )
+
+    def test_so_fc_color_bar_follows_the_render_size(self):
+        """Lay the color bar out again when it is drawn at another size.
+
+        The bar kept the label width it first measured and reused it at every later size.
+        Labels are a fixed number of pixels, so a width measured in a larger view is too
+        narrow for a smaller one and pushed the bar off to the right with its labels cut
+        off. Setting a scene graph redraws the on-screen view before a capture, so at 150%
+        display scaling every snapshot after the first was measured at 768 px, not 512.
+        """
+        _require_gui()
+        if bool(os.environ.get("CI", "").strip()) and not sys.platform.startswith("linux"):
+            self.skipTest("baselines are rendered on Linux; other CI platforms only smoke-test")
+        try:
+            baseline_dir = _baseline_dir()
+        except FileNotFoundError as exc:
+            raise unittest.SkipTest(str(exc)) from exc
+
+        width = _SNAPSHOT_WIDTH
+        height = _SNAPSHOT_HEIGHT
+        out_dir = Path(
+            os.environ.get(
+                "FC_VISUAL_OUT_DIR",
+                os.path.join(tempfile.gettempdir(), "FreeCADTesting", "CoinNodeSnapshots"),
+            )
+        )
+        name = "SoFCColorBarAfterLargerRender"
+        actual_path = out_dir / "actual" / f"{name}.png"
+        expected_path = out_dir / "expected" / f"{name}.png"
+        expected_path.parent.mkdir(parents=True, exist_ok=True)
+        expected_path.write_bytes((baseline_dir / "SoFCColorBar.png").read_bytes())
+
+        scene = _make_snapshot_scene("SoFCColorBar")
+        with _ViewerSnapshotHarness(width, height) as harness:
+            harness.viewer.setSceneGraph(scene.root)
+            larger = harness.viewer.renderToImage(
+                width=4 * width, height=4 * height, samples=0, includeViewerLighting=False
+            )
+            self.assertFalse(larger.isNull(), "the larger render did not produce an image")
+            _render_png(
+                harness,
+                scene.root,
+                actual_path,
+                width,
+                height,
+                framing_policy=scene.framing_policy,
+            )
+
+        ok, msg = _compare_images(
+            expected_path,
+            actual_path,
+            out_dir / "diff" / f"{name}.png",
+            tolerance=_PIXEL_TOLERANCE,
+            ignore_alpha=_IGNORE_ALPHA,
+            max_mismatched_pixels=int((width * height) * (_MAX_MISMATCH_PCT / 100.0)),
+        )
+        self.assertTrue(ok, f"after a {4 * width} px render the bar was laid out wrongly: {msg}")
 
     def test_coin_node_snapshots(self):
         """Render each configured node and compare against baseline images."""

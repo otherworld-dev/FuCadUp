@@ -2862,14 +2862,26 @@ QWidget#RibbonWorkspaceBlock {
   border: none;
 }
 
-/* The workspace block leads the panel row, where Fusion puts DESIGN. One
-   workspace is defined, so the block names it rather than offering a choice,
-   and is set as text so that nothing suggests a control that does nothing. */
-QLabel#RibbonWorkspaceSelector {
+/* The block leads the panel row, where Fusion puts DESIGN. It names the area
+   on screen and opens the workbench switcher, so it reads as text until the
+   pointer is over it; see src/Gui/Ribbon/WorkbenchSwitcher.cpp. */
+QToolButton#RibbonWorkspaceSelector {
   background-color: transparent;
-  border: none;
+  border: 1px solid transparent;
+  border-radius: @InputFieldBorderRadius;
   color: @TextForegroundColor;
   padding: 0px 6px;
+  text-align: left;
+}
+
+QToolButton#RibbonWorkspaceSelector:hover {
+  background-color: @AccentHoverColor;
+  border: 1px solid @AccentColor;
+}
+
+QToolButton#RibbonWorkspaceSelector:pressed {
+  background-color: @AccentBackgroundColor;
+  border: 1px solid @AccentColor;
 }
 
 QWidget#RibbonPanelSeparator {
@@ -3211,6 +3223,40 @@ Gui--MarkingMenu {
   qproperty-outlineColor: @GeneralBorderColor;
   qproperty-accentColor: @AccentColor;
   color: @TextForegroundColor;
+}
+
+/*==================================================================================================
+Workbench switcher, see src/Gui/Ribbon/WorkbenchSwitcher.cpp
+==================================================================================================*/
+QWidget#WorkbenchSwitcher {
+  background-color: @PrimaryColor;
+  border: 1px solid @AccentColor;
+  border-radius: @InputFieldBorderRadius;
+}
+
+QListWidget#WorkbenchSwitcherList {
+  background-color: transparent;
+  border: none;
+  outline: none;
+}
+
+QListWidget#WorkbenchSwitcherList::item {
+  border: 1px solid transparent;
+  border-radius: @InputFieldBorderRadius;
+  color: @TextForegroundColor;
+  padding: 3px 4px;
+}
+
+/* Captions are the only items that cannot be picked. */
+QListWidget#WorkbenchSwitcherList::item:disabled {
+  color: @RibbonCaptionColor;
+  padding: 6px 2px 1px 2px;
+}
+
+QListWidget#WorkbenchSwitcherList::item:hover,
+QListWidget#WorkbenchSwitcherList::item:selected {
+  background-color: @AccentHoverColor;
+  border: 1px solid @AccentColor;
 }
 
 /*==================================================================================================

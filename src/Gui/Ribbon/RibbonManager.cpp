@@ -58,6 +58,7 @@
 #include "RibbonPage.h"
 #include "RibbonPanel.h"
 #include "RibbonPanelMenu.h"
+#include "WorkbenchSwitcher.h"
 
 
 using namespace Gui;
@@ -426,6 +427,9 @@ int RibbonManager::indexOfTab(const QString& id) const
 
 void RibbonManager::onWorkbenchActivated(const QString& workbench)
 {
+    // Whichever way the switch came, it is one the switcher can offer again.
+    WorkbenchSwitcher::noteWorkbenchUsed(workbench);
+
     if (updating || ribbonBar.isNull()) {
         return;
     }
@@ -446,13 +450,68 @@ void RibbonManager::onTabActivated(int index)
     const TabDefinition* tab = visibleTabs[index];
     if (!tab->context && !tab->workbench.isEmpty()
         && tab->workbench.toStdString() != WorkbenchManager::instance()->activeName()) {
-        // The workbench has to come up first: it is what registers the commands
-        // the page is about to resolve.
-        Base::StateLocker lock(updating);
-        Application::Instance->activateWorkbench(tab->workbench.toLatin1().constData());
+        {
+            // The workbench has to come up first: it is what registers the commands
+            // the page is about to resolve.
+            Base::StateLocker lock(updating);
+            Application::Instance->activateWorkbench(tab->workbench.toLatin1().constData());
+        }
+
+        // The lock kept onWorkbenchActivated() from rebuilding the strip, so a tab
+        // that only stood for the workbench just left would stay behind, the way
+        // MESH did after clicking SOLID. The strip is rebuilt on the next turn,
+        // since this runs inside the tab bar's own signal, and that builds the
+        // page too.
+        const QString workbench = tab->workbench;
+        if (stripFollows(workbench)) {
+            QTimer::singleShot(0, this, [this, workbench]() {
+                if (WorkbenchManager::instance()->activeName() == workbench.toStdString()) {
+                    rebuildTabs(workbench);
+                }
+            });
+            return;
+        }
+        showWorkbench(workbench);
     }
 
     buildPage(index);
+}
+
+void RibbonManager::showWorkbench(const QString& workbench)
+{
+    QStringList available;
+    {
+        Base::PyGILStateLocker lock;
+        available = Application::Instance->workbenches();
+    }
+
+    // The switcher lists the ribbon's own areas first and names them after their
+    // tabs, and the block names the area on screen the same way.
+    std::vector<WorkbenchSwitcher::Area> areas;
+    for (const TabDefinition& tab : workspaceTabs) {
+        if (tab.workbench.isEmpty() || !available.contains(tab.workbench)) {
+            continue;
+        }
+        const bool listed = std::any_of(areas.begin(), areas.end(), [&tab](const auto& area) {
+            return area.workbench == tab.workbench;
+        });
+        if (!listed) {
+            areas.push_back({tab.workbench, translateRibbon(tab.id)});
+        }
+    }
+
+    WorkbenchSwitcher* switcher = WorkbenchSwitcher::instance();
+    switcher->setAreas(areas);
+    if (!ribbonBar.isNull()) {
+        ribbonBar->setWorkspaceTitle(switcher->titleFor(workbench));
+    }
+}
+
+bool RibbonManager::stripFollows(const QString& workbench) const
+{
+    return std::any_of(visibleTabs.begin(), visibleTabs.end(), [&workbench](const TabDefinition* tab) {
+        return (tab->passthrough || tab->generated) && tab->workbench != workbench;
+    });
 }
 
 void RibbonManager::loadWorkspace()
@@ -487,8 +546,6 @@ void RibbonManager::loadWorkspace()
     }
 
     const QJsonObject root = document.object();
-
-    workspaceName = root.value(QLatin1String("name")).toString();
 
     const QJsonArray tabs = root.value(QLatin1String("tabs")).toArray();
     for (int i = 0; i < tabs.size(); ++i) {
@@ -627,7 +684,7 @@ void RibbonManager::rebuildTabs(const QString& workbench)
 
     loadWorkspace();
 
-    ribbonBar->setWorkspaceName(workspaceName);
+    showWorkbench(workbench);
 
     QStringList available;
     {

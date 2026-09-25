@@ -121,7 +121,11 @@ const std::unordered_map<std::string_view, const char*> shortcuts = {
     // The constraints the sketch letters displaced. Each keeps a letter that
     // says what it does, now behind the K that the other dimensions use.
     {"Sketcher_ConstrainDistanceX", "K, H"},
-    {"Sketcher_CompConstrainRadDia", "K, C"},
+    // Radiam rather than the RadDia drop-down it stands in for: the drop-down only
+    // builds an action while SeparatedDimensioningTools is on, so in the default
+    // mode "K, C" was bound to nothing. Radiam does the same job (radius on an
+    // arc, diameter on a circle) and is in the Sketcher menu in every mode.
+    {"Sketcher_ConstrainRadiam", "K, C"},
     {"Sketcher_ConstrainTangent", "K, T"},
     {"Sketcher_ConstrainPointOnObject", "K, N"},
     {"Sketcher_ConstrainParallel", "K, P"},

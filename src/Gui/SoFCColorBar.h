@@ -102,6 +102,9 @@ private:
     std::unique_ptr<ColorScaleCoinPresentation> presentation;
     SbVec2s windowSize;
     float boxWidth {-1.0F};
+    /// The size boxWidth was measured at. The labels are a fixed number of pixels, so
+    /// their width in the bar's layout units only holds for that size.
+    SbVec2s boxWidthSize {0, 0};
 };
 
 }  // namespace Gui

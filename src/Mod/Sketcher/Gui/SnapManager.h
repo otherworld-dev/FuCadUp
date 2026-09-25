@@ -196,7 +196,7 @@ private:
 
     double snapAngle;
     double snapRadiusPixels = 8.0;
-    double gridSnapTolerancePixels = 15.0;
+    double gridSnapTolerancePixels = 8.0;
 
     std::optional<SnapResult> lastSnapResult;
 

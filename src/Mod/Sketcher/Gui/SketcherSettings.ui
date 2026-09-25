@@ -459,7 +459,7 @@ This setting is only for the toolbar. Whichever you choose, all tools are always
          <double>100.000000000000000</double>
         </property>
         <property name="value">
-         <double>15.000000000000000</double>
+         <double>8.000000000000000</double>
         </property>
         <property name="prefEntry" stdset="0">
          <cstring>GridSnapTolerance</cstring>

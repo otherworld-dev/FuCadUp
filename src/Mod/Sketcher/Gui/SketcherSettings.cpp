@@ -22,6 +22,8 @@
  *                                                                         *
  ***************************************************************************/
 
+#include <cmath>
+
 #include <QMessageBox>
 #include <QPainter>
 #include <QPixmap>
@@ -31,7 +33,9 @@
 #include <App/Application.h>
 #include <Base/Console.h>
 #include <Base/Interpreter.h>
+#include <Base/Quantity.h>
 #include <Gui/Command.h>
+#include <Gui/ViewportGrid.h>
 
 #include "SketcherSettings.h"
 #include "ui_SketcherSettings.h"
@@ -393,7 +397,19 @@ bool SketcherSettingsGrid::event(QEvent* event)
 void SketcherSettingsGrid::saveSettings()
 {
     ui->checkBoxShowGrid->onSave();
-    ui->gridSize->onSave();
+    // An absent GridSize means "follow the unit schema" (10 mm metric, 1 inch imperial).
+    // Writing the default back on every OK would pin it to whichever schema was active
+    // then, so only save it once it has been set to something else.
+    const bool gridSizeUnset
+        = App::GetApplication()
+              .GetParameterGroupByPath(
+                  "User parameter:BaseApp/Preferences/Mod/Sketcher/General/GridSize"
+              )
+              ->GetASCII("GridSize", "")
+              .empty();
+    if (!gridSizeUnset || std::abs(ui->gridSize->value().getValue() - Gui::gridBaseSpacing()) > 1e-9) {
+        ui->gridSize->onSave();
+    }
     ui->checkBoxGridAuto->onSave();
     ui->gridSizePixelThreshold->onSave();
     ui->gridTransparency->onSave();
@@ -418,6 +434,9 @@ void SketcherSettingsGrid::saveSettings()
 void SketcherSettingsGrid::loadSettings()
 {
     ui->checkBoxShowGrid->onRestore();
+    // onRestore() falls back to what the box shows, so show the schema's default first
+    // rather than the 10 mm from the .ui file.
+    ui->gridSize->setValue(Base::Quantity(Gui::gridBaseSpacing(), Base::Unit::Length));
     ui->gridSize->onRestore();
     ui->checkBoxGridAuto->onRestore();
     ui->gridSizePixelThreshold->onRestore();

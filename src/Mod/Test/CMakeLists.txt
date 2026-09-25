@@ -40,10 +40,12 @@ SET(Test_SRCS
     TestOriginPlaneHover.py
     TestNavigationBarIcons.py
     TestFuCadIcons.py
+    TestWorkbenchSwitcher.py
     TestFusionShortcuts.py
     TestExtrudeFlip.py
     TestGizmoValueLabels.py
     TestPatternPanel.py
+    TestViewportProjection.py
     TestMeasureHover.py
     TestPartDesignLetters.py
     TestRibbon.py
@@ -52,11 +54,13 @@ SET(Test_SRCS
     TestShellVocabulary.py
     TestFeatureDialogs.py
     TestFuCadDefaults.py
+    TestViewCube.py
     TestSketcherSnapFeedback.py
     TestSketchPlanePick.py
     TestMarkingMenu.py
     TestTimeline.py
     TestPartDesignDialogTitles.py
+    TestGridUnits.py
     TestRibbonStrings.py
     TestSketchStatusChip.py
     # Not a suite: pins the preferences a GUI test depends on and puts them back.

@@ -235,6 +235,15 @@ private:
     int indexOfTab(const TabDefinition* tab) const;
     int indexOfTab(const QString& id) const;
 
+    /**
+     * Hands the workbench switcher the ribbon's areas and names \a workbench on
+     * the block, by its tab's title where it has one.
+     */
+    void showWorkbench(const QString& workbench);
+    /// Whether the strip has a tab that only stands for a workbench other than
+    /// \a workbench, and so has to be rebuilt when \a workbench becomes active.
+    bool stripFollows(const QString& workbench) const;
+
     static bool parseTab(const QJsonObject& source, TabDefinition& tab);
     static bool parsePanel(const QJsonObject& source, PanelDefinition& panel);
     static bool parseItem(const QJsonObject& source, ItemDefinition& item);
@@ -242,9 +251,6 @@ private:
     static RibbonManager* _instance;
 
     QPointer<RibbonBar> ribbonBar;
-    /// What the definition calls itself, shown in the block at the left of
-    /// the strip. Never a workbench name.
-    QString workspaceName;
     std::vector<TabDefinition> workspaceTabs;
     /// Filled once by loadWorkspace(), so that pushed tabs stay addressable.
     std::vector<TabDefinition> contextTabs;

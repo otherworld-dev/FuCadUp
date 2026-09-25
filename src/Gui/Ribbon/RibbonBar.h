@@ -28,7 +28,6 @@
 
 #include <FCGlobal.h>
 
-class QLabel;
 class QStackedWidget;
 class QTabBar;
 class QToolButton;
@@ -42,9 +41,9 @@ namespace Ribbon
  * The tab strip of the Fusion-style shell: a QTabBar stacked on top of a
  * QStackedWidget so that selecting a tab swaps the row of tool panels below it.
  *
- * The workspace selector leads the panel row, the way Fusion's workspace
- * drop-down does: a block as tall as the panels, to the left of every page
- * rather than inside any of them.
+ * The workbench switcher leads the panel row, where Fusion puts its workspace
+ * drop-down: a block as tall as the panels, to the left of every page rather
+ * than inside any of them, naming the area the ribbon is showing.
  *
  * The bar only owns the presentation; RibbonManager decides which tabs exist
  * and fills the pages.
@@ -80,9 +79,13 @@ public:
     int currentIndex() const;
     void setCurrentIndex(int index);
 
-    /// Names the workspace the ribbon has loaded. The block shows this and
-    /// nothing else: a workbench is the core's own idea, not the shell's.
-    void setWorkspaceName(const QString& name);
+    /**
+     * Names the area the ribbon is showing on the block, the way the shell names
+     * it: a tab's title where the ribbon has a tab for the workbench.
+     */
+    void setWorkspaceTitle(const QString& title);
+    /// Opens the workbench switcher under the block.
+    void showWorkbenchSwitcher();
 
 Q_SIGNALS:
     void tabActivated(int index);
@@ -97,8 +100,8 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-    /// Builds the block that names the workspace, at the left of the strip
-    /// where Fusion puts its own workspace control.
+    /// Builds the block that names the area and opens the workbench switcher,
+    /// at the left of the strip where Fusion puts its own workspace control.
     QWidget* createWorkspaceBlock(QWidget* parent);
 
     /// The buttons of the page on screen that the keyboard can reach, in
@@ -114,7 +117,7 @@ private:
 
     QTabBar* tabBar;
     QStackedWidget* pageStack;
-    QLabel* workspaceLabel {nullptr};
+    QToolButton* workspaceButton {nullptr};
 
     Q_DISABLE_COPY(RibbonBar)
 };

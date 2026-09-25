@@ -36,12 +36,14 @@ class PatternPanelCase(unittest.TestCase):
     _draw_rectangle = staticmethod(extrude.ExtrudePanelCase._draw_rectangle)
     _find_widget = staticmethod(extrude.ExtrudePanelCase._find_widget)
     _refresh_view_widgets = extrude.TestExtrudeDrag._refresh_view_widgets
+    _pixels = extrude.TestExtrudeDrag._pixels
     _qt_pos = extrude.TestExtrudeDrag._qt_pos
     _mouse = extrude.TestExtrudeDrag._mouse
     _wait = gizmo_labels.GizmoLabelCase._wait
     _press = gizmo_labels.GizmoLabelCase._press
     _type = gizmo_labels.GizmoLabelCase._type
     _select_all = gizmo_labels.GizmoLabelCase._select_all
+    _screen_point = gizmo_labels.GizmoLabelCase._screen_point
     _box_centre_on_screen = gizmo_labels.GizmoLabelCase._box_centre_on_screen
     _dragger_under = gizmo_labels.TestGizmoValueLabels._dragger_under
     SO_SWITCH_NONE = extrude.TestExtrudeDrag.SO_SWITCH_NONE
@@ -181,71 +183,6 @@ class PatternPanelCase(unittest.TestCase):
         search.apply(self.viewer.getSoRenderManager().getSceneGraph())
         self._last_search_action = search
         return search
-
-    def _calibrated_pixels(self, point):
-        """Where `point` lands in the view, in Coin device pixels - a replacement for
-        _pixels() (view.getPointOnScreen(), i.e. View3DInventorViewer::
-        getPointOnViewport) for the grip-finding and drag-driving code below (finding
-        a dragger's grip, and converting a requested drag distance into a screen
-        distance to move the mouse by). That projection is wrong by up to the view's
-        own aspect ratio whenever the 3D view is taller than it is wide - which
-        happens over Remote Desktop, since the virtual display (and so the 3D view)
-        follows the shape of the client window - because it builds its view volume
-        from SoCamera::getViewVolume(aspect), the aspect-only overload, unlike every
-        other caller in View3DInventorViewer.cpp (including projectPointToLine, used
-        below), which use the zero-argument form that correctly honours the camera's
-        own viewportMapping. See followups-B-flake-investigation.md for the measured
-        ~1.83x error in a portrait view and the callers involved. This does not touch
-        that function - out of scope, core Gui rather than test code - and works
-        around it instead.
-
-        Calibrated from view.projectPointToLine(), which is unaffected by the same
-        bug. Every dragger test in this module uses an orthographic camera (set
-        explicitly in setUp() with setCameraType() - viewIsometric() only sets the
-        camera's orientation, not its type), so screen position is an affine
-        function of world position with no perspective divide: three calibration
-        points - the viewport's own centre pixel, and one small step from it along
-        each of Coin's own pixel axes - are enough to invert that affine map exactly
-        for any point, whatever the view's aspect ratio or shape."""
-
-        vp = self.viewer.getSoRenderManager().getViewportRegion()
-        size = vp.getViewportSizePixels()
-        width, height = float(size[0]), float(size[1])
-        # world_at() below is read through projectPointToLine(), which only accepts
-        # integer pixels (SbVec2s). ox/oy/step are rounded here, once, to plain
-        # ints, so the two points sampled are exactly ox,oy and ox+step,oy/oy+step
-        # with nothing left to truncate at the call site - the delta divided into
-        # below (step) is then guaranteed to be the delta actually sampled, not a
-        # float that world_at() would have quietly rounded by up to 1 px (which,
-        # applied as a *scale* about the view centre, would grow with distance from
-        # the centre and get worse in a smaller viewport).
-        ox, oy = int(width / 2.0), int(height / 2.0)
-        step = max(1, int(min(width, height) / 4.0))
-
-        def world_at(pixel):
-            near, _far = self.view.projectPointToLine(int(pixel[0]), int(pixel[1]))
-            return near
-
-        base = world_at((ox, oy))
-        along_x = world_at((ox + step, oy)) - base
-        along_y = world_at((ox, oy + step)) - base
-
-        # `target`'s own position within the (along_x, along_y) plane - solved, not
-        # assumed axis-aligned, so a rolled camera still inverts correctly. Any part
-        # of target's own offset along the view direction (it need not sit on the
-        # calibration points' own near-plane) drops out of a dot product with an
-        # in-plane vector, so it needs no removing by hand.
-        target = FreeCAD.Vector(point) - base
-        gxx, gxy = along_x.dot(along_x), along_x.dot(along_y)
-        gyx, gyy = along_y.dot(along_x), along_y.dot(along_y)
-        rx, ry = target.dot(along_x), target.dot(along_y)
-        det = gxx * gyy - gxy * gyx
-        if abs(det) < 1e-9:
-            self.fail("the view's own projection could not be calibrated")
-        a = (rx * gyy - ry * gxy) / det
-        b = (gxx * ry - gyx * rx) / det
-
-        return (ox + a * step, oy + b * step)
 
     # -- the task panel's width ----------------------------------------------
 
@@ -805,8 +742,9 @@ class TestLinearArrows(PatternPanelCase):
         self._refresh_view_widgets()
         self.view.viewIsometric()
         # viewIsometric() only sets the camera's orientation (View3DPy.cpp), not its
-        # type; _calibrated_pixels()'s affine-map assumption needs an orthographic
-        # one (the usual default, but made explicit here rather than assumed).
+        # type; the drag math in _drag_arrow_by below assumes an orthographic one
+        # (screen position affine in world position, no perspective divide), so it
+        # is made explicit here rather than assumed.
         self.view.setCameraType("Orthographic")
         self.view.fitAll()
         self._process_events(300)
@@ -819,14 +757,14 @@ class TestLinearArrows(PatternPanelCase):
 
     def _arrow_grip(self):
         """A point on the arrow near its tip, found by asking the scene what is under
-        it. The candidate points come from _calibrated_pixels(), not _pixels(), so
-        this still finds the real, on-screen arrow in a view that is taller than it
-        is wide - see _calibrated_pixels() for why _pixels() cannot be trusted there."""
+        it. The candidate points come from _pixels() (view.getPointOnScreen(), i.e.
+        View3DInventorViewer::getPointOnViewport), the product's own screen
+        projection - correct at any viewport shape."""
 
         from pivy import coin
 
         manager = self.viewer.getSoRenderManager()
-        tip, base = self._calibrated_pixels(self._tip()), self._calibrated_pixels(self.BASE)
+        tip, base = self._pixels(self._tip()), self._pixels(self.BASE)
         for along in (0.0, 0.03, 0.06, 0.1, 0.15, 0.2):
             pixels = (tip[0] + (base[0] - tip[0]) * along, tip[1] + (base[1] - tip[1]) * along)
             pick = coin.SoRayPickAction(manager.getViewportRegion())
@@ -849,13 +787,10 @@ class TestLinearArrows(PatternPanelCase):
 
         switches = self._switches_above_arrow()
         grip = self._arrow_grip()
-        # _calibrated_pixels(), not _pixels(), for the same reason as the grip itself:
-        # a view taller than it is wide would otherwise turn "millimetres" into some
-        # other, wrong distance on screen (found by forcing a portrait window and
-        # watching test_dragging_the_arrow_to_its_base_keeps_it_under_the_pointer
-        # overshoot its floor at 0 mm with _pixels() still in place here).
-        start = self._qt_pos(self._calibrated_pixels(self.BASE))
-        end = self._qt_pos(self._calibrated_pixels(self.BASE + FreeCAD.Vector(10.0, 0.0, 0.0)))
+        # start/end pin down the on-screen per-mm rate for the drag below, through
+        # _pixels() - the product's own projection, correct at any viewport shape.
+        start = self._qt_pos(self._pixels(self.BASE))
+        end = self._qt_pos(self._pixels(self.BASE + FreeCAD.Vector(10.0, 0.0, 0.0)))
         per_mm = (end - start) / 10.0
         self._mouse(QtCore.QEvent.MouseMove, grip, QtCore.Qt.NoButton, QtCore.Qt.NoButton)
         self._process_events()
@@ -990,6 +925,60 @@ class TestLinearArrows(PatternPanelCase):
         self.assertEqual(self.pattern.Occurrences, 4)
         self._process_events(250)
         self.assertAlmostEqual(self.pattern.Shape.Volume, 4 * PAD_VOLUME, places=3)
+
+    def test_the_arrow_is_grabbable_in_a_tall_view(self):
+        """The grips are found through the product's own projection at any view shape -
+        this is what _calibrated_pixels() used to work around."""
+
+        window = FreeCADGui.getMainWindow()
+        original = window.size()
+        # tearDown() closes self.doc unconditionally, and unittest always runs
+        # tearDown() before any addCleanup (doCleanups() only runs after it) - so an
+        # addCleanup alone cannot make the restore below happen before the document
+        # closes. Taking the close over ourselves through addCleanup instead, and
+        # blanking self.doc so tearDown()'s own close is a no-op (its
+        # "if self.doc is not None" guard, and _close_editing()'s AttributeError
+        # catch, both already allow for that), lets the window-restore - registered
+        # after, so addCleanup's LIFO order runs it first - resize the window while
+        # the document and its camera still exist. TestViewportProjection.
+        # _restore_window_size hit exactly this: restoring after the document had
+        # already closed logged a camera-reference exception on every test.
+        doc = self.doc
+        self.doc = None
+
+        def close_doc():
+            if doc.Name in FreeCAD.listDocuments():
+                FreeCAD.closeDocument(doc.Name)
+
+        self.addCleanup(close_doc)
+        self.addCleanup(lambda: (window.resize(original), self._process_events(300)))
+
+        def viewport_shape():
+            size = self.viewer.getSoRenderManager().getViewportRegion().getViewportSizePixels()
+            return int(size[0]), int(size[1])
+
+        window.resize(700, 1300)
+        self._process_events(400)
+        self.view.fitAll()
+        self._process_events(300)
+        width, height = viewport_shape()
+        if height <= width:
+            # A skip proves nothing here - this test exists to prove the grips are
+            # found through a tall viewport. Try the MDI sub-window directly, the
+            # way TestViewportProjection._shape_view does, before giving up.
+            mdi_area = window.findChild(QtWidgets.QMdiArea)
+            sub_window = mdi_area.activeSubWindow() if mdi_area is not None else None
+            if sub_window is not None:
+                sub_window.resize(700, 1300)
+                self._process_events(400)
+                self.view.fitAll()
+                self._process_events(300)
+                width, height = viewport_shape()
+        self.assertGreater(
+            height, width, "the window manager would not give a tall viewport"
+        )
+
+        self._arrow_grip()  # fails with "the arrow is not under any of the points tried"
 
 
 class TestCountBoxes(PatternPanelCase):
@@ -1334,7 +1323,8 @@ class TestPolarHandle(PatternPanelCase):
         self._refresh_view_widgets()
         self.view.viewIsometric()
         # See TestLinearArrows.setUp: viewIsometric() sets orientation only, not
-        # camera type; _calibrated_pixels() needs an orthographic one.
+        # camera type; the drag math in _drag_handle_towards below needs an
+        # orthographic one.
         self.view.setCameraType("Orthographic")
         self.view.fitAll()
         self._process_events(300)
@@ -1531,15 +1521,15 @@ class TestPolarHandle(PatternPanelCase):
     def _handle_grip(self, value, arm_length):
         """A point on the handle's arm at the given angle, found by asking the scene
         what is under it, the way _arrow_grip does for the linear arrows (including
-        using _calibrated_pixels() rather than _pixels(), for the same reason)."""
+        using _pixels(), the product's own projection)."""
 
         from pivy import coin
 
         manager = self.viewer.getSoRenderManager()
         direction = FreeCAD.Rotation(FreeCAD.Vector(0, 0, 1), value).multVec(self.RADIAL)
         direction.normalize()
-        tip = self._calibrated_pixels(self.PIVOT + direction * arm_length)
-        base = self._calibrated_pixels(self.PIVOT)
+        tip = self._pixels(self.PIVOT + direction * arm_length)
+        base = self._pixels(self.PIVOT)
         for along in (0.0, 0.03, 0.06, 0.1, 0.15, 0.2):
             pixels = (tip[0] + (base[0] - tip[0]) * along, tip[1] + (base[1] - tip[1]) * along)
             pick = coin.SoRayPickAction(manager.getViewportRegion())
@@ -1567,8 +1557,7 @@ class TestPolarHandle(PatternPanelCase):
         def screen_for(value):
             direction = FreeCAD.Rotation(axis, value).multVec(self.RADIAL)
             direction.normalize()
-            # _calibrated_pixels(), not _pixels() - see _drag_arrow_by's own note.
-            return self._qt_pos(self._calibrated_pixels(self.PIVOT + direction * arm_length))
+            return self._qt_pos(self._pixels(self.PIVOT + direction * arm_length))
 
         grip = self._handle_grip(start_value, arm_length)
         self._mouse(QtCore.QEvent.MouseMove, grip, QtCore.Qt.NoButton, QtCore.Qt.NoButton)
