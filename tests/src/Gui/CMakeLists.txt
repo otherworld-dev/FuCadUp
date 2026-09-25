@@ -18,6 +18,7 @@ add_executable(Gui_tests_run
         ViewportGridTest.cpp
         ViewCubeLayoutTest.cpp
         SoViewCubeTest.cpp
+        ViewVolumeCorrectionTest.cpp
 )
 
 # Qt tests
