@@ -8,6 +8,8 @@ from upstream FreeCAD merges are not listed, only the work done in this fork.
 
 ## [Unreleased]
 
+## [26.4.0] - 2026-09-25
+
 The first FuCadUp release. It carries on from FuCad 26.3.2 with a new name, a reworked
 ribbon and timeline, values shown in the 3D view while you edit, new pattern tools and a
 new view cube. The fork is up to date with FreeCAD as of 9 September 2026.
